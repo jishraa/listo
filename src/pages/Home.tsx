@@ -5,6 +5,8 @@ import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
 import Sheet from '../components/ui/Sheet'
+import InstallBanner from '../components/InstallBanner'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
 import type { ListType, List } from '../types'
 
@@ -107,6 +109,7 @@ export default function Home() {
   const { user, displayName } = useAuthStore()
   const store = useListsStore()
   const navigate = useNavigate()
+  const installPrompt = useInstallPrompt()
 
   const [createOpen, setCreateOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<List | null>(null)
@@ -256,6 +259,8 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        <InstallBanner {...installPrompt} />
 
         {hasLists && (
           <div style={{ padding: '0 16px 12px' }}>
