@@ -35,12 +35,7 @@ function mergeQuantities(a: string | null | undefined, b: string): string {
 }
 
 function Overlay({ onClick }: { onClick?: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 }}
-    />
-  )
+  return <div className="sheet-overlay" onClick={onClick} />
 }
 
 export default function ListDetail() {
@@ -428,19 +423,6 @@ export default function ListDetail() {
   }
 
   // ── Sheet styles ────────────────────────────────────────────
-  const sheetStyle: CSSProperties = {
-    position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-    width: '100%', maxWidth: 480,
-    background: 'rgba(5, 11, 22, 0.97)',
-    backdropFilter: 'blur(28px)',
-    WebkitBackdropFilter: 'blur(28px)',
-    borderTop: '1px solid rgba(0, 212, 255, 0.16)',
-    borderRadius: '24px 24px 0 0',
-    zIndex: 101, animation: 'slide-up 0.3s cubic-bezier(0.22,1,0.36,1)',
-    paddingBottom: 'env(safe-area-inset-bottom, 16px)',
-    boxShadow: '0 -12px 60px rgba(0,0,0,0.75)',
-  }
-  const handle  = <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,212,255,0.22)', margin: '14px auto 6px' }} />
   const sectionLabel: CSSProperties = {
     fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
     color: 'var(--text-3)', textTransform: 'uppercase',
@@ -672,8 +654,8 @@ export default function ListDetail() {
       {showAdd && (
         <>
           <Overlay onClick={() => { resetAdd(); setShowAdd(false) }} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ position: 'relative' }}>
                 <div className="flex gap-2">
@@ -710,9 +692,9 @@ export default function ListDetail() {
                 {suggestions.length > 0 && (
                   <div style={{
                     position: 'absolute', top: '100%', left: 0, right: 52, zIndex: 10,
-                    background: 'rgba(5, 11, 22, 0.98)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                    borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                    border: '1px solid rgba(0,212,255,0.15)', marginTop: 4,
+                    background: 'var(--bg-card)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                    borderRadius: 10, boxShadow: 'var(--shadow)',
+                    border: '1px solid var(--border)', marginTop: 4,
                   }}>
                     {suggestions.map(s => (
                       <button key={s} onClick={() => { setAddInput(s); addInputRef.current?.focus() }}
@@ -724,10 +706,18 @@ export default function ListDetail() {
                 )}
               </div>
 
-              {/* Category chips */}
+              {/* Parsed qty badge */}
+              {parsedInput.qty && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qty</span>
+                  <span style={{ padding: '2px 10px', borderRadius: 100, fontSize: 12, fontWeight: 700, background: 'var(--accent)', color: '#04080f' }}>{parsedInput.qty}</span>
+                </div>
+              )}
+
+              {/* Category chips — show only auto-detected when not sticky */}
               {cats.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {cats.map(c => {
+                  {(addCategory && !addCatSticky ? cats.filter(c => c.id === addCategory) : cats).map(c => {
                     const active = addCategory === c.id
                     return (
                       <button key={c.id}
@@ -736,11 +726,17 @@ export default function ListDetail() {
                           padding: '4px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                           background: active ? c.color : 'var(--bg-input)',
                           color: active ? '#fff' : 'var(--text-2)',
-                          border: `1px solid ${active ? c.color : 'rgba(255,255,255,0.08)'}`,
+                          border: `1px solid ${active ? c.color : 'var(--border)'}`,
                           transition: 'all 0.15s',
                         }}>{c.name}</button>
                     )
                   })}
+                  {addCategory && !addCatSticky && (
+                    <button onClick={() => setAddCatSticky(true)}
+                      style={{ padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: '1px solid var(--border)' }}>
+                      Change
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -752,8 +748,8 @@ export default function ListDetail() {
       {showMerge && mergeTarget && pendingAdd && (
         <>
           <Overlay />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontWeight: 700, fontSize: 16 }}>"{mergeTarget.title}" already exists</p>
               <p className="text-muted text-sm">
@@ -772,8 +768,8 @@ export default function ListDetail() {
       {menuOpen && (
         <>
           <Overlay onClick={() => setMenuOpen(false)} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '8px 0 8px' }}>
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
@@ -807,8 +803,8 @@ export default function ListDetail() {
       {sortMenuOpen && (
         <>
           <Overlay onClick={() => setSortMenuOpen(false)} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-3)', margin: '10px 20px 6px' }}>Sort by</p>
             {([
               { key: 'date', label: 'Date added', hint: 'Newest first' },
@@ -833,8 +829,8 @@ export default function ListDetail() {
       {renaming && (
         <>
           <Overlay onClick={() => setRenaming(false)} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Rename list</p>
               <input
@@ -865,8 +861,8 @@ export default function ListDetail() {
       {confirmDelete && (
         <>
           <Overlay onClick={() => setConfirmDelete(false)} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Delete this list?</p>
               <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
@@ -884,14 +880,27 @@ export default function ListDetail() {
         </>
       )}
 
-      {/* ── Insights sheet ── */}
+      {/* ── Insights (full screen) ── */}
       {insightsOpen && (
-        <>
-          <Overlay onClick={() => setInsightsOpen(false)} />
-          <div style={{ ...sheetStyle, maxHeight: '85vh', overflowY: 'auto' }}>
-            {handle}
-            <div style={{ padding: '10px 20px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Insights · {list.emoji} {list.name}</p>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'var(--bg)', display: 'flex', flexDirection: 'column',
+          animation: 'slide-up 0.3s var(--ease)',
+        }}>
+          {/* Nav */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '14px 16px', borderBottom: '1px solid var(--border)',
+            paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))',
+          }}>
+            <button onClick={() => setInsightsOpen(false)}
+              style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'var(--bg-input)', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ArrowLeft size={18} />
+            </button>
+            <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Insights · {list.emoji} {list.name}</span>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Summary stats */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -1009,19 +1018,16 @@ export default function ListDetail() {
               {insTotal === 0 && (
                 <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 14, padding: '16px 0' }}>Add some items to see insights.</p>
               )}
-
-              <button className="btn btn-secondary btn-full" onClick={() => setInsightsOpen(false)}>Close</button>
             </div>
           </div>
-        </>
       )}
 
       {/* ── Share sheet ── */}
       {shareOpen && (
         <>
           <Overlay onClick={() => setShareOpen(false)} />
-          <div style={sheetStyle}>
-            {handle}
+          <div className="sheet">
+            <div className="sheet-handle" />
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Share List</p>
               <p className="text-muted text-sm">Anyone with this link can join and collaborate — no account needed.</p>
@@ -1047,11 +1053,11 @@ export default function ListDetail() {
         <div style={{
           position: 'fixed', bottom: 84, left: 16, right: 16, zIndex: 200,
           display: 'flex', alignItems: 'center', gap: 12,
-          background: 'rgba(5, 11, 22, 0.96)',
+          background: 'var(--bg-card)',
           backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0,212,255,0.20)',
+          border: '1px solid var(--border)',
           borderRadius: 16, padding: '13px 16px',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,212,255,0.06)',
+          boxShadow: 'var(--shadow)',
         }}>
           <p style={{ flex: 1, fontSize: 14, color: 'var(--text)', margin: 0 }}>
             "<span style={{ fontWeight: 600 }}>{undoItem.title}</span>" deleted

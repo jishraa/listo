@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, UserCircle, RefreshCw, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Plus, Home as HomeIcon, User, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
@@ -11,11 +11,11 @@ import { formatRelativeTime } from '../lib/utils'
 import type { ListType, List } from '../types'
 
 function ListCard({
-  list, isOwner, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, items,
+  list, isOwner, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare, items,
 }: {
   list: List; isOwner: boolean; isPinned: boolean; items: { completed: boolean }[]
   onOpen: () => void; onPin: () => void; onMoveTop: () => void
-  onRename: () => void; onDuplicate: () => void; onDelete: () => void; onLeave: () => void
+  onRename: () => void; onDuplicate: () => void; onDelete: () => void; onLeave: () => void; onShare: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const total = items.length
@@ -83,6 +83,9 @@ function ListCard({
           <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onMoveTop(); setMenuOpen(false) }}>
             <ArrowUp size={16} /> Move to top
           </button>
+          <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onShare(); setMenuOpen(false) }}>
+            <Share2 size={16} /> Share list
+          </button>
           {isOwner && <>
             <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { setMenuOpen(false); onRename() }}>
               <Pencil size={16} /> Rename
@@ -109,7 +112,44 @@ export default function Home() {
   const { user, displayName } = useAuthStore()
   const store = useListsStore()
   const navigate = useNavigate()
+  const location = useLocation()
   const installPrompt = useInstallPrompt()
+
+  const pageRef = useRef<HTMLDivElement>(null)
+  const touchStartY = useRef(0)
+  const [pullY, setPullY] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const scrollTop = pageRef.current?.scrollTop ?? 0
+    if (scrollTop > 0 || isRefreshing) return
+    const delta = e.touches[0].clientY - touchStartY.current
+    if (delta > 0) setPullY(Math.min(delta * 0.55, 72))
+  }
+
+  const handleTouchEnd = async () => {
+    if (pullY >= 60) {
+      setIsRefreshing(true)
+      setPullY(0)
+      await store.refreshLists()
+      setIsRefreshing(false)
+    } else {
+      setPullY(0)
+    }
+  }
+
+  const handleShare = async (list: List) => {
+    const url = `${window.location.origin}/join/${list.invite_code}`
+    if (navigator.share) {
+      await navigator.share({ title: list.name, url }).catch(() => {})
+    } else {
+      await navigator.clipboard.writeText(url).catch(() => {})
+    }
+  }
 
   const [createOpen, setCreateOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<List | null>(null)
@@ -120,6 +160,7 @@ export default function Home() {
   const [showOwnCompleted, setShowOwnCompleted] = useState(false)
   const [showSharedCompleted, setShowSharedCompleted] = useState(false)
   const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -213,8 +254,6 @@ export default function Home() {
   const activeShared = [...filteredShared].sort(byRecent).filter(l => !isAllDone(l.id))
   const completedShared = [...filteredShared].sort(byRecent).filter(l => isAllDone(l.id))
 
-  const firstName = displayName.split(' ')[0] || 'there'
-
   const renderCard = (list: List, isOwner: boolean) => (
     <ListCard
       key={list.id}
@@ -229,6 +268,7 @@ export default function Home() {
       onDuplicate={() => store.duplicateList(list.id)}
       onDelete={() => setDeleteTarget(list)}
       onLeave={() => store.leaveList(list.id)}
+      onShare={() => handleShare(list)}
     />
   )
 
@@ -236,35 +276,62 @@ export default function Home() {
 
   return (
     <div className="app-container">
-      <div className="page">
-        <div style={{ padding: '28px 16px 14px' }} className="flex items-center justify-between">
-          <div>
-            <p style={{ fontSize: 13, color: 'var(--text-3)', letterSpacing: '0.04em', marginBottom: 4 }}>
-              Hey, <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{firstName}</span>
-            </p>
-            <h2 style={{
-              fontSize: 24, fontWeight: 800, letterSpacing: -0.8, marginTop: 0,
-              background: 'linear-gradient(130deg, var(--text) 40%, var(--text-2) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-            }}>Your Lists</h2>
+      <div
+        className="page"
+        ref={pageRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull-to-refresh indicator */}
+        {(pullY > 0 || isRefreshing) && (
+          <div style={{
+            height: isRefreshing ? 56 : pullY,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', transition: isRefreshing ? 'none' : 'height 0.15s ease',
+          }}>
+            <div className={isRefreshing ? 'spinner' : undefined} style={{
+              width: 22, height: 22, borderRadius: '50%',
+              border: '2px solid var(--accent)', borderTopColor: 'transparent',
+              transform: isRefreshing ? undefined : `rotate(${pullY * 5}deg)`,
+              opacity: Math.min(pullY / 40, 1),
+            }} />
           </div>
+        )}
+
+        {/* Logo header */}
+        <div style={{ padding: '20px 16px 14px' }} className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={() => store.refreshLists()}
-              style={{ padding: 8, borderRadius: 10, border: '1px solid var(--border)' }}>
-              <RefreshCw size={17} color="var(--text-2)" />
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/profile')}
-              style={{ padding: 8, borderRadius: 10, border: '1px solid var(--border)' }}>
-              <UserCircle size={24} color="var(--text-2)" />
-            </button>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(135deg, var(--accent) 0%, #0088bb 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 14px rgba(0,212,255,0.35)',
+            }}>
+              <span style={{ fontWeight: 900, fontSize: 17, color: '#04080f', letterSpacing: -1 }}>L</span>
+            </div>
+            <span style={{
+              fontWeight: 800, fontSize: 22, letterSpacing: -0.6,
+              background: 'linear-gradient(130deg, var(--text) 30%, var(--accent) 180%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>listo</span>
           </div>
+          {hasLists && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ padding: 8, borderRadius: 10, color: searchOpen ? 'var(--accent)' : 'var(--text-2)' }}
+              onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch('') }}
+            >
+              {searchOpen ? <X size={18} /> : <Search size={18} />}
+            </button>
+          )}
         </div>
 
         <InstallBanner {...installPrompt} />
 
-        {hasLists && (
+        {hasLists && searchOpen && (
           <div style={{ padding: '0 16px 12px' }}>
-            <input className="input" placeholder="Search lists…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input className="input" placeholder="Search lists…" value={search} onChange={e => setSearch(e.target.value)} autoFocus />
           </div>
         )}
 
@@ -340,7 +407,29 @@ export default function Home() {
         </div>
       </div>
 
-      {hasLists && <button className="fab" onClick={() => setCreateOpen(true)}><Plus size={24} /></button>}
+      <nav className="bottom-nav">
+        <button className={`nav-item ${location.pathname === '/' ? 'active' : ''}`} onClick={() => navigate('/')}>
+          <HomeIcon size={22} />
+          <span>Home</span>
+        </button>
+        <button
+          onClick={() => setCreateOpen(true)}
+          style={{
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'var(--accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'none', cursor: 'pointer', flexShrink: 0,
+            marginTop: -14,
+            boxShadow: '0 0 20px rgba(0,212,255,0.45)',
+          }}
+        >
+          <Plus size={24} color="#04080f" strokeWidth={2.5} />
+        </button>
+        <button className={`nav-item ${location.pathname === '/profile' ? 'active' : ''}`} onClick={() => navigate('/profile')}>
+          <User size={22} />
+          <span>Profile</span>
+        </button>
+      </nav>
 
       <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} />
 
