@@ -571,3 +571,210 @@ a { text-decoration: none; color: inherit; }
 .text-accent     { color: var(--accent); }
 .line-through    { text-decoration: line-through; }
 .truncate        { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════════
+   LIGHT THEME  —  applied when html[data-theme="light"]
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --accent:      #0088aa;
+  --accent-dim:  rgba(0, 136, 170, 0.10);
+  --accent-mid:  rgba(0, 136, 170, 0.28);
+  --accent-glow: 0 0 14px rgba(0, 136, 170, 0.22), 0 0 4px rgba(0, 136, 170, 0.10);
+
+  --bg:       #f0f5fa;
+  --bg-card:  rgba(255, 255, 255, 0.94);
+  --bg-input: rgba(0, 0, 0, 0.04);
+
+  --text:   #0a1628;
+  --text-2: rgba(10, 22, 40, 0.58);
+  --text-3: rgba(10, 22, 40, 0.32);
+
+  --border:   rgba(0, 136, 170, 0.10);
+  --border-2: rgba(0, 136, 170, 0.26);
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:    0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 8px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+/* Background */
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background-color: #f0f5fa;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(0, 140, 200, 0.08) 0%, transparent 60%),
+    linear-gradient(rgba(0, 136, 170, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 136, 170, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 60px 60px, 60px 60px;
+  background-attachment: fixed, fixed, fixed;
+  color: #0a1628;
+}
+
+/* Header / Nav */
+[data-theme="light"] .header {
+  background: rgba(240, 245, 250, 0.94);
+  border-bottom-color: rgba(0,136,170,0.10);
+}
+
+[data-theme="light"] .bottom-nav {
+  background: rgba(240, 245, 250, 0.96);
+  border-top-color: rgba(0,136,170,0.10);
+}
+
+[data-theme="light"] .nav-item.active { text-shadow: none; }
+
+/* Card */
+[data-theme="light"] .card {
+  box-shadow: var(--shadow-sm);
+  border-color: rgba(0,136,170,0.09);
+}
+
+[data-theme="light"] .card:hover {
+  border-color: rgba(0,136,170,0.20);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(0,136,170,0.06);
+}
+
+/* Buttons */
+[data-theme="light"] .btn-primary { color: #ffffff; }
+
+[data-theme="light"] .btn-secondary {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.09);
+  border-color: rgba(0, 0, 0, 0.13);
+}
+
+[data-theme="light"] .btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .btn-danger {
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+[data-theme="light"] .btn-danger:hover {
+  background: rgba(220, 38, 38, 0.14);
+}
+
+/* Inputs */
+[data-theme="light"] .input {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(0, 136, 170, 0.14);
+}
+
+[data-theme="light"] .input:focus {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(0, 136, 170, 0.12);
+}
+
+/* Sheet */
+[data-theme="light"] .sheet-overlay { background: rgba(0, 0, 0, 0.32); }
+
+[data-theme="light"] .sheet {
+  background: rgba(247, 250, 255, 0.98);
+  border-top-color: rgba(0, 136, 170, 0.16);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.10);
+}
+
+[data-theme="light"] .sheet-handle { background: rgba(0, 136, 170, 0.22); }
+
+/* Progress */
+[data-theme="light"] .progress-bar { background: rgba(0, 0, 0, 0.07); }
+[data-theme="light"] .progress-fill { box-shadow: 0 0 6px rgba(0,136,170,0.35); }
+
+/* FAB */
+[data-theme="light"] .fab {
+  color: #ffffff;
+  animation: fab-pulse-light 3s ease-in-out infinite;
+}
+
+@keyframes fab-pulse-light {
+  0%, 100% { box-shadow: 0 0 18px rgba(0,136,170,0.38), 0 4px 12px rgba(0,136,170,0.18); }
+  50%       { box-shadow: 0 0 30px rgba(0,136,170,0.58), 0 4px 18px rgba(0,136,170,0.30); }
+}
+
+/* Spinner */
+[data-theme="light"] .spinner {
+  border-color: rgba(0, 136, 170, 0.14);
+  border-top-color: var(--accent);
+}
+
+/* Skeleton */
+[data-theme="light"] .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 136, 170, 0.09) 50%,
+    rgba(0, 0, 0, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+/* Badges */
+[data-theme="light"] .badge-green { background: rgba(0,136,170,0.10); }
+[data-theme="light"] .badge-gray  { background: rgba(0,0,0,0.06); color: var(--text-2); }
+
+/* Type icon backgrounds */
+[data-theme="light"] .type-bg-personal {
+  background: rgba(109, 40, 217, 0.08);
+  border-color: rgba(109, 40, 217, 0.16);
+}
+[data-theme="light"] .type-bg-tasks {
+  background: rgba(7, 89, 133, 0.08);
+  border-color: rgba(7, 89, 133, 0.16);
+}
+[data-theme="light"] .type-bg-shopping {
+  background: rgba(154, 52, 18, 0.08);
+  border-color: rgba(154, 52, 18, 0.16);
+}
+
+/* Error */
+[data-theme="light"] .error-msg {
+  background: rgba(220, 38, 38, 0.07);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.16);
+}
+
+/* Auth */
+[data-theme="light"] .auth-page::before {
+  background: radial-gradient(ellipse, rgba(0, 140, 200, 0.09) 0%, transparent 68%);
+}
+[data-theme="light"] .auth-page::after {
+  background: radial-gradient(ellipse, rgba(100, 40, 200, 0.05) 0%, transparent 68%);
+}
+
+[data-theme="light"] .auth-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(0, 136, 170, 0.15);
+  box-shadow:
+    0 0 0 1px rgba(0,136,170,0.04),
+    0 24px 60px rgba(0,0,0,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.80);
+}
+
+[data-theme="light"] .auth-logo .logo-icon {
+  background: rgba(0, 136, 170, 0.08);
+  border-color: rgba(0, 136, 170, 0.32);
+  animation: logo-glow-light 3s ease-in-out infinite;
+}
+
+@keyframes logo-glow-light {
+  0%, 100% { box-shadow: 0 0 22px rgba(0,136,170,0.22), inset 0 0 8px rgba(0,136,170,0.05); }
+  50%       { box-shadow: 0 0 36px rgba(0,136,170,0.38), inset 0 0 14px rgba(0,136,170,0.10); }
+}
+
+[data-theme="light"] .auth-logo h1 {
+  background: linear-gradient(130deg, #0088aa 20%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+[data-theme="light"] .auth-switch a { text-shadow: none; }

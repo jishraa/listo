@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/useAuthStore'
+import { useThemeStore, applyTheme } from './store/useThemeStore'
 import Login from './pages/Login'
 import Home from './pages/Home'
 import ListDetail from './pages/ListDetail'
@@ -28,6 +29,21 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Guests can only access join pages and list detail if they're already a member
   return <>{children}</>
+}
+
+function ThemeController() {
+  const { pref } = useThemeStore()
+
+  useEffect(() => {
+    applyTheme(pref)
+    if (pref !== 'system') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = () => applyTheme('system')
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [pref])
+
+  return null
 }
 
 function AppRoutes() {
@@ -73,6 +89,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ThemeController />
       <AppRoutes />
     </BrowserRouter>
   )
