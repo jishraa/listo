@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 
 interface Props {
   onDelete: () => void
-  children: React.ReactNode
+  children: ReactNode
 }
 
 export function SwipeRow({ onDelete, children }: Props) {

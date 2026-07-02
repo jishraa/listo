@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowUpDown, BarChart2, Check, Copy, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
@@ -31,6 +32,15 @@ function mergeQuantities(a: string | null | undefined, b: string): string {
   if (!pa || !pb) return `${a}+${b}`
   const sum = pa.num + pb.num
   return `${(pa.cross || pb.cross) ? '×' : ''}${Number.isInteger(sum) ? sum : sum.toFixed(1)}${pa.unit || pb.unit}`
+}
+
+function Overlay({ onClick }: { onClick?: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 }}
+    />
+  )
 }
 
 export default function ListDetail() {
@@ -418,7 +428,7 @@ export default function ListDetail() {
   }
 
   // ── Sheet styles ────────────────────────────────────────────
-  const sheetStyle: React.CSSProperties = {
+  const sheetStyle: CSSProperties = {
     position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
     width: '100%', maxWidth: 480,
     background: 'rgba(5, 11, 22, 0.97)',
@@ -430,12 +440,31 @@ export default function ListDetail() {
     paddingBottom: 'env(safe-area-inset-bottom, 16px)',
     boxShadow: '0 -12px 60px rgba(0,0,0,0.75)',
   }
-  const overlay = <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 }} />
   const handle  = <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(0,212,255,0.22)', margin: '14px auto 6px' }} />
-  const sectionLabel: React.CSSProperties = {
+  const sectionLabel: CSSProperties = {
     fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
     color: 'var(--text-3)', textTransform: 'uppercase',
   }
+
+  // ── Insights precomputed vars ────────────────────────────────
+  const insTotal = items.length
+  const insDone = items.filter(i => i.completed).length
+  const insPctDone = insTotal > 0 ? Math.round((insDone / insTotal) * 100) : 0
+  const insCatStats = cats.map(c => {
+    const catItems = items.filter(i => i.category === c.id)
+    const catDone = catItems.filter(i => i.completed).length
+    return { ...c, total: catItems.length, done: catDone }
+  }).filter(c => c.total > 0)
+  const insUncategorised = items.filter(i => !i.category)
+  const insUncatDone = insUncategorised.filter(i => i.completed).length
+  const insMemberAdded: Record<string, number> = {}
+  const insMemberCompleted: Record<string, number> = {}
+  items.forEach(i => {
+    if (i.added_by_name)     insMemberAdded[i.added_by_name]     = (insMemberAdded[i.added_by_name] || 0) + 1
+    if (i.completed_by_name) insMemberCompleted[i.completed_by_name] = (insMemberCompleted[i.completed_by_name] || 0) + 1
+  })
+  const insTopAdder    = Object.entries(insMemberAdded).sort((a, b) => b[1] - a[1])[0]
+  const insTopCompleter = Object.entries(insMemberCompleted).sort((a, b) => b[1] - a[1])[0]
 
   return (
     <div className="app-container">
@@ -642,10 +671,7 @@ export default function ListDetail() {
       {/* ── Add Item Sheet ── */}
       {showAdd && (
         <>
-          {React.createElement('div', {
-            onClick: () => { resetAdd(); setShowAdd(false) },
-            style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 },
-          })}
+          <Overlay onClick={() => { resetAdd(); setShowAdd(false) }} />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -725,7 +751,7 @@ export default function ListDetail() {
       {/* ── Merge confirm ── */}
       {showMerge && mergeTarget && pendingAdd && (
         <>
-          {overlay}
+          <Overlay />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -745,7 +771,7 @@ export default function ListDetail() {
       {/* ── Menu ── */}
       {menuOpen && (
         <>
-          {React.createElement('div', { onClick: () => setMenuOpen(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
+          <Overlay onClick={() => setMenuOpen(false)} />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '8px 0 8px' }}>
@@ -757,7 +783,7 @@ export default function ListDetail() {
                 { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }, disabled: completed.length === 0 },
                 isOwner ? { icon: <Trash2 size={16} color="#ef4444" />, label: 'Delete List', hint: '', action: () => { setMenuOpen(false); setConfirmDelete(true) }, danger: true } : null,
               ].filter(Boolean).map((item, i) => {
-                const it = item as { icon: React.ReactNode; label: string; hint: string; action: () => void; disabled?: boolean; danger?: boolean }
+                const it = item as { icon: ReactNode; label: string; hint: string; action: () => void; disabled?: boolean; danger?: boolean }
                 return (
                   <button key={i} onClick={it.action} disabled={it.disabled}
                     style={{
@@ -780,7 +806,7 @@ export default function ListDetail() {
       {/* ── Sort sheet ── */}
       {sortMenuOpen && (
         <>
-          {React.createElement('div', { onClick: () => setSortMenuOpen(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
+          <Overlay onClick={() => setSortMenuOpen(false)} />
           <div style={sheetStyle}>
             {handle}
             <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-3)', margin: '10px 20px 6px' }}>Sort by</p>
@@ -806,7 +832,7 @@ export default function ListDetail() {
       {/* ── Rename sheet ── */}
       {renaming && (
         <>
-          {React.createElement('div', { onClick: () => setRenaming(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
+          <Overlay onClick={() => setRenaming(false)} />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -838,7 +864,7 @@ export default function ListDetail() {
       {/* ── Delete confirm ── */}
       {confirmDelete && (
         <>
-          {React.createElement('div', { onClick: () => setConfirmDelete(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
+          <Overlay onClick={() => setConfirmDelete(false)} />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -859,166 +885,141 @@ export default function ListDetail() {
       )}
 
       {/* ── Insights sheet ── */}
-      {insightsOpen && (() => {
-        const total = items.length
-        const done  = items.filter(i => i.completed).length
-        const pctDone = total > 0 ? Math.round((done / total) * 100) : 0
+      {insightsOpen && (
+        <>
+          <Overlay onClick={() => setInsightsOpen(false)} />
+          <div style={{ ...sheetStyle, maxHeight: '85vh', overflowY: 'auto' }}>
+            {handle}
+            <div style={{ padding: '10px 20px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Insights · {list.emoji} {list.name}</p>
 
-        // Category breakdown
-        const catStats = cats.map(c => {
-          const catItems = items.filter(i => i.category === c.id)
-          const catDone  = catItems.filter(i => i.completed).length
-          return { ...c, total: catItems.length, done: catDone }
-        }).filter(c => c.total > 0)
-        const uncategorised = items.filter(i => !i.category)
-        const uncatDone = uncategorised.filter(i => i.completed).length
-
-        // Member activity
-        const memberAdded: Record<string, number>     = {}
-        const memberCompleted: Record<string, number> = {}
-        items.forEach(i => {
-          if (i.added_by_name)     memberAdded[i.added_by_name]     = (memberAdded[i.added_by_name] || 0) + 1
-          if (i.completed_by_name) memberCompleted[i.completed_by_name] = (memberCompleted[i.completed_by_name] || 0) + 1
-        })
-        const topAdder    = Object.entries(memberAdded).sort((a,b) => b[1]-a[1])[0]
-        const topCompleter = Object.entries(memberCompleted).sort((a,b) => b[1]-a[1])[0]
-
-        return (
-          <>
-            {React.createElement('div', { onClick: () => setInsightsOpen(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
-            <div style={{ ...sheetStyle, maxHeight: '85vh', overflowY: 'auto' }}>
-              {handle}
-              <div style={{ padding: '10px 20px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Insights · {list.emoji} {list.name}</p>
-
-                {/* Summary stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                  {[
-                    { label: 'Total', value: total, color: 'var(--text)' },
-                    { label: 'Done',  value: done,  color: '#16a34a' },
-                    { label: 'Left',  value: total - done, color: total - done > 0 ? '#d97706' : 'var(--text-3)' },
-                  ].map(s => (
-                    <div key={s.label} style={{
-                      background: 'var(--bg-input)', borderRadius: 12,
-                      padding: '12px 10px', textAlign: 'center',
-                    }}>
-                      <p style={{ fontSize: 22, fontWeight: 800, color: s.color, margin: 0 }}>{s.value}</p>
-                      <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Overall progress */}
-                {total > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Progress</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: pctDone === 100 ? '#16a34a' : 'var(--accent)' }}>{pctDone}%</span>
-                    </div>
-                    <div style={{ height: 8, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 99, width: `${pctDone}%`, background: pctDone === 100 ? '#16a34a' : 'var(--accent)', transition: 'width 0.5s ease' }} />
-                    </div>
+              {/* Summary stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                {[
+                  { label: 'Total', value: insTotal, color: 'var(--text)' },
+                  { label: 'Done',  value: insDone,  color: '#16a34a' },
+                  { label: 'Left',  value: insTotal - insDone, color: insTotal - insDone > 0 ? '#d97706' : 'var(--text-3)' },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: 'var(--bg-input)', borderRadius: 12,
+                    padding: '12px 10px', textAlign: 'center',
+                  }}>
+                    <p style={{ fontSize: 22, fontWeight: 800, color: s.color, margin: 0 }}>{s.value}</p>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
                   </div>
-                )}
+                ))}
+              </div>
 
-                {/* Category breakdown */}
-                {(catStats.length > 0 || uncategorised.length > 0) && (
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>By Category</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {catStats.map(c => {
-                        const p = c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
-                        return (
-                          <div key={c.id}>
-                            <div className="flex items-center justify-between" style={{ marginBottom: 5 }}>
-                              <div className="flex items-center gap-2">
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block', flexShrink: 0 }} />
-                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
-                              </div>
-                              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.done}/{c.total} · {p}%</span>
-                            </div>
-                            <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', borderRadius: 99, width: `${p}%`, background: c.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {uncategorised.length > 0 && (
-                        <div>
+              {/* Overall progress */}
+              {insTotal > 0 && (
+                <div>
+                  <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Progress</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: insPctDone === 100 ? '#16a34a' : 'var(--accent)' }}>{insPctDone}%</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 99, width: `${insPctDone}%`, background: insPctDone === 100 ? '#16a34a' : 'var(--accent)', transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Category breakdown */}
+              {(insCatStats.length > 0 || insUncategorised.length > 0) && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>By Category</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {insCatStats.map(c => {
+                      const p = c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
+                      return (
+                        <div key={c.id}>
                           <div className="flex items-center justify-between" style={{ marginBottom: 5 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Uncategorised</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{uncatDone}/{uncategorised.length} · {uncategorised.length > 0 ? Math.round((uncatDone/uncategorised.length)*100) : 0}%</span>
+                            <div className="flex items-center gap-2">
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block', flexShrink: 0 }} />
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
+                            </div>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.done}/{c.total} · {p}%</span>
                           </div>
                           <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 99, width: `${uncategorised.length > 0 ? Math.round((uncatDone/uncategorised.length)*100) : 0}%`, background: 'var(--text-3)', transition: 'width 0.5s ease' }} />
+                            <div style={{ height: '100%', borderRadius: 99, width: `${p}%`, background: c.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
                           </div>
                         </div>
-                      )}
-                    </div>
+                      )
+                    })}
+                    {insUncategorised.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between" style={{ marginBottom: 5 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Uncategorised</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{insUncatDone}/{insUncategorised.length} · {insUncategorised.length > 0 ? Math.round((insUncatDone / insUncategorised.length) * 100) : 0}%</span>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 99, width: `${insUncategorised.length > 0 ? Math.round((insUncatDone / insUncategorised.length) * 100) : 0}%`, background: 'var(--text-3)', transition: 'width 0.5s ease' }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Member activity */}
-                {(topAdder || topCompleter) && (
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Member Activity</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {topAdder && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
-                          <div style={{
-                            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                            background: `hsl(${(topAdder[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{topAdder[0][0]?.toUpperCase()}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topAdder[0]}</p>
-                            <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Added {topAdder[1]} item{topAdder[1] !== 1 ? 's' : ''}</p>
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(22,163,74,0.12)', color: '#16a34a' }}>Top Adder</span>
+              {/* Member activity */}
+              {(insTopAdder || insTopCompleter) && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Member Activity</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {insTopAdder && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
+                        <div style={{
+                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                          background: `hsl(${(insTopAdder[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{insTopAdder[0][0]?.toUpperCase()}</span>
                         </div>
-                      )}
-                      {topCompleter && topCompleter[0] !== topAdder?.[0] && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
-                          <div style={{
-                            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                            background: `hsl(${(topCompleter[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{topCompleter[0][0]?.toUpperCase()}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topCompleter[0]}</p>
-                            <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Checked off {topCompleter[1]} item{topCompleter[1] !== 1 ? 's' : ''}</p>
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>Top Completer</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{insTopAdder[0]}</p>
+                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Added {insTopAdder[1]} item{insTopAdder[1] !== 1 ? 's' : ''}</p>
                         </div>
-                      )}
-                      {topCompleter && topCompleter[0] === topAdder?.[0] && (
-                        <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', padding: '4px 0' }}>
-                          {topAdder[0]} is leading on both adding and completing! 🏆
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(22,163,74,0.12)', color: '#16a34a' }}>Top Adder</span>
+                      </div>
+                    )}
+                    {insTopCompleter && insTopCompleter[0] !== insTopAdder?.[0] && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
+                        <div style={{
+                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                          background: `hsl(${(insTopCompleter[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{insTopCompleter[0][0]?.toUpperCase()}</span>
                         </div>
-                      )}
-                    </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{insTopCompleter[0]}</p>
+                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Checked off {insTopCompleter[1]} item{insTopCompleter[1] !== 1 ? 's' : ''}</p>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>Top Completer</span>
+                      </div>
+                    )}
+                    {insTopCompleter && insTopCompleter[0] === insTopAdder?.[0] && (
+                      <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', padding: '4px 0' }}>
+                        {insTopAdder[0]} is leading on both adding and completing! 🏆
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {total === 0 && (
-                  <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 14, padding: '16px 0' }}>Add some items to see insights.</p>
-                )}
+              {insTotal === 0 && (
+                <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 14, padding: '16px 0' }}>Add some items to see insights.</p>
+              )}
 
-                <button className="btn btn-secondary btn-full" onClick={() => setInsightsOpen(false)}>Close</button>
-              </div>
+              <button className="btn btn-secondary btn-full" onClick={() => setInsightsOpen(false)}>Close</button>
             </div>
-          </>
-        )
-      })()}
+          </div>
+        </>
+      )}
 
       {/* ── Share sheet ── */}
       {shareOpen && (
         <>
-          {React.createElement('div', { onClick: () => setShareOpen(false), style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(5px)', WebkitBackdropFilter: 'blur(5px)', zIndex: 100 } })}
+          <Overlay onClick={() => setShareOpen(false)} />
           <div style={sheetStyle}>
             {handle}
             <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1064,6 +1065,3 @@ export default function ListDetail() {
     </div>
   )
 }
-
-// Need React in scope for createElement calls
-import React from 'react'

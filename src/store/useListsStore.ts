@@ -106,7 +106,8 @@ export const useListsStore = create<ListsState>((set, get) => ({
       let shared: List[] = []
       if ((memberRes.data ?? []).length > 0) {
         const ids = memberRes.data!.map(r => r.list_id)
-        const { data } = await supabase.from('lists').select('*').in('id', ids)
+        const { data, error } = await supabase.from('lists').select('*').in('id', ids)
+        if (error) { set({ loading: false, loadError: true }); return }
         shared = (data ?? []) as List[]
       }
       const all = [...(ownRes.data ?? []) as List[], ...shared]

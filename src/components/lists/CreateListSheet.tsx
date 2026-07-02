@@ -130,7 +130,7 @@ export default function CreateListSheet({ open, onClose, onCreate }: Props) {
                   onClick={() => setEmoji(e)}
                   style={{
                     width: 44, height: 44, borderRadius: 10, fontSize: 22,
-                    background: emoji === e ? 'var(--accent-light)' : 'var(--bg-input)',
+                    background: emoji === e ? 'var(--accent-dim)' : 'var(--bg-input)',
                     border: emoji === e ? '2px solid var(--accent)' : '2px solid transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
