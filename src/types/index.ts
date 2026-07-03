@@ -16,6 +16,7 @@ export interface ListItem {
   completed: boolean
   added_by_name: string
   completed_by_name: string | null
+  completed_at: string | null
   category: string | null
   sort_order: number
   created_at: string

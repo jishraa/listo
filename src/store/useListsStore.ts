@@ -269,10 +269,21 @@ export const useListsStore = create<ListsState>((set, get) => ({
   toggleItem: async (listId, item) => {
     const { displayName } = get()
     const next = !item.completed
-    const patch = { completed: next, completed_by_name: next ? displayName : null }
+    const patch = {
+      completed: next,
+      completed_by_name: next ? displayName : null,
+      completed_at: next ? new Date().toISOString() : null,
+    }
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: prev.map(i => i.id === item.id ? { ...i, ...patch } : i) } })
-    const { error } = await supabase.from('list_items').update(patch).eq('id', item.id)
+    let { error } = await supabase.from('list_items').update(patch).eq('id', item.id)
+    // Migration-v4 not applied yet: retry without the timestamp column
+    // (PGRST204 = unknown column) so toggling keeps working.
+    if (error?.code === 'PGRST204') {
+      ({ error } = await supabase.from('list_items')
+        .update({ completed: patch.completed, completed_by_name: patch.completed_by_name })
+        .eq('id', item.id))
+    }
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
     else bumpUpdatedAt(listId, get, set)
   },
@@ -295,8 +306,13 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
   uncheckAll: async (listId) => {
     const prev = get().items[listId] ?? []
-    set({ items: { ...get().items, [listId]: prev.map(i => ({ ...i, completed: false, completed_by_name: null })) } })
-    const { error } = await supabase.from('list_items').update({ completed: false, completed_by_name: null }).eq('list_id', listId)
+    set({ items: { ...get().items, [listId]: prev.map(i => ({ ...i, completed: false, completed_by_name: null, completed_at: null })) } })
+    let { error } = await supabase.from('list_items')
+      .update({ completed: false, completed_by_name: null, completed_at: null }).eq('list_id', listId)
+    if (error?.code === 'PGRST204') {
+      ({ error } = await supabase.from('list_items')
+        .update({ completed: false, completed_by_name: null }).eq('list_id', listId))
+    }
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
     else bumpUpdatedAt(listId, get, set)
   },

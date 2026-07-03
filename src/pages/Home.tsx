@@ -7,7 +7,7 @@ import CreateListSheet from '../components/lists/CreateListSheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
-import type { ListType, List } from '../types'
+import type { ListType, List, ListItem } from '../types'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -57,11 +57,18 @@ export default function Home() {
     return l.owner_id === user?.id && its.length > 0 && its.every(i => i.completed)
   })
 
-  // Recent Activity — item additions carry added_by_name + created_at.
-  // (Completions have no timestamp yet, so they can't be ordered honestly.)
+  // Recent Activity — add events (created_at) merged with completion events
+  // (completed_at, present after migration v4). Latest 3 across all lists.
   const activity = visible
-    .flatMap(l => (store.items[l.id] ?? []).map(i => ({ item: i, list: l })))
-    .sort((a, b) => b.item.created_at.localeCompare(a.item.created_at))
+    .flatMap(l => (store.items[l.id] ?? []).flatMap(i => {
+      const events: { kind: 'added' | 'completed'; who: string; at: string; item: ListItem; list: List }[] =
+        [{ kind: 'added', who: i.added_by_name, at: i.created_at, item: i, list: l }]
+      if (i.completed && i.completed_at) {
+        events.push({ kind: 'completed', who: i.completed_by_name ?? i.added_by_name, at: i.completed_at, item: i, list: l })
+      }
+      return events
+    }))
+    .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 3)
 
   const firstName = displayName.trim().split(' ')[0] || 'there'
@@ -196,9 +203,9 @@ export default function Home() {
                 <div>
                   <span style={sectionLabel}>Recent Activity</span>
                   <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                    {activity.map(({ item, list }, i) => (
+                    {activity.map(({ kind, who, at, item, list }, i) => (
                       <button
-                        key={item.id}
+                        key={`${item.id}-${kind}`}
                         onClick={() => navigate(`/list/${list.id}`)}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
@@ -206,16 +213,15 @@ export default function Home() {
                           borderBottom: i < activity.length - 1 ? '1px solid var(--border)' : 'none',
                         }}
                       >
-                        {item.completed
+                        {kind === 'completed'
                           ? <CheckCircle2 size={16} color="var(--accent)" style={{ flexShrink: 0 }} />
                           : <PlusCircle size={16} color="var(--text-3)" style={{ flexShrink: 0 }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          {/* Timestamp is the add event; completion state shows via icon */}
                           <p style={{ fontSize: 13.5, color: 'var(--text)', lineHeight: 1.4 }} className="truncate">
-                            <strong>{item.added_by_name}</strong> added <strong>{item.title}</strong>
+                            <strong>{who}</strong> {kind} <strong>{item.title}</strong>
                           </p>
                           <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 1 }}>
-                            {list.emoji} {list.name} · {formatRelativeTime(item.created_at)}
+                            {list.emoji} {list.name} · {formatRelativeTime(at)}
                           </p>
                         </div>
                       </button>
