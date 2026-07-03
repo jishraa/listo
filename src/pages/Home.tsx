@@ -38,9 +38,10 @@ export default function Home() {
     const items = store.items[l.id] ?? []
     return items.length === 0 || items.some(i => !i.completed)
   })
-  const pendingItems = visible.reduce(
-    (n, l) => n + (store.items[l.id] ?? []).filter(i => !i.completed).length, 0,
-  )
+  const allItems = visible.flatMap(l => store.items[l.id] ?? [])
+  const pendingItems = allItems.filter(i => !i.completed).length
+  const totalItems = allItems.length
+  const completionPct = totalItems > 0 ? Math.round(((totalItems - pendingItems) / totalItems) * 100) : 0
   const recent = [...visible]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 3)
@@ -106,23 +107,37 @@ export default function Home() {
                     {recent.map((list, i) => {
                       const items = store.items[list.id] ?? []
                       const done = items.filter(it => it.completed).length
+                      const pct = items.length > 0 ? Math.round((done / items.length) * 100) : 0
+                      const allDone = items.length > 0 && done === items.length
                       return (
                         <button
                           key={list.id}
                           onClick={() => navigate(`/list/${list.id}`)}
                           style={{
                             width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                            padding: '13px 16px', textAlign: 'left', cursor: 'pointer',
+                            padding: '12px 16px', textAlign: 'left', cursor: 'pointer',
                             borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
                           }}
                         >
                           <span style={{ fontSize: 20, flexShrink: 0 }}>{list.emoji}</span>
-                          <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 14 }} className="truncate">
-                            {list.name}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--text-3)', flexShrink: 0 }}>
-                            {items.length === 0 ? formatRelativeTime(list.updated_at) : `${done}/${items.length}`}
-                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="flex items-center justify-between" style={{ gap: 8 }}>
+                              <span style={{ fontWeight: 600, fontSize: 14, minWidth: 0 }} className="truncate">
+                                {list.name}
+                              </span>
+                              <span className="text-xs" style={{ color: allDone ? '#00e087' : 'var(--text-3)', flexShrink: 0, fontWeight: allDone ? 600 : 400 }}>
+                                {items.length === 0 ? formatRelativeTime(list.updated_at) : allDone ? '✓ Done' : `${done}/${items.length}`}
+                              </span>
+                            </div>
+                            {items.length > 0 && (
+                              <div className="progress-bar" style={{ marginTop: 7 }}>
+                                <div className="progress-fill" style={{
+                                  width: `${pct}%`,
+                                  background: allDone ? '#00e087' : 'var(--accent)',
+                                }} />
+                              </div>
+                            )}
+                          </div>
                           <ChevronRight size={15} color="var(--text-3)" style={{ flexShrink: 0 }} />
                         </button>
                       )
@@ -139,8 +154,9 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Placeholder for insights quick cards (needs insights engine) */}
-              {visible.length > 0 && (
+              {/* Insights teaser with a live completion number; richer quick
+                  cards (savings, predictions) arrive with shopping history */}
+              {visible.length > 0 && totalItems > 0 && (
                 <button
                   onClick={() => navigate('/insights')}
                   className="card"
@@ -150,7 +166,15 @@ export default function Home() {
                   }}
                 >
                   <ListChecks size={18} color="var(--accent)" style={{ flexShrink: 0 }} />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Shopping Insights</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 14, fontWeight: 600 }}>Insights</p>
+                    <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 2 }}>
+                      You've completed {completionPct}% of your items
+                    </p>
+                  </div>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--accent)', flexShrink: 0 }}>
+                    {completionPct}%
+                  </span>
                   <ChevronRight size={15} color="var(--text-3)" style={{ flexShrink: 0 }} />
                 </button>
               )}
