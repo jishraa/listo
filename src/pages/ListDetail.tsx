@@ -275,8 +275,8 @@ export default function ListDetail() {
             maxLength={200}
             style={{
               flex: 1, height: 40, borderRadius: 8, padding: '0 12px',
-              background: 'rgba(0,212,255,0.06)', border: '1.5px solid var(--accent)',
-              boxShadow: '0 0 0 3px rgba(0,212,255,0.12)',
+              background: 'rgba(22,163,74,0.06)', border: '1.5px solid var(--accent)',
+              boxShadow: '0 0 0 3px rgba(22,163,74,0.12)',
               color: 'var(--text)', fontSize: 15, outline: 'none',
             }}
           />
@@ -393,8 +393,8 @@ export default function ListDetail() {
                 maxLength={20}
                 style={{
                   flexShrink: 0, width: 58, height: 28, borderRadius: 99, padding: '0 8px',
-                  textAlign: 'center', background: 'rgba(0,212,255,0.08)', border: '1.5px solid var(--accent)',
-                  boxShadow: '0 0 0 3px rgba(0,212,255,0.12)',
+                  textAlign: 'center', background: 'rgba(22,163,74,0.08)', border: '1.5px solid var(--accent)',
+                  boxShadow: '0 0 0 3px rgba(22,163,74,0.12)',
                   color: 'var(--text)', fontSize: 14, fontWeight: 600, outline: 'none',
                 }}
               />
@@ -509,7 +509,7 @@ export default function ListDetail() {
               color: filterCategories.size === 0 ? '#030a14' : 'var(--text-2)',
               border: filterCategories.size === 0 ? 'none' : '1px solid var(--border-2)',
               fontSize: 13, fontWeight: filterCategories.size === 0 ? 700 : 500,
-              boxShadow: filterCategories.size === 0 ? '0 0 10px rgba(0,212,255,0.35)' : 'none',
+              boxShadow: filterCategories.size === 0 ? '0 0 10px rgba(22,163,74,0.35)' : 'none',
             }}>All</button>
             {cats.filter(c => usedCatIds.has(c.id)).map(c => {
               const active = filterCategories.has(c.id)
@@ -522,7 +522,7 @@ export default function ListDetail() {
                   color: active ? '#030a14' : 'var(--text-2)',
                   border: active ? 'none' : '1px solid var(--border-2)',
                   fontSize: 13, fontWeight: active ? 700 : 500,
-                  boxShadow: active ? '0 0 10px rgba(0,212,255,0.35)' : 'none',
+                  boxShadow: active ? '0 0 10px rgba(22,163,74,0.35)' : 'none',
                 }}>{c.name}</button>
               )
             })}

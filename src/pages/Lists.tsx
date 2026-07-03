@@ -37,7 +37,7 @@ function ListCard({
         className="card"
         style={{
           padding: '14px 16px', cursor: 'pointer',
-          ...(isPinned && { borderColor: 'rgba(0,212,255,0.28)', boxShadow: '0 0 0 1px rgba(0,212,255,0.10)' }),
+          ...(isPinned && { borderColor: 'rgba(22,163,74,0.28)', boxShadow: '0 0 0 1px rgba(22,163,74,0.10)' }),
           ...(allDone  && !isPinned && { borderColor: 'rgba(0,230,140,0.22)' }),
         }}
         onClick={onOpen}
@@ -51,7 +51,7 @@ function ListCard({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="flex items-center gap-2">
-              {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.6))' }} />}
+              {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ filter: 'drop-shadow(0 0 4px rgba(22,163,74,0.6))' }} />}
               <span style={{ fontWeight: 600, fontSize: 15 }} className="truncate">{list.name}</span>
             </div>
             <div className="flex items-center justify-between mt-2">
@@ -65,7 +65,7 @@ function ListCard({
                 <div className="progress-fill" style={{
                   width: `${pct}%`,
                   background: allDone ? '#00e087' : 'var(--accent)',
-                  boxShadow: allDone ? '0 0 8px rgba(0,224,135,0.55)' : '0 0 8px rgba(0,212,255,0.55)',
+                  boxShadow: allDone ? '0 0 8px rgba(0,224,135,0.55)' : '0 0 8px rgba(22,163,74,0.55)',
                 }} />
               </div>
             )}

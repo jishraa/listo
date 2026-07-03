@@ -9,9 +9,9 @@ export default function InstallBanner({ canShow, platform, install, dismiss }: I
     <div style={{
       margin: '0 16px 4px',
       borderRadius: 16,
-      background: 'linear-gradient(135deg, rgba(0,212,255,0.07) 0%, rgba(168,85,247,0.05) 100%)',
-      border: '1px solid rgba(0,212,255,0.20)',
-      boxShadow: '0 0 28px rgba(0,212,255,0.07), inset 0 1px 0 rgba(0,212,255,0.08)',
+      background: 'linear-gradient(135deg, rgba(22,163,74,0.07) 0%, rgba(168,85,247,0.05) 100%)',
+      border: '1px solid rgba(22,163,74,0.20)',
+      boxShadow: '0 0 28px rgba(22,163,74,0.07), inset 0 1px 0 rgba(22,163,74,0.08)',
       padding: '14px 14px 14px 16px',
       position: 'relative',
     }}>
@@ -34,8 +34,8 @@ export default function InstallBanner({ canShow, platform, install, dismiss }: I
         {/* App icon */}
         <div style={{
           width: 46, height: 46, borderRadius: 13, flexShrink: 0, overflow: 'hidden',
-          border: '1.5px solid rgba(0,212,255,0.22)',
-          boxShadow: '0 0 14px rgba(0,212,255,0.18)',
+          border: '1.5px solid rgba(22,163,74,0.22)',
+          boxShadow: '0 0 14px rgba(22,163,74,0.18)',
         }}>
           <img src="./apple-touch-icon.png" alt="Listo" style={{ width: '100%', height: '100%', display: 'block' }} />
         </div>
@@ -74,7 +74,7 @@ function Step({ icon, text }: { icon: ReactNode; text: string }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{
         width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-        background: 'rgba(0,212,255,0.12)', border: '1px solid rgba(0,212,255,0.22)',
+        background: 'rgba(22,163,74,0.12)', border: '1px solid rgba(22,163,74,0.22)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: 'var(--accent)',
       }}>

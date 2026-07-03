@@ -69,7 +69,7 @@ export default function AppShell() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: 'none', cursor: 'pointer', flexShrink: 0,
             marginTop: -14,
-            boxShadow: '0 0 20px rgba(0,212,255,0.45)',
+            boxShadow: '0 0 20px rgba(22,163,74,0.45)',
           }}
         >
           <Plus size={24} color="#04080f" strokeWidth={2.5} />

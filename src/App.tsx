@@ -9,6 +9,7 @@ import Insights from './pages/Insights'
 import ListDetail from './pages/ListDetail'
 import JoinList from './pages/JoinList'
 import Profile from './pages/Profile'
+import { Terms, Privacy } from './pages/Legal'
 import AppShell from './components/layout/AppShell'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -59,6 +60,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
       <Route path="/join/:code" element={<JoinList />} />
       {/* Tab pages render inside the AppShell (bottom nav + create FAB) */}
       <Route
