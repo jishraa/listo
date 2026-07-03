@@ -12,6 +12,7 @@ interface AuthState {
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signIn: (email: string, password: string) => Promise<string | null>
   signInWithProvider: (provider: 'google' | 'apple') => Promise<string | null>
+  changePassword: (newPassword: string) => Promise<string | null>
   signInAsGuest: (displayName: string) => Promise<string | null>
   signOut: () => Promise<void>
   setDisplayName: (name: string) => void
@@ -72,6 +73,11 @@ export const useAuthStore = create<AuthState>(set => ({
       provider,
       options: { redirectTo: window.location.origin },
     })
+    return error?.message ?? null
+  },
+
+  changePassword: async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
     return error?.message ?? null
   },
 

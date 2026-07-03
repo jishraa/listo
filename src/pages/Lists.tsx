@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
@@ -203,6 +203,10 @@ export default function Lists() {
     }
   }
 
+  // ?filter=shared etc. lets other screens (e.g. Profile) deep-link a view
+  const [searchParams] = useSearchParams()
+  const urlFilter = searchParams.get('filter')
+
   const [shareTarget, setShareTarget] = useState<List | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<List | null>(null)
@@ -211,7 +215,9 @@ export default function Lists() {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
   const [customOrder, setCustomOrder] = useState<string[]>([])
   const [showCompleted, setShowCompleted] = useState(false)
-  const [filter, setFilter] = useState<Filter>('active')
+  const [filter, setFilter] = useState<Filter>(
+    () => FILTERS.some(f => f.id === urlFilter) ? urlFilter as Filter : 'active'
+  )
   const [sort, setSort] = useState<Sort>('recent')
   const [sortOpen, setSortOpen] = useState(false)
   const [search, setSearch] = useState('')

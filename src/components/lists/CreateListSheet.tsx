@@ -16,6 +16,13 @@ const TYPE_LABELS: Record<ListType, string> = {
   shopping: 'Shopping',
 }
 
+// User preference set in Profile → Preferences → Default List Type
+export const DEFAULT_TYPE_KEY = 'listo-default-list-type'
+export function getDefaultListType(): ListType {
+  const t = localStorage.getItem(DEFAULT_TYPE_KEY)
+  return t === 'tasks' || t === 'shopping' ? t : 'personal'
+}
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -27,8 +34,8 @@ interface Props {
 export default function CreateListSheet({ open, onClose, onCreate, initialStep = 'templates' }: Props) {
   const [step, setStep] = useState<'templates' | 'custom'>(initialStep)
   const [name, setName] = useState('')
-  const [type, setType] = useState<ListType>('personal')
-  const [emoji, setEmoji] = useState('📋')
+  const [type, setType] = useState<ListType>(getDefaultListType)
+  const [emoji, setEmoji] = useState(() => TYPE_EMOJIS[getDefaultListType()][0])
   const [loading, setLoading] = useState(false)
 
   const lists = useListsStore(s => s.lists)
@@ -40,7 +47,10 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   // different initialStep (e.g. Home's "New List" vs "Templates" actions).
   useEffect(() => { if (open) setStep(initialStep) }, [open, initialStep])
 
-  const reset = () => { setStep(initialStep); setName(''); setType('personal'); setEmoji('📋') }
+  const reset = () => {
+    const t = getDefaultListType()
+    setStep(initialStep); setName(''); setType(t); setEmoji(TYPE_EMOJIS[t][0])
+  }
 
   const handleCreate = async (templateItems?: { title: string; category?: string }[]) => {
     if (!name.trim()) return
