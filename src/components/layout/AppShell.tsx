@@ -30,6 +30,15 @@ export default function AppShell() {
     store.init(user.id, name || displayName)
   }, [user])
 
+  // Items/members power every tab (Home stats, Insights, Lists progress),
+  // so load them here rather than in any one page.
+  useEffect(() => {
+    for (const list of store.lists) {
+      if (!store.items[list.id]) store.loadItems(list.id)
+      if (!store.members[list.id]) store.loadMembers(list.id)
+    }
+  }, [store.lists.length])
+
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
     const list = await store.createList({ name, type, emoji })
     if (!list) return

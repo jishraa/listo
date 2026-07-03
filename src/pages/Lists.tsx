@@ -171,13 +171,6 @@ export default function Lists() {
     } catch { /* ignore */ }
   }, [user?.id])
 
-  useEffect(() => {
-    for (const list of store.lists) {
-      if (!store.items[list.id]) store.loadItems(list.id)
-      if (!store.members[list.id]) store.loadMembers(list.id)
-    }
-  }, [store.lists.length])
-
   const togglePin = (listId: string) => {
     const next = new Set(pinnedIds)
     next.has(listId) ? next.delete(listId) : next.add(listId)
