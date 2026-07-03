@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowUpDown, BarChart2, Check, Copy, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, BarChart2, Check, Copy, FileText, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { LIST_CATEGORIES, detectCategory, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
+import { exportListReport } from '../lib/report'
 import { SwipeRow } from '../components/lists/SwipeRow'
 
 type SortMode = 'date' | 'alpha' | 'category'
@@ -774,6 +775,7 @@ export default function ListDetail() {
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
                 { icon: <BarChart2 size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } },
+                { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
                 isOwner ? { icon: <Share2 size={16} />, label: 'Share', hint: '', action: () => { setMenuOpen(false); setShareOpen(true) } } : null,
                 { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }, disabled: completed.length === 0 },
