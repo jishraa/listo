@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sheet from '../ui/Sheet'
 import type { List, ListType } from '../../types'
 import { TEMPLATES } from '../../lib/constants'
@@ -20,10 +20,12 @@ interface Props {
   open: boolean
   onClose: () => void
   onCreate: (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => Promise<void>
+  // Opening screen: template gallery (default) or the blank-list form
+  initialStep?: 'templates' | 'custom'
 }
 
-export default function CreateListSheet({ open, onClose, onCreate }: Props) {
-  const [step, setStep] = useState<'templates' | 'custom'>('templates')
+export default function CreateListSheet({ open, onClose, onCreate, initialStep = 'templates' }: Props) {
+  const [step, setStep] = useState<'templates' | 'custom'>(initialStep)
   const [name, setName] = useState('')
   const [type, setType] = useState<ListType>('personal')
   const [emoji, setEmoji] = useState('📋')
@@ -34,7 +36,11 @@ export default function CreateListSheet({ open, onClose, onCreate }: Props) {
   const createFromTemplate = useListsStore(s => s.createFromTemplate)
   const myTemplates = templateLists(lists)
 
-  const reset = () => { setStep('templates'); setName(''); setType('personal'); setEmoji('📋') }
+  // Re-sync when reopened — the same instance can be opened with a
+  // different initialStep (e.g. Home's "New List" vs "Templates" actions).
+  useEffect(() => { if (open) setStep(initialStep) }, [open, initialStep])
+
+  const reset = () => { setStep(initialStep); setName(''); setType('personal'); setEmoji('📋') }
 
   const handleCreate = async (templateItems?: { title: string; category?: string }[]) => {
     if (!name.trim()) return

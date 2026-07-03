@@ -25,13 +25,18 @@ No test suite.
 
 | Path | Page | Notes |
 |---|---|---|
-| `/login` | Login | Supabase auth; supports anonymous "guest" sign-in |
+| `/login` | Login | Email/password + Google/Apple OAuth + anonymous "guest"; Create Account UX with password rules |
+| `/terms`, `/privacy` | Legal | Static legal pages (no auth guard) |
 | `/join/:code` | JoinList | Invite-link landing (no auth guard) |
-| `/` | Home | List overview |
-| `/list/:id` | ListDetail | Items, members, share |
+| `/` | Home | Dashboard: Today's Focus, Quick Actions, Smart Insights, Recent Activity |
+| `/lists` | Lists | Management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates |
+| `/insights` | Insights | Completion rate, stat grid, category distribution |
+| `/list/:id` | ListDetail | Items, members, share (drill-in — renders outside the shell) |
 | `/profile` | Profile | Account, inline Settings (appearance), sign out |
 
-Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading, no shared layout shell — each page renders its own header. Target navigation per vision: Home / Lists / + / Insights / Profile bottom bar (not yet built).
+The four tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Home / Lists / + / Insights / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading.
+
+**IA rule (docs spec v2):** Home is the dashboard ("what needs my attention?") and must never duplicate Lists content; Lists is the management hub (browse/search/organize). Home's Smart Insights and Recent Activity sections only show honestly computable data — no placeholder analytics.
 
 ### Stores (`src/store/`) — zustand
 
