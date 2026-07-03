@@ -4,7 +4,6 @@ import { useAuthStore } from './store/useAuthStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
 import Login from './pages/Login'
 import Lists from './pages/Lists'
-import Insights from './pages/Insights'
 import ListDetail from './pages/ListDetail'
 import JoinList from './pages/JoinList'
 import Profile from './pages/Profile'
@@ -71,9 +70,9 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Lists />} />
-        {/* Old dashboard URL — Lists is the root screen now */}
+        {/* Old dashboard/insights URLs — Lists is the root screen now */}
         <Route path="/lists" element={<Navigate to="/" replace />} />
-        <Route path="/insights" element={<Insights />} />
+        <Route path="/insights" element={<Navigate to="/" replace />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
       {/* Drill-in page — full-screen, own header, no bottom nav */}

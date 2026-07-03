@@ -28,14 +28,13 @@ No test suite.
 | `/login` | Login | Email/password + Google/Apple OAuth + anonymous "guest"; Create Account UX with password rules |
 | `/terms`, `/privacy` | Legal | Static legal pages (no auth guard) |
 | `/join/:code` | JoinList | Invite-link landing (no auth guard) |
-| `/` | Lists | Root screen + management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates. `/lists` redirects here |
-| `/insights` | Insights | Completion rate, stat grid, category distribution |
-| `/list/:id` | ListDetail | Items, members, share, PDF export (drill-in — renders outside the shell) |
+| `/` | Lists | Root screen + management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates. `/lists` and `/insights` redirect here |
+| `/list/:id` | ListDetail | Items, members, share, per-list insights sheet, PDF export (drill-in — renders outside the shell) |
 | `/profile` | Profile | Account, inline Settings (appearance), sign out |
 
-The three tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Lists / + / Insights / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading, except jspdf (report export).
+The two tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Lists / + / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading, except jspdf (report export).
 
-**IA decision (2026-07-03):** the user removed the Home dashboard tab — with the FAB always available it was redundant, and the "Templates" quick action wasn't meaningful. Lists is the root screen. Do NOT reintroduce a dashboard/Home tab without being asked. Joining shared lists happens only via the secure `/join/:code` invite link — no manual code entry anywhere.
+**IA decision (2026-07-03):** the user removed both the Home dashboard tab and the standalone Insights tab — insights live only at the per-list level (the Insights sheet in ListDetail's overflow menu). Lists is the root screen. Do NOT reintroduce a dashboard/Home tab or a global Insights tab without being asked. Joining shared lists happens only via the secure `/join/:code` invite link — no manual code entry anywhere.
 
 ### Stores (`src/store/`) — zustand
 

@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { ListChecks, Plus, BarChart2, User } from 'lucide-react'
+import { ListChecks, Plus, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useListsStore } from '../../store/useListsStore'
 import CreateListSheet from '../lists/CreateListSheet'
 import type { ListType } from '../../types'
 
 const TABS = [
-  { path: '/',         label: 'Lists',    Icon: ListChecks },
-  { path: '/insights', label: 'Insights', Icon: BarChart2 },
-  { path: '/profile',  label: 'Profile',  Icon: User },
+  { path: '/',        label: 'Lists',   Icon: ListChecks },
+  { path: '/profile', label: 'Profile', Icon: User },
 ]
 
 // App shell for the four tab pages: owns the bottom nav, the center-FAB
