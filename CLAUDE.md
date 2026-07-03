@@ -28,15 +28,14 @@ No test suite.
 | `/login` | Login | Email/password + Google/Apple OAuth + anonymous "guest"; Create Account UX with password rules |
 | `/terms`, `/privacy` | Legal | Static legal pages (no auth guard) |
 | `/join/:code` | JoinList | Invite-link landing (no auth guard) |
-| `/` | Home | Dashboard: Today's Focus, Quick Actions (New List / Templates), Smart Insights, Recent Activity. Joining shared lists happens only via the secure `/join/:code` invite link — no manual code entry anywhere |
-| `/lists` | Lists | Management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates |
+| `/` | Lists | Root screen + management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates. `/lists` redirects here |
 | `/insights` | Insights | Completion rate, stat grid, category distribution |
-| `/list/:id` | ListDetail | Items, members, share (drill-in — renders outside the shell) |
+| `/list/:id` | ListDetail | Items, members, share, PDF export (drill-in — renders outside the shell) |
 | `/profile` | Profile | Account, inline Settings (appearance), sign out |
 
-The four tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Home / Lists / + / Insights / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading.
+The three tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Lists / + / Insights / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading, except jspdf (report export).
 
-**IA rule (docs spec v2):** Home is the dashboard ("what needs my attention?") and must never duplicate Lists content; Lists is the management hub (browse/search/organize). Home's Smart Insights and Recent Activity sections only show honestly computable data — no placeholder analytics.
+**IA decision (2026-07-03):** the user removed the Home dashboard tab — with the FAB always available it was redundant, and the "Templates" quick action wasn't meaningful. Lists is the root screen. Do NOT reintroduce a dashboard/Home tab without being asked. Joining shared lists happens only via the secure `/join/:code` invite link — no manual code entry anywhere.
 
 ### Stores (`src/store/`) — zustand
 

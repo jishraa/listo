@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Home, ListChecks, Plus, BarChart2, User } from 'lucide-react'
+import { ListChecks, Plus, BarChart2, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useListsStore } from '../../store/useListsStore'
 import CreateListSheet from '../lists/CreateListSheet'
 import type { ListType } from '../../types'
 
 const TABS = [
-  { path: '/',         label: 'Home',     Icon: Home },
-  { path: '/lists',    label: 'Lists',    Icon: ListChecks },
+  { path: '/',         label: 'Lists',    Icon: ListChecks },
   { path: '/insights', label: 'Insights', Icon: BarChart2 },
   { path: '/profile',  label: 'Profile',  Icon: User },
 ]
@@ -54,7 +53,7 @@ export default function AppShell() {
       <Outlet />
 
       <nav className="bottom-nav">
-        {TABS.slice(0, 2).map(({ path, label, Icon }) => (
+        {TABS.slice(0, 1).map(({ path, label, Icon }) => (
           <button key={path} className={`nav-item ${pathname === path ? 'active' : ''}`} onClick={() => navigate(path)}>
             <Icon size={22} />
             <span>{label}</span>
@@ -74,7 +73,7 @@ export default function AppShell() {
         >
           <Plus size={24} color="#04080f" strokeWidth={2.5} />
         </button>
-        {TABS.slice(2).map(({ path, label, Icon }) => (
+        {TABS.slice(1).map(({ path, label, Icon }) => (
           <button key={path} className={`nav-item ${pathname === path ? 'active' : ''}`} onClick={() => navigate(path)}>
             <Icon size={22} />
             <span>{label}</span>

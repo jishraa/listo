@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { useAuthStore } from './store/useAuthStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
 import Login from './pages/Login'
-import Home from './pages/Home'
 import Lists from './pages/Lists'
 import Insights from './pages/Insights'
 import ListDetail from './pages/ListDetail'
@@ -71,8 +70,9 @@ function AppRoutes() {
           </AuthGuard>
         }
       >
-        <Route path="/" element={<Home />} />
-        <Route path="/lists" element={<Lists />} />
+        <Route path="/" element={<Lists />} />
+        {/* Old dashboard URL — Lists is the root screen now */}
+        <Route path="/lists" element={<Navigate to="/" replace />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
