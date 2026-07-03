@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut } from 'lucide-react'
+import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
-import { useListsStore } from '../store/useListsStore'
+import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
 import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
@@ -11,11 +11,17 @@ import { formatRelativeTime } from '../lib/utils'
 import type { ListType, List } from '../types'
 
 function ListCard({
-  list, isOwner, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare, items,
+  list, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare,
+  onSaveTemplate, onArchive, onUnarchive, items,
 }: {
-  list: List; isOwner: boolean; isPinned: boolean; items: { completed: boolean }[]
-  onOpen: () => void; onPin: () => void; onMoveTop: () => void
-  onRename: () => void; onDuplicate: () => void; onDelete: () => void; onLeave: () => void; onShare: () => void
+  list: List; isPinned: boolean; items: { completed: boolean }[]
+  onOpen: () => void
+  // Menu actions render only when provided, so each section (active /
+  // template / archived) passes just the actions that apply to it.
+  onPin?: () => void; onMoveTop?: () => void
+  onRename?: () => void; onDuplicate?: () => void; onDelete?: () => void
+  onLeave?: () => void; onShare?: () => void
+  onSaveTemplate?: () => void; onArchive?: () => void; onUnarchive?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const total = items.length
@@ -77,27 +83,52 @@ function ListCard({
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)}>
         <div className="sheet-body" style={{ paddingTop: 8, gap: 8 }}>
           <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{list.name}</p>
-          <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onPin(); setMenuOpen(false) }}>
-            <Pin size={16} /> {isPinned ? 'Unpin' : 'Pin to top'}
-          </button>
-          <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onMoveTop(); setMenuOpen(false) }}>
-            <ArrowUp size={16} /> Move to top
-          </button>
-          <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onShare(); setMenuOpen(false) }}>
-            <Share2 size={16} /> Share list
-          </button>
-          {isOwner && <>
+          {onPin && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onPin(); setMenuOpen(false) }}>
+              <Pin size={16} /> {isPinned ? 'Unpin' : 'Pin to top'}
+            </button>
+          )}
+          {onMoveTop && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onMoveTop(); setMenuOpen(false) }}>
+              <ArrowUp size={16} /> Move to top
+            </button>
+          )}
+          {onShare && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onShare(); setMenuOpen(false) }}>
+              <Share2 size={16} /> Share list
+            </button>
+          )}
+          {onRename && (
             <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { setMenuOpen(false); onRename() }}>
               <Pencil size={16} /> Rename
             </button>
+          )}
+          {onDuplicate && (
             <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onDuplicate(); setMenuOpen(false) }}>
               <Copy size={16} /> Duplicate
             </button>
+          )}
+          {onSaveTemplate && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onSaveTemplate(); setMenuOpen(false) }}>
+              <LayoutTemplate size={16} /> Save as template
+            </button>
+          )}
+          {onArchive && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onArchive(); setMenuOpen(false) }}>
+              <Archive size={16} /> Archive
+            </button>
+          )}
+          {onUnarchive && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onUnarchive(); setMenuOpen(false) }}>
+              <ArchiveRestore size={16} /> Unarchive
+            </button>
+          )}
+          {onDelete && (
             <button className="btn btn-danger btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { setMenuOpen(false); onDelete() }}>
               <Trash2 size={16} /> Delete list
             </button>
-          </>}
-          {!isOwner && (
+          )}
+          {onLeave && (
             <button className="btn btn-danger btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onLeave(); setMenuOpen(false) }}>
               <LogOut size={16} /> Leave list
             </button>
@@ -158,6 +189,7 @@ export default function Lists() {
   const [customOrder, setCustomOrder] = useState<string[]>([])
   const [showOwnCompleted, setShowOwnCompleted] = useState(false)
   const [showSharedCompleted, setShowSharedCompleted] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -207,9 +239,12 @@ export default function Lists() {
     setRenameInput('')
   }
 
-  const ownLists = store.lists.filter(l => l.owner_id === user?.id)
-  const sharedLists = store.lists.filter(l => l.owner_id !== user?.id)
-  const hasLists = ownLists.length > 0 || sharedLists.length > 0
+  const visible = visibleLists(store.lists)
+  const templates = templateLists(store.lists)
+  const archived = archivedLists(store.lists)
+  const ownLists = visible.filter(l => l.owner_id === user?.id)
+  const sharedLists = visible.filter(l => l.owner_id !== user?.id)
+  const hasLists = store.lists.length > 0
 
   const byRecent = (a: List, b: List) =>
     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -244,19 +279,55 @@ export default function Lists() {
     <ListCard
       key={list.id}
       list={list}
-      isOwner={isOwner}
       isPinned={pinnedIds.has(list.id)}
       items={store.items[list.id] ?? []}
       onOpen={() => navigate(`/list/${list.id}`)}
       onPin={() => togglePin(list.id)}
       onMoveTop={() => moveToTop(list.id)}
-      onRename={() => { setRenameTarget(list); setRenameInput(list.name) }}
-      onDuplicate={() => store.duplicateList(list.id)}
-      onDelete={() => setDeleteTarget(list)}
-      onLeave={() => store.leaveList(list.id)}
       onShare={() => handleShare(list)}
+      {...(isOwner
+        ? {
+            onRename: () => { setRenameTarget(list); setRenameInput(list.name) },
+            onDuplicate: () => store.duplicateList(list.id),
+            onSaveTemplate: () => store.saveAsTemplate(list.id),
+            onArchive: () => store.setArchived(list.id, true),
+            onDelete: () => setDeleteTarget(list),
+          }
+        : { onLeave: () => store.leaveList(list.id) })}
     />
   )
+
+  // Templates open in ListDetail for item editing; archived cards only restore or delete.
+  const renderTemplate = (list: List) => (
+    <ListCard
+      key={list.id}
+      list={list}
+      isPinned={false}
+      items={store.items[list.id] ?? []}
+      onOpen={() => navigate(`/list/${list.id}`)}
+      onRename={() => { setRenameTarget(list); setRenameInput(list.name) }}
+      onDelete={() => setDeleteTarget(list)}
+    />
+  )
+
+  const renderArchived = (list: List) => {
+    const isOwner = list.owner_id === user?.id
+    return (
+      <ListCard
+        key={list.id}
+        list={list}
+        isPinned={false}
+        items={store.items[list.id] ?? []}
+        onOpen={() => navigate(`/list/${list.id}`)}
+        {...(isOwner
+          ? {
+              onUnarchive: () => store.setArchived(list.id, false),
+              onDelete: () => setDeleteTarget(list),
+            }
+          : { onLeave: () => store.leaveList(list.id) })}
+      />
+    )
+  }
 
   const sectionLabel = { fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' as const }
 
@@ -370,6 +441,25 @@ export default function Lists() {
                           {showSharedCompleted && completedShared.map(l => <div key={l.id} style={{ opacity: 0.6 }}>{renderCard(l, false)}</div>)}
                         </>
                       )}
+                    </>
+                  )}
+
+                  {!q && templates.length > 0 && (
+                    <>
+                      <span style={{ ...sectionLabel, padding: '8px 2px 0', display: 'block' }}>Templates</span>
+                      {templates.map(renderTemplate)}
+                    </>
+                  )}
+
+                  {!q && archived.length > 0 && (
+                    <>
+                      <div className="flex items-center justify-between" style={{ padding: '8px 2px 0' }}>
+                        <span style={sectionLabel}>Archived · {archived.length}</span>
+                        <button onClick={() => setShowArchived(v => !v)} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'none', cursor: 'pointer' }}>
+                          {showArchived ? 'Hide ↑' : 'Show ↓'}
+                        </button>
+                      </div>
+                      {showArchived && archived.map(l => <div key={l.id} style={{ opacity: 0.6 }}>{renderArchived(l)}</div>)}
                     </>
                   )}
                 </>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, ChevronRight, ListChecks } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
-import { useListsStore } from '../store/useListsStore'
+import { useListsStore, visibleLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -33,14 +33,15 @@ export default function Home() {
     }
   }
 
-  const activeLists = store.lists.filter(l => {
+  const visible = visibleLists(store.lists)
+  const activeLists = visible.filter(l => {
     const items = store.items[l.id] ?? []
     return items.length === 0 || items.some(i => !i.completed)
   })
-  const pendingItems = store.lists.reduce(
+  const pendingItems = visible.reduce(
     (n, l) => n + (store.items[l.id] ?? []).filter(i => !i.completed).length, 0,
   )
-  const recent = [...store.lists]
+  const recent = [...visible]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, 3)
 
@@ -130,7 +131,7 @@ export default function Home() {
                 </div>
               )}
 
-              {store.lists.length === 0 && !store.loadError && (
+              {visible.length === 0 && !store.loadError && (
                 <div className="empty-state">
                   <div className="icon">📋</div>
                   <h3>Welcome to Listo</h3>
@@ -139,7 +140,7 @@ export default function Home() {
               )}
 
               {/* Placeholder for insights quick cards (needs insights engine) */}
-              {store.lists.length > 0 && (
+              {visible.length > 0 && (
                 <button
                   onClick={() => navigate('/insights')}
                   className="card"

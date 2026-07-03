@@ -29,6 +29,8 @@ export interface List {
   owner_id: string
   invite_code: string
   invite_expires_at: string | null
+  is_template: boolean
+  archived_at: string | null
   created_at: string
   updated_at: string
 }

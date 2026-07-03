@@ -1,4 +1,4 @@
-import { useListsStore } from '../store/useListsStore'
+import { useListsStore, visibleLists } from '../store/useListsStore'
 import { LIST_CATEGORIES } from '../lib/constants'
 
 // Insights v1 — stats computable from loaded lists/items only. The vision's
@@ -6,15 +6,16 @@ import { LIST_CATEGORIES } from '../lib/constants'
 // history that doesn't exist yet; every number shown here is real.
 export default function Insights() {
   const store = useListsStore()
+  const visible = visibleLists(store.lists)
 
-  const allItems = store.lists.flatMap(l => store.items[l.id] ?? [])
+  const allItems = visible.flatMap(l => store.items[l.id] ?? [])
   const doneItems = allItems.filter(i => i.completed)
   const completionPct = allItems.length > 0 ? Math.round((doneItems.length / allItems.length) * 100) : 0
 
-  const sharedCount = store.lists.filter(l => (store.members[l.id] ?? []).length > 1).length
+  const sharedCount = visible.filter(l => (store.members[l.id] ?? []).length > 1).length
 
   // Uncategorized shopping items — actionable: categorizing improves future insights
-  const shoppingItems = store.lists.filter(l => l.type === 'shopping').flatMap(l => store.items[l.id] ?? [])
+  const shoppingItems = visible.filter(l => l.type === 'shopping').flatMap(l => store.items[l.id] ?? [])
   const uncategorized = shoppingItems.filter(i => !i.category).length
 
   // Category distribution across shopping items
@@ -32,7 +33,7 @@ export default function Insights() {
   const maxCatCount = topCats[0]?.count ?? 1
 
   const stats = [
-    { label: 'Lists', value: store.lists.length },
+    { label: 'Lists', value: visible.length },
     { label: 'Items completed', value: doneItems.length },
     { label: 'Items pending', value: allItems.length - doneItems.length },
     { label: 'Shared lists', value: sharedCount },

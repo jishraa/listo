@@ -21,6 +21,9 @@ interface ListsState {
   renameList: (listId: string, name: string) => Promise<void>
   deleteList: (listId: string) => Promise<void>
   duplicateList: (listId: string) => Promise<void>
+  saveAsTemplate: (listId: string) => Promise<void>
+  createFromTemplate: (templateId: string) => Promise<List | null>
+  setArchived: (listId: string, archived: boolean) => Promise<void>
   leaveList: (listId: string) => Promise<void>
   loadItems: (listId: string) => Promise<void>
   loadMembers: (listId: string) => Promise<void>
@@ -39,6 +42,24 @@ interface ListsState {
 
 type Get = () => ListsState
 type Set = (partial: Partial<ListsState>) => void
+
+// Central list filters — every surface (Home stats, Insights, Lists sections)
+// must exclude templates and archived lists from "normal" views through these.
+// `!!` because rows loaded before migration v3 lack the columns entirely.
+export const visibleLists  = (lists: List[]) => lists.filter(l => !l.is_template && !l.archived_at)
+export const templateLists = (lists: List[]) => lists.filter(l => !!l.is_template)
+export const archivedLists = (lists: List[]) => lists.filter(l => !l.is_template && !!l.archived_at)
+
+// Copies a list's items to a new list (fresh, uncompleted).
+async function copyItems(fromItems: { title: string; quantity: string | null; category: string | null; sort_order: number }[], toListId: string, displayName: string) {
+  if (fromItems.length === 0) return
+  await Promise.all(fromItems.map(item =>
+    supabase.from('list_items').insert({
+      list_id: toListId, title: item.title, quantity: item.quantity,
+      category: item.category, sort_order: item.sort_order, added_by_name: displayName,
+    })
+  ))
+}
 
 function bumpUpdatedAt(listId: string, get: Get, set: Set) {
   const now = new Date().toISOString()
@@ -165,16 +186,50 @@ export const useListsStore = create<ListsState>((set, get) => ({
     if (!data) return
     const newList = data as List
     await supabase.from('list_members').insert({ list_id: newList.id, user_id: userId, role: 'owner', display_name: displayName })
-    const origItems = get().items[listId] ?? []
-    if (origItems.length > 0) {
-      await Promise.all(origItems.map(item =>
-        supabase.from('list_items').insert({
-          list_id: newList.id, title: item.title, quantity: item.quantity,
-          category: item.category, added_by_name: displayName,
-        })
-      ))
-    }
+    await copyItems(get().items[listId] ?? [], newList.id, displayName)
     set({ lists: [newList, ...get().lists] })
+  },
+
+  saveAsTemplate: async (listId) => {
+    const { userId, displayName } = get()
+    const orig = get().lists.find(l => l.id === listId)
+    if (!orig) return
+    const { data, error } = await supabase
+      .from('lists')
+      .insert({ name: orig.name, type: orig.type, emoji: orig.emoji, owner_id: userId, invite_code: generateInviteCode(), is_template: true })
+      .select()
+      .single()
+    if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
+    const tpl = data as List
+    await supabase.from('list_members').insert({ list_id: tpl.id, user_id: userId, role: 'owner', display_name: displayName })
+    await copyItems(get().items[listId] ?? [], tpl.id, displayName)
+    set({ lists: [tpl, ...get().lists] })
+  },
+
+  createFromTemplate: async (templateId) => {
+    const { userId, displayName } = get()
+    const tpl = get().lists.find(l => l.id === templateId)
+    if (!tpl) return null
+    const { data, error } = await supabase
+      .from('lists')
+      .insert({ name: tpl.name, type: tpl.type, emoji: tpl.emoji, owner_id: userId, invite_code: generateInviteCode() })
+      .select()
+      .single()
+    if (error || !data) { set({ lastError: "Couldn't create list — try again" }); return null }
+    const list = data as List
+    await supabase.from('list_members').insert({ list_id: list.id, user_id: userId, role: 'owner', display_name: displayName })
+    if (!get().items[templateId]) await get().loadItems(templateId)
+    await copyItems(get().items[templateId] ?? [], list.id, displayName)
+    set({ lists: [list, ...get().lists] })
+    return list
+  },
+
+  setArchived: async (listId, archived) => {
+    const prev = get().lists
+    const archived_at = archived ? new Date().toISOString() : null
+    set({ lists: prev.map(l => l.id === listId ? { ...l, archived_at } : l) })
+    const { error } = await supabase.from('lists').update({ archived_at }).eq('id', listId)
+    if (error) set({ lists: prev, lastError: archived ? "Couldn't archive — try again" : "Couldn't restore — try again" })
   },
 
   leaveList: async (listId) => {

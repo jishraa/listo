@@ -38,14 +38,16 @@ Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loadin
 | Store | Purpose |
 |---|---|
 | `useAuthStore` | Session, user, `displayName`, `isGuest` (Supabase anonymous auth), signOut |
-| `useListsStore` | Lists, items, members; Supabase CRUD + realtime |
+| `useListsStore` | Lists, items, members; Supabase CRUD + realtime; templates (`saveAsTemplate`/`createFromTemplate`) and archiving (`setArchived`) |
 | `useThemeStore` | `pref: 'light' \| 'dark' \| 'system'`; `applyTheme()` sets `data-theme` on `<html>` |
 
 Go through store helpers for Supabase access; don't call Supabase directly from components.
 
-### Supabase (`supabase-migration.sql` + `supabase-migration-v2.sql`)
+### Supabase (`supabase-migration.sql` + `-v2.sql` + `-v3.sql`)
 
-Tables: `lists` (name, type, emoji, owner_id, invite_code, invite_expires_at), `list_items` (title, quantity, completed, category, sort_order, added_by_name, completed_by_name), `list_members` (list_id, user_id, role owner|collaborator, display_name).
+Tables: `lists` (name, type, emoji, owner_id, invite_code, invite_expires_at, is_template, archived_at), `list_items` (title, quantity, completed, category, sort_order, added_by_name, completed_by_name), `list_members` (list_id, user_id, role owner|collaborator, display_name).
+
+Templates and archived lists are regular `lists` rows flagged by `is_template` / `archived_at` — no separate tables. Every "normal" list view must filter through the store's exported helpers `visibleLists` / `templateLists` / `archivedLists` (rows loaded before migration v3 lack the columns, so the helpers use truthiness, never `=== false`).
 
 RPCs (SECURITY DEFINER): `redeem_list_invite(code, display_name)` — validates code + expiry, inserts membership; raises `invalid_code` / `expired_code` / `own_list` / `already_member`. `remove_list_member` — owner only.
 

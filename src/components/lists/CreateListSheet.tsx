@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import Sheet from '../ui/Sheet'
-import type { ListType } from '../../types'
+import type { List, ListType } from '../../types'
 import { TEMPLATES } from '../../lib/constants'
+import { useListsStore, templateLists } from '../../store/useListsStore'
 
 const TYPE_EMOJIS: Record<ListType, string[]> = {
   personal: ['📋', '📝', '🗒️', '📌', '🏠', '💼'],
@@ -28,6 +29,11 @@ export default function CreateListSheet({ open, onClose, onCreate }: Props) {
   const [emoji, setEmoji] = useState('📋')
   const [loading, setLoading] = useState(false)
 
+  const lists = useListsStore(s => s.lists)
+  const items = useListsStore(s => s.items)
+  const createFromTemplate = useListsStore(s => s.createFromTemplate)
+  const myTemplates = templateLists(lists)
+
   const reset = () => { setStep('templates'); setName(''); setType('personal'); setEmoji('📋') }
 
   const handleCreate = async (templateItems?: { title: string; category?: string }[]) => {
@@ -46,12 +52,56 @@ export default function CreateListSheet({ open, onClose, onCreate }: Props) {
     onClose()
   }
 
+  const handleUserTemplate = async (t: List) => {
+    setLoading(true)
+    await createFromTemplate(t.id)
+    setLoading(false)
+    onClose()
+  }
+
   const handleClose = () => { reset(); onClose() }
 
   return (
     <Sheet open={open} onClose={handleClose} title={step === 'templates' ? 'New List' : 'Custom List'}>
       {step === 'templates' ? (
         <div className="sheet-body">
+          {myTemplates.length > 0 && (
+            <>
+              <p className="text-xs" style={{ fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                My templates
+              </p>
+              <div className="flex-col gap-2">
+                {myTemplates.map(t => {
+                  const count = (items[t.id] ?? []).length
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => handleUserTemplate(t)}
+                      disabled={loading}
+                      className="card"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '12px 14px', textAlign: 'left', width: '100%',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        opacity: loading ? 0.6 : 1,
+                      }}
+                    >
+                      <span style={{ fontSize: 26 }}>{t.emoji}</span>
+                      <div>
+                        <p style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</p>
+                        <p className="text-xs text-hint" style={{ marginTop: 2 }}>
+                          {count} {count === 1 ? 'item' : 'items'} · {TYPE_LABELS[t.type]}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-xs" style={{ fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                Suggested
+              </p>
+            </>
+          )}
           <div className="flex-col gap-2">
             {TEMPLATES.map(t => (
               <button
