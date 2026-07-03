@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ChevronRight, LayoutTemplate, UserPlus, ArrowRight, Tag, Archive, PlusCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, ChevronRight, LayoutTemplate, ArrowRight, Tag, Archive, PlusCircle, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
-import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
@@ -26,10 +25,6 @@ export default function Home() {
   const installPrompt = useInstallPrompt()
   const [createOpen, setCreateOpen] = useState(false)
   const [createStep, setCreateStep] = useState<'templates' | 'custom'>('custom')
-  const [joinOpen, setJoinOpen] = useState(false)
-  const [joinCode, setJoinCode] = useState('')
-  const [joinMsg, setJoinMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [joining, setJoining] = useState(false)
 
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
     const list = await store.createList({ name, type, emoji })
@@ -38,21 +33,6 @@ export default function Home() {
       for (const item of templateItems) {
         await store.addItem(list.id, item.title, '', item.category ?? null)
       }
-    }
-  }
-
-  const handleJoin = async () => {
-    if (!joinCode.trim() || joining) return
-    setJoining(true)
-    setJoinMsg(null)
-    const res = await store.joinByCode(joinCode)
-    setJoining(false)
-    setJoinMsg({ ok: res.success, text: res.message })
-    if (res.success && res.list) {
-      setTimeout(() => {
-        setJoinOpen(false); setJoinCode(''); setJoinMsg(null)
-        navigate(`/list/${res.list!.id}`)
-      }, 900)
     }
   }
 
@@ -165,10 +145,10 @@ export default function Home() {
               {/* Quick Actions */}
               <div>
                 <span style={sectionLabel}>Quick Actions</span>
+                {/* Joining a shared list happens only via its secure invite link */}
                 <div style={{ display: 'flex', gap: 10 }}>
                   {quickAction('New List', <PlusCircle size={20} />, () => { setCreateStep('custom'); setCreateOpen(true) })}
                   {quickAction('Templates', <LayoutTemplate size={20} />, () => { setCreateStep('templates'); setCreateOpen(true) })}
-                  {quickAction('Join List', <UserPlus size={20} />, () => { setJoinMsg(null); setJoinCode(''); setJoinOpen(true) })}
                 </div>
               </div>
 
@@ -249,32 +229,6 @@ export default function Home() {
       </div>
 
       <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} initialStep={createStep} />
-
-      {/* Join shared list by invite code */}
-      <Sheet open={joinOpen} onClose={() => setJoinOpen(false)} title="Join Shared List">
-        <div className="sheet-body">
-          <p className="text-sm text-muted">
-            Paste the invite code or link a friend shared with you.
-          </p>
-          <input
-            className="input"
-            placeholder="Invite code"
-            value={joinCode}
-            autoCapitalize="none"
-            onChange={e => setJoinCode(e.target.value.trim().split('/').pop() ?? '')}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            autoFocus
-          />
-          {joinMsg && (
-            <p className="text-sm" style={{ color: joinMsg.ok ? 'var(--accent)' : '#f87171', fontWeight: 600 }}>
-              {joinMsg.text}
-            </p>
-          )}
-          <button className="btn btn-primary btn-full" onClick={handleJoin} disabled={!joinCode.trim() || joining}>
-            {joining ? <span className="spinner" /> : 'Join List'}
-          </button>
-        </div>
-      </Sheet>
     </>
   )
 }

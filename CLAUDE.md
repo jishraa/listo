@@ -28,7 +28,7 @@ No test suite.
 | `/login` | Login | Email/password + Google/Apple OAuth + anonymous "guest"; Create Account UX with password rules |
 | `/terms`, `/privacy` | Legal | Static legal pages (no auth guard) |
 | `/join/:code` | JoinList | Invite-link landing (no auth guard) |
-| `/` | Home | Dashboard: Today's Focus, Quick Actions, Smart Insights, Recent Activity |
+| `/` | Home | Dashboard: Today's Focus, Quick Actions (New List / Templates), Smart Insights, Recent Activity. Joining shared lists happens only via the secure `/join/:code` invite link — no manual code entry anywhere |
 | `/lists` | Lists | Management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates |
 | `/insights` | Insights | Completion rate, stat grid, category distribution |
 | `/list/:id` | ListDetail | Items, members, share (drill-in — renders outside the shell) |
