@@ -141,9 +141,12 @@ export default function Profile() {
           )}
         </SettingsSection>
 
-        {/* Appearance */}
-        <SettingsSection title="Appearance">
+        {/* Settings */}
+        <SettingsSection title="Settings">
           <div style={{ padding: '14px 16px' }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>
+              Appearance
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {THEME_OPTIONS.map(({ value, label, Icon }) => {
                 const active = pref === value
