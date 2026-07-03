@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, LogOut, Monitor, Moon, Pencil, Sun, User } from 'lucide-react'
+import { ChevronRight, LogOut, Monitor, Moon, Pencil, Sun, User } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useThemeStore } from '../store/useThemeStore'
 import type { ThemePref } from '../store/useThemeStore'
@@ -64,15 +64,12 @@ export default function Profile() {
   const initials = displayName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
 
   return (
-    <div className="app-container">
-      <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}>
-          <ArrowLeft size={20} />
-        </button>
-        <span className="header-title">Settings</span>
+    <div className="page">
+      <div style={{ padding: '24px 16px 4px' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Profile</h1>
       </div>
 
-      <div className="page page-padded" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="page-padded" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Avatar card */}
         <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
           <div style={{

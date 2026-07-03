@@ -4,9 +4,12 @@ import { useAuthStore } from './store/useAuthStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
 import Login from './pages/Login'
 import Home from './pages/Home'
+import Lists from './pages/Lists'
+import Insights from './pages/Insights'
 import ListDetail from './pages/ListDetail'
 import JoinList from './pages/JoinList'
 import Profile from './pages/Profile'
+import AppShell from './components/layout/AppShell'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -57,27 +60,25 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/join/:code" element={<JoinList />} />
+      {/* Tab pages render inside the AppShell (bottom nav + create FAB) */}
       <Route
-        path="/"
         element={
           <AuthGuard>
-            <Home />
+            <AppShell />
           </AuthGuard>
         }
-      />
+      >
+        <Route path="/" element={<Home />} />
+        <Route path="/lists" element={<Lists />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="/profile" element={<Profile />} />
+      </Route>
+      {/* Drill-in page — full-screen, own header, no bottom nav */}
       <Route
         path="/list/:id"
         element={
           <AuthGuard>
             <ListDetail />
-          </AuthGuard>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <AuthGuard>
-            <Profile />
           </AuthGuard>
         }
       />
