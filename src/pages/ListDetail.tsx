@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowUpDown, BarChart2, Check, Copy, FileText, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, BarChart2, Check, FileText, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { LIST_CATEGORIES, detectCategory, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
 import { exportListReport } from '../lib/report'
 import { SwipeRow } from '../components/lists/SwipeRow'
+import ShareListSheet from '../components/lists/ShareListSheet'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -83,7 +84,6 @@ export default function ListDetail() {
   const [showCategories,   setShowCategories]   = useState(false)
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
-  const [copied,           setCopied]           = useState(false)
   const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
     id ? localStorage.getItem(`listo-completed-${id}`) : null
@@ -241,11 +241,6 @@ export default function ListDetail() {
     setShowMerge(false); setMergeTarget(null); resetAdd()
     await store.updateItem(list.id, mergeTarget.id, { title: mergeTarget.title, quantity: combined, category: mergeTarget.category })
     setPendingAdd(null)
-  }
-
-  async function copyLink() {
-    await navigator.clipboard.writeText(`${window.location.origin}/join/${list!.invite_code}`)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
   if (!list) return (
@@ -1026,28 +1021,7 @@ export default function ListDetail() {
 
       {/* ── Share sheet ── */}
       {shareOpen && (
-        <>
-          <Overlay onClick={() => setShareOpen(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Share List</p>
-              <p className="text-muted text-sm">Anyone with this link can join and collaborate — no account needed.</p>
-              <div style={{ background: 'var(--bg-input)', borderRadius: 10, padding: '12px 14px', wordBreak: 'break-all', fontSize: 13, color: 'var(--text-2)' }}>
-                {window.location.origin}/join/{list.invite_code}
-              </div>
-              <button className="btn btn-primary btn-full" onClick={copyLink}>
-                {copied ? <><Check size={16} /> Copied!</> : <><Copy size={16} /> Copy Link</>}
-              </button>
-              {isOwner && (
-                <button className="btn btn-ghost btn-full text-sm text-muted"
-                  onClick={async () => { await store.regenerateInvite(list.id); setShareOpen(false) }}>
-                  Generate new link (revokes old one)
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+        <ShareListSheet list={list} members={members} onClose={() => setShareOpen(false)} />
       )}
 
       {/* ── Undo delete toast ── */}

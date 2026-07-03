@@ -4,6 +4,7 @@ import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, La
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
+import ShareListSheet from '../components/lists/ShareListSheet'
 import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -202,15 +203,7 @@ export default function Lists() {
     }
   }
 
-  const handleShare = async (list: List) => {
-    const url = `${window.location.origin}/join/${list.invite_code}`
-    if (navigator.share) {
-      await navigator.share({ title: list.name, url }).catch(() => {})
-    } else {
-      await navigator.clipboard.writeText(url).catch(() => {})
-    }
-  }
-
+  const [shareTarget, setShareTarget] = useState<List | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<List | null>(null)
   const [renameInput, setRenameInput] = useState('')
@@ -336,9 +329,10 @@ export default function Lists() {
         onOpen={() => navigate(`/list/${list.id}`)}
         onPin={() => togglePin(list.id)}
         onMoveTop={() => moveToTop(list.id)}
-        onShare={() => handleShare(list)}
         {...(isOwner
           ? {
+              // Sharing is owner-only: the sheet rotates the invite code
+              onShare: () => setShareTarget(list),
               onRename: () => { setRenameTarget(list); setRenameInput(list.name) },
               onDuplicate: () => store.duplicateList(list.id),
               onSaveTemplate: () => store.saveAsTemplate(list.id),
@@ -557,6 +551,14 @@ export default function Lists() {
       </div>
 
       <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} />
+
+      {shareTarget && (
+        <ShareListSheet
+          list={shareTarget}
+          members={store.members[shareTarget.id] ?? []}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
 
       <Sheet open={sortOpen} onClose={() => setSortOpen(false)} title="Sort by">
         <div className="sheet-body" style={{ gap: 8 }}>
