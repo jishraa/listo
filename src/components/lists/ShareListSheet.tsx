@@ -1,9 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, MessageCircle, MoreHorizontal, X } from 'lucide-react'
+import { Check, Copy, MessageCircle, MoreHorizontal, Shuffle, X } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
 import type { List, ListMember } from '../../types'
 
 const REVEAL = 80
+
+// Invite message drafts — the shuffle button cycles through these.
+const MESSAGE_DRAFTS: ((name: string) => string)[] = [
+  n => `🛒 Hey! Join my "${n}" list on Listo — we can add and tick off items together:`,
+  n => `📝 I'm organizing "${n}" on Listo. Hop in so we stay in sync:`,
+  n => `Let's plan "${n}" together! One tap to join on Listo:`,
+  n => `You're invited to "${n}" on Listo — everything updates live:`,
+]
+
+// Shorten via our own Worker proxy (/api/shorten → TinyURL). Returns null on
+// any failure (e.g. local dev where the Worker isn't running) — callers fall
+// back to the full link.
+async function shortenUrl(longUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/shorten?url=${encodeURIComponent(longUrl)}`)
+    if (!res.ok) return null
+    const short = (await res.text()).trim()
+    return short.startsWith('https://tinyurl.com/') ? short : null
+  } catch {
+    return null
+  }
+}
 
 function WhatsAppIcon({ size = 24 }: { size?: number }) {
   return (
@@ -123,8 +145,10 @@ interface Props {
 export default function ShareListSheet({ list, members, onClose }: Props) {
   const store = useListsStore()
   const [currentCode, setCurrentCode] = useState<string>(list.invite_code ?? '')
+  const [shortUrl, setShortUrl]       = useState<string | null>(null)
   const [generating, setGenerating]   = useState(true)
   const [copied, setCopied]           = useState(false)
+  const [draftIdx, setDraftIdx]       = useState(() => Math.floor(Math.random() * MESSAGE_DRAFTS.length))
   // StrictMode double-invoke guard: regenerate exactly once per open so the
   // DB and currentCode always agree.
   const didRegenerate = useRef(false)
@@ -132,20 +156,24 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
   useEffect(() => {
     if (didRegenerate.current) return
     didRegenerate.current = true
-    store.regenerateInvite(list.id).then(newCode => {
+    store.regenerateInvite(list.id).then(async newCode => {
+      const code = newCode ?? list.invite_code
       if (newCode) setCurrentCode(newCode)
+      setShortUrl(await shortenUrl(`${window.location.origin}/join/${code}`))
       setGenerating(false)
     }).catch(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const joinUrl   = currentCode ? `${window.location.origin}/join/${currentCode}` : ''
-  const shareText = `Join my "${list.name}" list on Listo: ${joinUrl}`
+  const shareUrl  = shortUrl ?? joinUrl
+  const message   = MESSAGE_DRAFTS[draftIdx](list.name)
+  const shareText = `${message} ${shareUrl}`
   const disabled  = generating || !joinUrl
 
   function handleCopy() {
-    if (!joinUrl) return
-    navigator.clipboard.writeText(joinUrl).catch(() => {})
+    if (disabled) return
+    navigator.clipboard.writeText(shareText).catch(() => {})
     navigator.vibrate?.(12)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -180,9 +208,35 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
             <X size={16} strokeWidth={2.5} />
           </button>
         </div>
-        <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '6px 20px 18px' }}>
+        <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '6px 20px 14px' }}>
           {generating ? 'Generating a fresh link…' : 'A fresh link was generated — older links no longer work.'}
         </p>
+
+        {/* Message draft — shuffle cycles the wording; all share actions use it */}
+        <div style={{
+          margin: '0 20px 18px', padding: '12px 14px', borderRadius: 14,
+          background: 'var(--bg-input)', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <p style={{ flex: 1, fontSize: 13.5, lineHeight: 1.5, color: 'var(--text)', margin: 0, wordBreak: 'break-word' }}>
+            {message}{' '}
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              {generating ? '…' : shareUrl}
+            </span>
+          </p>
+          <button
+            onClick={() => setDraftIdx(i => (i + 1) % MESSAGE_DRAFTS.length)}
+            aria-label="Try another message"
+            style={{
+              flexShrink: 0, width: 32, height: 32, borderRadius: 10,
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'var(--text-2)',
+            }}
+          >
+            <Shuffle size={14} strokeWidth={2.2} />
+          </button>
+        </div>
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: 18, padding: '0 20px 22px' }}>
@@ -222,7 +276,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
               {copied ? <Check size={22} strokeWidth={2.5} /> : <Copy size={22} strokeWidth={2} />}
             </button>
             <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-              {copied ? 'Link copied' : 'Copy'}
+              {copied ? 'Copied' : 'Copy'}
             </span>
           </div>
 
@@ -230,7 +284,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <button
                 disabled={disabled}
-                onClick={() => { if (joinUrl) navigator.share({ title: `Join "${list.name}" on Listo`, url: joinUrl }).catch(() => {}) }}
+                onClick={() => { if (!disabled) navigator.share({ title: `Join "${list.name}" on Listo`, text: message, url: shareUrl }).catch(() => {}) }}
                 style={{ ...btnBase, background: 'var(--bg-input)', color: 'var(--text)' }}
               >
                 <MoreHorizontal size={22} strokeWidth={2} />

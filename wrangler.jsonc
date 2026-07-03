@@ -1,11 +1,13 @@
 {
   "name": "listo",
   "compatibility_date": "2026-07-01",
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // SPA fallback: serve index.html for unknown paths (/list/:id, /join/:code…).
-    // Replaces the old Pages `_redirects` catch-all, which Workers rejects
-    // as an infinite loop (error 100324).
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // API routes bypass asset serving and hit the Worker script
+    "run_worker_first": ["/api/*"]
   }
 }
