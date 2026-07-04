@@ -603,6 +603,13 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .pw-strength .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
 .pw-strength .bar > div { height: 100%; border-radius: 2px; transition: width 0.2s var(--ease), background 0.2s; }
 
+/* Referral card ambient glow (profile spec v3) */
+@keyframes referral-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(22, 163, 74, 0); }
+  50%      { box-shadow: 0 0 22px rgba(22, 163, 74, 0.16); }
+}
+.referral-card { animation: referral-glow 3s ease-in-out infinite; }
+
 /* Filter/sort change transition (list detail, spec §11) */
 @keyframes list-fade-in {
   from { opacity: 0; transform: translateY(4px); }
