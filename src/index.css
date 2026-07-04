@@ -5,6 +5,8 @@
   --accent:      #16A34A;
   --accent-dim:  rgba(22, 163, 74, 0.10);
   --accent-mid:  rgba(22, 163, 74, 0.30);
+  --accent-soft: rgba(34, 197, 94, 0.16);
+  --accent-text: #4ade80;
   --accent-glow: 0 0 20px rgba(22, 163, 74, 0.40), 0 0 6px rgba(22, 163, 74, 0.15);
 
   --bg:      #04080f;
@@ -678,6 +680,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 
 [data-theme="light"] {
   --accent:      #15803d;
+  --accent-soft: rgba(21, 128, 61, 0.12);
+  --accent-text: #15803d;
   --accent-dim:  rgba(21, 128, 61, 0.10);
   --accent-mid:  rgba(21, 128, 61, 0.28);
   --accent-glow: 0 0 14px rgba(21, 128, 61, 0.22), 0 0 4px rgba(21, 128, 61, 0.10);

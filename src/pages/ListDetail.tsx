@@ -15,6 +15,19 @@ import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
+// Category filter pill — 36px, non-truncating; soft green tint when active so
+// the strongest Listo green stays reserved for CTAs/progress (spec §1.1–1.2).
+function pillStyle(active: boolean): CSSProperties {
+  return {
+    flexShrink: 0, height: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer',
+    whiteSpace: 'nowrap', border: 'none',
+    background: active ? 'var(--accent-soft)' : 'var(--bg-input)',
+    color: active ? 'var(--accent-text)' : 'var(--text-2)',
+    fontSize: 13, fontWeight: active ? 700 : 500,
+    transition: 'background 160ms ease, color 160ms ease',
+  }
+}
+
 function formatCompletedAt(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return ''
@@ -524,9 +537,9 @@ export default function ListDetail() {
           <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {list.emoji} {list.name}
           </p>
-          {/* Shared lists keep the live done-count in the header so members
-              see collective progress at a glance (personal lists stay compact) */}
-          {members.length > 1 && items.length > 0 && (
+          {/* Live remaining-count under the title — the single source of the
+              "items left" info (spec §1.3), shown for personal and shared alike */}
+          {items.length > 0 && (
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>
               {isAllComplete ? 'All done' : `${itemsLeft} ${itemsLeft === 1 ? 'item' : 'items'} left`}
             </p>
@@ -564,9 +577,11 @@ export default function ListDetail() {
               <span style={{ fontSize: 13, fontWeight: 600, color: isAllComplete ? 'var(--accent)' : 'var(--text-2)' }}>
                 {progressMsg}
               </span>
-              {!isAllComplete && (
-                <span style={{ fontSize: 13, fontWeight: 500, color: doneCount > 0 ? 'var(--accent)' : 'var(--text-3)' }}>
-                  {itemsLeft} {itemsLeft === 1 ? 'item' : 'items'} left{doneCount > 0 ? ` • ${Math.round(pct)}%` : ''}
+              {/* Only the % here — "N items left" already lives in the header
+                  (spec §1.3, no repetition) */}
+              {!isAllComplete && doneCount > 0 && (
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+                  {Math.round(pct)}%
                 </span>
               )}
             </div>
@@ -578,32 +593,17 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Category filter strip */}
+        {/* Category filter strip — horizontally scrollable, labels never
+            truncate or wrap (spec §1.1); soft green tint when active (§1.2) */}
         {list.type === 'shopping' && usedCatIds.size > 0 && (
-          <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' as const }}>
-            {/* Lightweight pills (spec §3/§9): filled green when active,
-                neutral background otherwise — no outlines, no glow */}
-            <button onClick={() => setFilterCategories(new Set())} style={{
-              flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 99, cursor: 'pointer',
-              background: filterCategories.size === 0 ? 'var(--accent)' : 'var(--bg-input)',
-              color: filterCategories.size === 0 ? '#030a14' : 'var(--text-2)',
-              border: 'none',
-              fontSize: 13, fontWeight: filterCategories.size === 0 ? 700 : 500,
-              transition: 'background 150ms ease, color 150ms ease',
-            }}>All</button>
+          <div className="cat-filter-strip" style={{ display: 'flex', gap: 8, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' as const }}>
+            <button onClick={() => setFilterCategories(new Set())} style={pillStyle(filterCategories.size === 0)}>All</button>
             {cats.filter(c => usedCatIds.has(c.id)).map(c => {
               const active = filterCategories.has(c.id)
               return (
                 <button key={c.id} onClick={() => setFilterCategories(prev => {
                   const next = new Set(prev); active ? next.delete(c.id) : next.add(c.id); return next
-                })} style={{
-                  flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 99, cursor: 'pointer',
-                  background: active ? 'var(--accent)' : 'var(--bg-input)',
-                  color: active ? '#030a14' : 'var(--text-2)',
-                  border: 'none',
-                  fontSize: 13, fontWeight: active ? 700 : 500,
-                  transition: 'background 150ms ease, color 150ms ease',
-                }}>{c.name}</button>
+                })} style={pillStyle(active)}>{c.name}</button>
               )
             })}
           </div>
@@ -786,23 +786,8 @@ export default function ListDetail() {
           <div className="sheet">
             <div className="sheet-handle" />
             <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p style={{ fontSize: 17, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Add Item</p>
-                  <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '2px 0 0' }}>to {list.name}</p>
-                </div>
-                {/* "✓ added" confirmation — auto-hides after ~2s */}
-                {addedToast && (
-                  <span className="list-fade-in" style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                    padding: '5px 12px', borderRadius: 99, maxWidth: '55%',
-                    background: 'var(--accent-dim)', color: 'var(--accent)',
-                    fontSize: 13, fontWeight: 600,
-                  }}>
-                    <Check size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
-                  </span>
-                )}
+              <div>
+                <p style={{ fontSize: 17, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Add to {list.name}</p>
               </div>
               <div style={{ position: 'relative' }}>
                 <div className="flex gap-2">
@@ -811,7 +796,7 @@ export default function ListDetail() {
                     value={addInput}
                     onChange={e => setAddInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSheetAdd()}
-                    placeholder={list.type === 'shopping' ? 'Item name or "Milk x2"' : 'Add an item…'}
+                    placeholder={list.type === 'shopping' ? 'Add item… e.g. Milk ×2 or Rice 2kg' : 'Add an item…'}
                     maxLength={200}
                     style={{
                       flex: 1, height: 48, borderRadius: 10, padding: '0 14px',
@@ -852,6 +837,18 @@ export default function ListDetail() {
                   </div>
                 )}
               </div>
+
+              {/* "✓ added" confirmation — directly below the input, close to the
+                  action that triggered it; auto-hides after ~2s (spec §2.1) */}
+              {addedToast && (
+                <span className="list-fade-in" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                  padding: '4px 2px', color: 'var(--accent)', fontSize: 13, fontWeight: 600,
+                }}>
+                  <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
+                </span>
+              )}
 
               {/* Parsed qty badge */}
               {parsedInput.qty && (
