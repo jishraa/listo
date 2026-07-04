@@ -1044,7 +1044,10 @@ export default function ListDetail() {
               style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'var(--bg-input)', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <ChevronLeft size={18} />
             </button>
-            <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Insights · {list.emoji} {list.name}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>Insights</p>
+              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.emoji} {list.name}</p>
+            </div>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1116,8 +1119,8 @@ export default function ListDetail() {
                 </div>
               )}
 
-              {/* Member activity */}
-              {(insTopAdder || insTopCompleter) && (
+              {/* Member activity — collaboration-only (spec §3.3) */}
+              {members.length > 1 && (insTopAdder || insTopCompleter) && (
                 <div>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Member Activity</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1175,12 +1178,12 @@ export default function ListDetail() {
                 >
                   <img src="/yft.png" alt="YFT" style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Track Grocery Spending</span>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Track Your Shopping Spend</span>
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                      Shopping organized — track what you spend each month.
+                      Record this shopping expense in YFT and keep an eye on your monthly budget.
                     </span>
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Open in YFT →</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Track Spending in YFT →</span>
                 </button>
               )}
             </div>
