@@ -79,13 +79,12 @@ export default function Login() {
 
   const handleSubmit = async () => {
     setError('')
-    // Inline validation — never browser-native popups (form is noValidate)
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      setError('Please enter a valid email address.')
-      return
-    }
+    // Inline validation on submit — the CTA stays enabled so it's always
+    // clear what's missing; never browser-native popups (form is noValidate)
+    if (mode === 'register' && !name.trim()) { setError('Please enter your full name.'); return }
+    if (!email) { setError('Please enter your email address.'); return }
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setError('Please enter a valid email address.'); return }
     if (mode === 'forgot') {
-      if (!email) return
       setLoading(true)
       const err = await forgotPassword(email)
       setLoading(false)
@@ -94,10 +93,9 @@ export default function Login() {
       setResendIn(30)
       return
     }
-    if (!email || !password) return
-    if (mode === 'register') {
-      if (!name.trim()) return
-      if (!allRulesPass) { fail('password policy'); setError('Please meet all the password requirements.'); return }
+    if (!password) { setError('Please enter your password.'); return }
+    if (mode === 'register' && !allRulesPass) {
+      fail('password policy'); setError('Please meet all the password requirements.'); return
     }
     setLoading(true)
     if (mode === 'login') {
@@ -378,18 +376,20 @@ export default function Login() {
               )}
 
               {mode === 'register' && (
-                <p style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'center', lineHeight: 1.7 }}>
+                // 12.5px + full width so it wraps as two balanced lines instead
+                // of stranding "Privacy Policy." on a third (spec)
+                <p style={{ fontSize: 12.5, color: 'var(--text-2)', textAlign: 'center', lineHeight: 1.7, margin: '0 -4px' }}>
                   By creating an account, you agree to our{' '}
                   <Link to="/terms" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '10px 2px', margin: '-10px -2px' }}>Terms of Service</Link>
                   {' '}and{' '}
-                  <Link to="/privacy" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '10px 2px', margin: '-10px -2px' }}>Privacy Policy</Link>.
+                  <Link to="/privacy" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '10px 2px', margin: '-10px -2px', whiteSpace: 'nowrap' }}>Privacy Policy</Link>.
                 </p>
               )}
 
               <button
                 type="submit"
                 className="btn btn-primary btn-full"
-                disabled={disabled || !email || (mode !== 'forgot' && !password) || (mode === 'register' && !name.trim())}
+                disabled={disabled}
                 style={{ marginTop: 8 }}
               >
                 {loading

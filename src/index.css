@@ -501,13 +501,13 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   padding: 8px 0;
   /* Upper-middle, not dead centre: cap the top gap so short forms (e.g.
      forgot password) don't float in a sea of empty space. */
-  margin: clamp(12px, 9vh, 84px) 0 auto;
+  margin: clamp(8px, 6vh, 60px) 0 auto;
   position: relative;
   z-index: 1;
   animation: fade-in 220ms var(--ease);
 }
 
-.auth-logo { text-align: center; margin-bottom: 26px; }
+.auth-logo { text-align: center; margin-bottom: 20px; }
 
 /* Softer logo treatment (spec §3): 15–20% glow, no pulse animation */
 .auth-logo .logo-icon {
@@ -568,8 +568,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 }
 
 /* Better placeholder contrast + calm focus: green border, no glow ring */
-.auth-form .input::placeholder { color: rgba(221, 238, 255, 0.42); }
-[data-theme="light"] .auth-form .input::placeholder { color: rgba(10, 22, 40, 0.42); }
+.auth-form .input::placeholder { color: rgba(221, 238, 255, 0.50); }
+[data-theme="light"] .auth-form .input::placeholder { color: rgba(10, 22, 40, 0.50); }
 .auth-form .input:focus {
   border-color: var(--accent);
   box-shadow: none;
@@ -584,11 +584,11 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 
 /* Sign In stays the strongest element, but without neon (login spec) */
 .auth-form .btn-primary {
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.18);
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.14);
 }
 .auth-form .btn-primary:hover:not(:disabled) {
   filter: brightness(1.06);
-  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.24);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.20);
 }
 
 .auth-social {
