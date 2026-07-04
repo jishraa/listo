@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Listo — Smart Lists for Everyday Life** is a collaborative list PWA (grocery/shopping, tasks, personal lists) built with React 19 + TypeScript + Vite, deployed to web via Cloudflare Pages and to iOS/Android via Capacitor. Product vision and roadmap live in `docs/VISION.md` — consult it before proposing features; every feature must serve one of the UX goals there (save time/money/effort, improve planning, collaborate better, better decisions).
 
-The Cloudflare Worker (`worker/index.ts`, config in `wrangler.jsonc`) serves the SPA assets and exposes `/api/shorten` — a TinyURL proxy used by the share sheet (TinyURL has no CORS headers, so the browser can't call it directly). API routes are listed in `assets.run_worker_first`.
+Deployed as a Cloudflare Worker serving static assets only (`wrangler.jsonc`, SPA fallback via `not_found_handling`). Share links use the full `/join/:code` URL — a TinyURL integration was tried and removed at the user's request (don't reintroduce shorteners).
 
 ## Development Commands
 

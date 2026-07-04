@@ -13,20 +13,6 @@ const MESSAGE_DRAFTS: ((name: string) => string)[] = [
   n => `You're invited to "${n}" on Listo — everything updates live:`,
 ]
 
-// Shorten via our own Worker proxy (/api/shorten → TinyURL). Returns null on
-// any failure (e.g. local dev where the Worker isn't running) — callers fall
-// back to the full link.
-async function shortenUrl(longUrl: string): Promise<string | null> {
-  try {
-    const res = await fetch(`/api/shorten?url=${encodeURIComponent(longUrl)}`)
-    if (!res.ok) return null
-    const short = (await res.text()).trim()
-    return short.startsWith('https://tinyurl.com/') ? short : null
-  } catch {
-    return null
-  }
-}
-
 function WhatsAppIcon({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -145,7 +131,6 @@ interface Props {
 export default function ShareListSheet({ list, members, onClose }: Props) {
   const store = useListsStore()
   const [currentCode, setCurrentCode] = useState<string>(list.invite_code ?? '')
-  const [shortUrl, setShortUrl]       = useState<string | null>(null)
   const [generating, setGenerating]   = useState(true)
   const [copied, setCopied]           = useState(false)
   const [draftIdx, setDraftIdx]       = useState(() => Math.floor(Math.random() * MESSAGE_DRAFTS.length))
@@ -156,17 +141,15 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
   useEffect(() => {
     if (didRegenerate.current) return
     didRegenerate.current = true
-    store.regenerateInvite(list.id).then(async newCode => {
-      const code = newCode ?? list.invite_code
+    store.regenerateInvite(list.id).then(newCode => {
       if (newCode) setCurrentCode(newCode)
-      setShortUrl(await shortenUrl(`${window.location.origin}/join/${code}`))
       setGenerating(false)
     }).catch(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const joinUrl   = currentCode ? `${window.location.origin}/join/${currentCode}` : ''
-  const shareUrl  = shortUrl ?? joinUrl
+  const shareUrl  = joinUrl
   const message   = MESSAGE_DRAFTS[draftIdx](list.name)
   const shareText = `${message} ${shareUrl}`
   const disabled  = generating || !joinUrl
