@@ -246,7 +246,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
   },
 
   loadMembers: async (listId) => {
-    const { data } = await supabase.from('list_members').select('*').eq('list_id', listId)
+    const { data, error } = await supabase.from('list_members').select('*').eq('list_id', listId)
+    // Don't overwrite existing members with [] on error (e.g. transient RLS
+    // failure) — keep whatever we last had so shared indicators don't blink out.
+    if (error) { if (import.meta.env.DEV) console.warn('loadMembers failed', listId, error.message); return }
     set({ members: { ...get().members, [listId]: (data ?? []) as ListMember[] } })
   },
 
