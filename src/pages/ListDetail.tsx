@@ -529,7 +529,7 @@ export default function ListDetail() {
               see collective progress at a glance (personal lists stay compact) */}
           {members.length > 1 && items.length > 0 && (
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>
-              {doneCount} of {items.length} done
+              {isAllComplete ? 'All done' : `${itemsLeft} ${itemsLeft === 1 ? 'item' : 'items'} left`}
             </p>
           )}
         </div>
@@ -560,7 +560,7 @@ export default function ListDetail() {
         {/* Compact contextual progress (spec §1–2): one line + 4px bar,
             bar hidden until something is completed */}
         {items.length > 0 && (
-          <div style={{ padding: '10px 16px 8px' }}>
+          <div style={{ padding: '10px 16px 16px' }}>
             <div className="flex items-center justify-between" style={{ marginBottom: doneCount > 0 ? 6 : 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: isAllComplete ? 'var(--accent)' : 'var(--text-2)' }}>
                 {progressMsg}

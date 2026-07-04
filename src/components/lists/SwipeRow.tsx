@@ -88,7 +88,13 @@ export function SwipeRow({ onDelete, children }: Props) {
         </button>
       </div>
       <div ref={rowRef} onClick={() => peeking && setPeeking(false)}
-        style={{ background: 'var(--bg-card)', willChange: 'transform', transition: 'transform 0.22s ease' }}>
+        style={{
+          // Opaque base under the translucent glass surface, otherwise the
+          // red delete panel behind bleeds through the row's edge at rest.
+          backgroundColor: 'var(--bg)',
+          backgroundImage: 'linear-gradient(var(--bg-card), var(--bg-card))',
+          willChange: 'transform', transition: 'transform 0.22s ease',
+        }}>
         {children}
       </div>
     </div>
