@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowUpDown, BarChart2, Check, FileText, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, BarChart2, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -288,7 +288,7 @@ export default function ListDetail() {
   if (!list) return (
     <div className="app-container">
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ArrowLeft size={20} /></button>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
         <span className="header-title">Loading…</span>
       </div>
     </div>
@@ -520,7 +520,7 @@ export default function ListDetail() {
     <div className="app-container">
       {/* Header */}
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ArrowLeft size={20} /></button>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {list.emoji} {list.name}
@@ -924,6 +924,8 @@ export default function ListDetail() {
                 { icon: <BarChart2 size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
+                isOwner ? { icon: <Copy size={16} />, label: 'Duplicate', hint: '', action: async () => { setMenuOpen(false); await store.duplicateList(list.id) } } : null,
+                isOwner ? { icon: <LayoutTemplate size={16} />, label: 'Save as Template', hint: '', action: async () => { setMenuOpen(false); await store.saveAsTemplate(list.id) } } : null,
                 isOwner ? { icon: <Share2 size={16} />, label: 'Share', hint: '', action: () => { setMenuOpen(false); setShareOpen(true) } } : null,
                 { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }, disabled: completed.length === 0 },
                 isOwner ? { icon: <Trash2 size={16} color="#ef4444" />, label: 'Delete List', hint: '', action: () => { setMenuOpen(false); setConfirmDelete(true) }, danger: true } : null,
@@ -1044,7 +1046,7 @@ export default function ListDetail() {
           }}>
             <button onClick={() => setInsightsOpen(false)}
               style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'var(--bg-input)', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <ArrowLeft size={18} />
+              <ChevronLeft size={18} />
             </button>
             <span style={{ flex: 1, fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>Insights · {list.emoji} {list.name}</span>
           </div>

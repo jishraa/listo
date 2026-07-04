@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore, ArrowUpDown, Check, Users, FileText, Sparkles, ChevronRight } from 'lucide-react'
+import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check, Users, Sparkles, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
@@ -11,7 +11,6 @@ import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
-import { exportListReport } from '../lib/report'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
@@ -35,22 +34,12 @@ const SORTS: { id: Sort; label: string }[] = [
 
 const SORT_KEY = 'listo-lists-sort'
 
-function ListCard({
-  list, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare,
-  onSaveTemplate, onArchive, onUnarchive, onExport, items, membersCount = 0, sharedInfo,
-}: {
-  list: List; isPinned: boolean; items: { completed: boolean }[]; membersCount?: number
-  sharedInfo?: string
+function ListCard({ list, isPinned, onOpen, items, collab }: {
+  list: List; isPinned: boolean; items: { completed: boolean }[]
+  // Consolidated collaborator label (names or "N members"); undefined = personal
+  collab?: string
   onOpen: () => void
-  // Menu actions render only when provided, so each section (active /
-  // template / archived) passes just the actions that apply to it.
-  onPin?: () => void; onMoveTop?: () => void
-  onRename?: () => void; onDuplicate?: () => void; onDelete?: () => void
-  onLeave?: () => void; onShare?: () => void
-  onSaveTemplate?: () => void; onArchive?: () => void; onUnarchive?: () => void
-  onExport?: () => void
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const total = items.length
   const done = items.filter(i => i.completed).length
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
@@ -59,131 +48,47 @@ function ListCard({
   const typeBgClass = { personal: 'type-bg-personal', tasks: 'type-bg-tasks', shopping: 'type-bg-shopping' }[list.type]
 
   return (
-    <>
-      <div
-        className="card card-press"
-        style={{
-          padding: '11px 14px', cursor: 'pointer',
-          ...(isPinned && { borderColor: 'rgba(22,163,74,0.28)', boxShadow: '0 0 0 1px rgba(22,163,74,0.10)' }),
-          ...(allDone  && !isPinned && { borderColor: 'rgba(0,230,140,0.22)' }),
-        }}
-        onClick={onOpen}
-      >
-        <div className="flex items-center gap-3">
-          <div className={typeBgClass} style={{
-            width: 46, height: 46, borderRadius: 13,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
-          }}>
-            {list.emoji}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="flex items-center gap-2">
-              {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ filter: 'drop-shadow(0 0 4px rgba(22,163,74,0.6))' }} />}
+    <div className="card card-press" style={{ padding: '12px 14px', cursor: 'pointer' }} onClick={onOpen}>
+      <div className="flex items-center gap-3">
+        <div className={typeBgClass} style={{
+          width: 46, height: 46, borderRadius: 13,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
+        }}>
+          {list.emoji}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* 1 — List name, with the done/total count pinned right */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2" style={{ minWidth: 0 }}>
+              {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ flexShrink: 0 }} />}
               <span style={{ fontWeight: 600, fontSize: 17 }} className="truncate">{list.name}</span>
             </div>
-            <div className="flex items-center justify-between mt-2">
-              {/* Remaining work first — users care about what's left (spec §5) */}
-              <span style={{ fontSize: 14, color: allDone ? '#00e087' : 'var(--text-2)', fontWeight: allDone ? 600 : 500 }}>
-                {total === 0 ? 'Empty' : allDone ? '✓ All done' : `${total - done} ${total - done === 1 ? 'item' : 'items'} left`}
-              </span>
-              <span className="text-hint flex items-center" style={{ gap: 8, fontSize: 13 }}>
-                {membersCount > 1 && (
-                  <span className="flex items-center" style={{ gap: 3 }}>
-                    <Users size={11} /> {membersCount}
-                  </span>
-                )}
-                Updated {formatRelativeTime(list.updated_at)}
-              </span>
-            </div>
-            {sharedInfo && (
-              <div className="flex items-center mt-1" style={{ gap: 5 }}>
-                <Users size={11} color="var(--text-3)" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {sharedInfo}
-                </span>
-              </div>
-            )}
-            {total > 0 && (
-              <div className="progress-bar mt-2">
-                <div className="progress-fill" style={{
-                  width: `${pct}%`,
-                  background: allDone ? '#00e087' : 'var(--accent)',
-                  boxShadow: allDone ? '0 0 8px rgba(0,224,135,0.55)' : '0 0 8px rgba(22,163,74,0.55)',
-                }} />
-              </div>
-            )}
+            <span style={{
+              flexShrink: 0, fontSize: 13, fontWeight: allDone ? 700 : 600, fontVariantNumeric: 'tabular-nums',
+              color: allDone ? '#00e087' : 'var(--text-3)',
+            }}>
+              {total === 0 ? 'Empty' : allDone ? '✓ Done' : `${done}/${total}`}
+            </span>
           </div>
-          <button
-            className="btn btn-ghost btn-sm"
-            style={{ padding: 6, flexShrink: 0 }}
-            onClick={e => { e.stopPropagation(); setMenuOpen(true) }}
-          >
-            <span style={{ fontSize: 20, color: 'var(--text-3)', lineHeight: 1 }}>⋯</span>
-          </button>
+          {/* 2 — Collaboration · updated time, one non-wrapping line */}
+          <div className="flex items-center" style={{ gap: 5, marginTop: 4, minWidth: 0 }}>
+            {collab && <Users size={12} color="var(--text-3)" style={{ flexShrink: 0 }} />}
+            <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {collab ? `${collab} · ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
+            </span>
+          </div>
+          {/* 3 — Progress, inset to the content column (starts after the icon) */}
+          {total > 0 && (
+            <div className="progress-bar" style={{ marginTop: 9, height: 7 }}>
+              <div className="progress-fill" style={{
+                width: `${pct}%`,
+                background: allDone ? '#00e087' : 'var(--accent)',
+              }} />
+            </div>
+          )}
         </div>
       </div>
-
-      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)}>
-        <div className="sheet-body" style={{ paddingTop: 8, gap: 8 }}>
-          <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{list.name}</p>
-          {onPin && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onPin(); setMenuOpen(false) }}>
-              <Pin size={16} /> {isPinned ? 'Unpin' : 'Pin to top'}
-            </button>
-          )}
-          {onMoveTop && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onMoveTop(); setMenuOpen(false) }}>
-              <ArrowUp size={16} /> Move to top
-            </button>
-          )}
-          {onShare && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onShare(); setMenuOpen(false) }}>
-              <Share2 size={16} /> Share list
-            </button>
-          )}
-          {onRename && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { setMenuOpen(false); onRename() }}>
-              <Pencil size={16} /> Rename
-            </button>
-          )}
-          {onDuplicate && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onDuplicate(); setMenuOpen(false) }}>
-              <Copy size={16} /> Duplicate
-            </button>
-          )}
-          {onSaveTemplate && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onSaveTemplate(); setMenuOpen(false) }}>
-              <LayoutTemplate size={16} /> Save as template
-            </button>
-          )}
-          {onExport && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onExport(); setMenuOpen(false) }}>
-              <FileText size={16} /> Export Report
-            </button>
-          )}
-          {onArchive && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onArchive(); setMenuOpen(false) }}>
-              <Archive size={16} /> Archive
-            </button>
-          )}
-          {onUnarchive && (
-            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onUnarchive(); setMenuOpen(false) }}>
-              <ArchiveRestore size={16} /> Unarchive
-            </button>
-          )}
-          {onDelete && (
-            <button className="btn btn-danger btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { setMenuOpen(false); onDelete() }}>
-              <Trash2 size={16} /> Delete list
-            </button>
-          )}
-          {onLeave && (
-            <button className="btn btn-danger btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onLeave(); setMenuOpen(false) }}>
-              <LogOut size={16} /> Leave list
-            </button>
-          )}
-        </div>
-      </Sheet>
-    </>
+    </div>
   )
 }
 
@@ -234,8 +139,6 @@ export default function Lists() {
   const [shareTarget, setShareTarget] = useState<List | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createStep, setCreateStep] = useState<'templates' | 'custom'>('templates')
-  const [renameTarget, setRenameTarget] = useState<List | null>(null)
-  const [renameInput, setRenameInput] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<List | null>(null)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
   const [customOrder, setCustomOrder] = useState<string[]>([])
@@ -269,12 +172,6 @@ export default function Lists() {
     localStorage.setItem(`listo-pins-${user?.id}`, JSON.stringify([...next]))
   }
 
-  const moveToTop = (listId: string) => {
-    const next = [listId, ...customOrder.filter(id => id !== listId)]
-    setCustomOrder(next)
-    localStorage.setItem(`listo-order-${user?.id}`, JSON.stringify(next))
-  }
-
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
     const list = await store.createList({ name, type, emoji })
     if (!list) return
@@ -291,12 +188,6 @@ export default function Lists() {
     setDeleteTarget(null)
   }
 
-  const handleRename = async () => {
-    if (!renameTarget || !renameInput.trim()) return
-    await store.renameList(renameTarget.id, renameInput.trim())
-    setRenameTarget(null)
-    setRenameInput('')
-  }
 
   const visible = visibleLists(store.lists)
   const templates = templateLists(store.lists)
@@ -363,17 +254,17 @@ export default function Lists() {
   const archivedAll  = applySort(archived.filter(matches))
   const templatesFiltered = templates.filter(matches)
 
-  const sharedInfoFor = (list: List): string | undefined => {
+  // Collaborator label for the card's metadata line (spec §3, §12):
+  // names up to two, then "+N"; four or more others collapses to "N members".
+  // undefined ⇒ personal list ⇒ card shows just "Updated …".
+  const collabLabelFor = (list: List): string | undefined => {
     const mem = store.members[list.id] ?? []
     if (mem.length < 2) return undefined
-    if (list.owner_id === user?.id) {
-      const others = mem.filter(m => m.user_id !== user?.id).map(m => m.display_name)
-      if (others.length === 0) return undefined
-      const shown = others.slice(0, 2).join(', ')
-      return `Shared with ${shown}${others.length > 2 ? ` +${others.length - 2}` : ''}`
-    }
-    const owner = mem.find(m => m.role === 'owner')?.display_name
-    return owner ? `Shared by ${owner}` : undefined
+    const others = mem.filter(m => m.user_id !== user?.id).map(m => m.display_name).filter(Boolean)
+    if (others.length === 0) return undefined
+    if (others.length >= 4) return `${mem.length} members`
+    const shown = others.slice(0, 2).join(', ')
+    return others.length > 2 ? `${shown} +${others.length - 2}` : shown
   }
 
   const renderCard = (list: List) => {
@@ -390,35 +281,18 @@ export default function Lists() {
       : [{ label: 'Leave', icon: <LogOut size={16} />, color: '#EF4444', onPress: () => store.leaveList(list.id) }]
     return (
       <SwipeCard key={list.id} leftActions={swipeLeft} rightActions={swipeRight}>
-      <ListCard
-        list={list}
-        isPinned={pinnedIds.has(list.id)}
-        items={store.items[list.id] ?? []}
-        membersCount={(store.members[list.id] ?? []).length}
-        sharedInfo={sharedInfoFor(list)}
-        onOpen={() => navigate(`/list/${list.id}`)}
-        onPin={() => togglePin(list.id)}
-        onMoveTop={() => moveToTop(list.id)}
-        onExport={(store.items[list.id] ?? []).length > 0
-          ? () => exportListReport(list, store.items[list.id] ?? [], store.members[list.id] ?? [])
-          : undefined}
-        {...(isOwner
-          ? {
-              // Sharing is owner-only: the sheet rotates the invite code
-              onShare: () => setShareTarget(list),
-              onRename: () => { setRenameTarget(list); setRenameInput(list.name) },
-              onDuplicate: () => store.duplicateList(list.id),
-              onSaveTemplate: () => store.saveAsTemplate(list.id),
-              onArchive: () => store.setArchived(list.id, true),
-              onDelete: () => setDeleteTarget(list),
-            }
-          : { onLeave: () => store.leaveList(list.id) })}
-      />
+        <ListCard
+          list={list}
+          isPinned={pinnedIds.has(list.id)}
+          items={store.items[list.id] ?? []}
+          collab={collabLabelFor(list)}
+          onOpen={() => navigate(`/list/${list.id}`)}
+        />
       </SwipeCard>
     )
   }
 
-  // Templates open in ListDetail for item editing; archived cards only restore or delete.
+  // Templates open in ListDetail, where rename/delete live in the header menu.
   const renderTemplate = (list: List) => (
     <ListCard
       key={list.id}
@@ -426,28 +300,28 @@ export default function Lists() {
       isPinned={false}
       items={store.items[list.id] ?? []}
       onOpen={() => navigate(`/list/${list.id}`)}
-      onRename={() => { setRenameTarget(list); setRenameInput(list.name) }}
-      onDelete={() => setDeleteTarget(list)}
     />
   )
 
+  // Archived cards stay swipeable so restore/delete remain reachable without a menu.
   const renderArchived = (list: List) => {
     const isOwner = list.owner_id === user?.id
+    const rightActions: SwipeAction[] = isOwner
+      ? [
+          { label: 'Restore', icon: <ArchiveRestore size={16} />, color: '#16A34A', onPress: () => store.setArchived(list.id, false) },
+          { label: 'Delete',  icon: <Trash2 size={16} />,         color: '#EF4444', onPress: () => setDeleteTarget(list) },
+        ]
+      : [{ label: 'Leave', icon: <LogOut size={16} />, color: '#EF4444', onPress: () => store.leaveList(list.id) }]
     return (
-      <ListCard
-        key={list.id}
-        list={list}
-        isPinned={false}
-        items={store.items[list.id] ?? []}
-        membersCount={(store.members[list.id] ?? []).length}
-        onOpen={() => navigate(`/list/${list.id}`)}
-        {...(isOwner
-          ? {
-              onUnarchive: () => store.setArchived(list.id, false),
-              onDelete: () => setDeleteTarget(list),
-            }
-          : { onLeave: () => store.leaveList(list.id) })}
-      />
+      <SwipeCard key={list.id} leftActions={[]} rightActions={rightActions}>
+        <ListCard
+          list={list}
+          isPinned={false}
+          items={store.items[list.id] ?? []}
+          collab={collabLabelFor(list)}
+          onOpen={() => navigate(`/list/${list.id}`)}
+        />
+      </SwipeCard>
     )
   }
 
@@ -686,16 +560,6 @@ export default function Lists() {
               {sort === s.id && <Check size={16} color="var(--accent)" strokeWidth={2.5} />}
             </button>
           ))}
-        </div>
-      </Sheet>
-
-      <Sheet open={!!renameTarget} onClose={() => setRenameTarget(null)} title="Rename List">
-        <div className="sheet-body">
-          <input className="input" value={renameInput} onChange={e => setRenameInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRename()} autoFocus />
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setRenameTarget(null)}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleRename} disabled={!renameInput.trim()}>Save</button>
-          </div>
         </div>
       </Sheet>
 

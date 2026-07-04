@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import { ChevronLeft, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useCategoriesStore, makeCategoryId } from '../store/useCategoriesStore'
 import type { ListCategory } from '../lib/constants'
@@ -102,7 +102,7 @@ export default function Categories() {
     <div className="app-container">
       <div className="header">
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
-          <ArrowLeft size={20} />
+          <ChevronLeft size={20} />
         </button>
         <span className="header-title">Categories</span>
         <button className="btn btn-ghost btn-sm" onClick={openAdd} aria-label="Add category" style={{ color: 'var(--accent)' }}>

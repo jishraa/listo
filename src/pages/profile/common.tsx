@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useListsStore } from '../../store/useListsStore'
 import { useCategoriesStore } from '../../store/useCategoriesStore'
@@ -12,7 +12,7 @@ export function SubPage({ title, children }: { title: string; children: React.Re
     <div className="app-container">
       <div className="header">
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
-          <ArrowLeft size={20} />
+          <ChevronLeft size={20} />
         </button>
         <span className="header-title">{title}</span>
       </div>

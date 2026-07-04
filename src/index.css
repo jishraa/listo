@@ -446,9 +446,9 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .type-tasks    { color: #38bdf8; }
 .type-shopping { color: #fb923c; }
 
-.type-bg-personal { background: rgba(167, 139, 250, 0.12); border: 1px solid rgba(167, 139, 250, 0.18); }
-.type-bg-tasks    { background: rgba(56, 189, 248, 0.12);  border: 1px solid rgba(56, 189, 248, 0.18); }
-.type-bg-shopping { background: rgba(251, 146, 60, 0.12);  border: 1px solid rgba(251, 146, 60, 0.18); }
+.type-bg-personal { background: rgba(167, 139, 250, 0.12); }
+.type-bg-tasks    { background: rgba(56, 189, 248, 0.12); }
+.type-bg-shopping { background: rgba(251, 146, 60, 0.12); }
 
 /* ── Auth pages ──────────────────────────────────────────────── */
 .auth-page {
@@ -822,18 +822,9 @@ html[data-theme="light"] body {
 [data-theme="light"] .badge-gray  { background: rgba(0,0,0,0.06); color: var(--text-2); }
 
 /* Type icon backgrounds */
-[data-theme="light"] .type-bg-personal {
-  background: rgba(109, 40, 217, 0.08);
-  border-color: rgba(109, 40, 217, 0.16);
-}
-[data-theme="light"] .type-bg-tasks {
-  background: rgba(7, 89, 133, 0.08);
-  border-color: rgba(7, 89, 133, 0.16);
-}
-[data-theme="light"] .type-bg-shopping {
-  background: rgba(154, 52, 18, 0.08);
-  border-color: rgba(154, 52, 18, 0.16);
-}
+[data-theme="light"] .type-bg-personal { background: rgba(109, 40, 217, 0.08); }
+[data-theme="light"] .type-bg-tasks    { background: rgba(7, 89, 133, 0.08); }
+[data-theme="light"] .type-bg-shopping { background: rgba(154, 52, 18, 0.08); }
 
 /* Error */
 [data-theme="light"] .error-msg {

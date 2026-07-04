@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 
 function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -7,7 +7,7 @@ function LegalPage({ title, children }: { title: string; children: React.ReactNo
     <div className="app-container">
       <div className="header">
         <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
-          <ArrowLeft size={20} />
+          <ChevronLeft size={20} />
         </button>
         <span className="header-title">{title}</span>
       </div>
