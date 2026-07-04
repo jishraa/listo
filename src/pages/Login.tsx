@@ -44,7 +44,7 @@ function AppleIcon() {
 }
 
 export default function Login() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -52,8 +52,8 @@ export default function Login() {
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState<'welcome' | 'confirm' | null>(null)
-  const { signIn, signUp, signInWithProvider } = useAuthStore()
+  const [success, setSuccess] = useState<'welcome' | 'confirm' | 'reset' | null>(null)
+  const { signIn, signUp, signInWithProvider, forgotPassword } = useAuthStore()
   const navigate = useNavigate()
 
   const rulesPassed = PW_RULES.filter(r => r.test(password))
@@ -69,6 +69,15 @@ export default function Login() {
 
   const handleSubmit = async () => {
     setError('')
+    if (mode === 'forgot') {
+      if (!email) return
+      setLoading(true)
+      const err = await forgotPassword(email)
+      setLoading(false)
+      if (err) { fail(err); return }
+      setSuccess('reset')
+      return
+    }
     if (!email || !password) return
     if (mode === 'register') {
       if (!name.trim()) return
@@ -101,7 +110,7 @@ export default function Login() {
     // On success the browser redirects away; nothing else to do here.
   }
 
-  const switchMode = (m: 'login' | 'register') => {
+  const switchMode = (m: 'login' | 'register' | 'forgot') => {
     setMode(m); setError(''); setSuccess(null); setShowPw(false)
   }
 
@@ -120,6 +129,11 @@ export default function Login() {
             <>
               <h1>Create your Listo account</h1>
               <p>Start organizing smarter together.</p>
+            </>
+          ) : mode === 'forgot' ? (
+            <>
+              <h1>Forgot password?</h1>
+              <p>We'll email you a link to reset it.</p>
             </>
           ) : (
             <>
@@ -147,18 +161,34 @@ export default function Login() {
               Go to Sign In
             </button>
           </div>
+        ) : success === 'reset' ? (
+          <div className="auth-success">
+            <div className="check"><Check size={26} strokeWidth={2.5} /></div>
+            <p style={{ fontWeight: 700, fontSize: 18 }}>Check your inbox</p>
+            <p className="text-sm text-muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
+              If an account exists for <strong>{email}</strong>,<br />
+              we've sent a password reset link.
+            </p>
+            <button className="btn btn-secondary btn-full" style={{ marginTop: 20 }} onClick={() => switchMode('login')}>
+              Back to Sign In
+            </button>
+          </div>
         ) : (
           <>
             <div className="auth-form">
-              {/* Social login first (spec §2) */}
-              <button className="auth-social" onClick={() => handleProvider('google')} disabled={disabled}>
-                <GoogleIcon /> Continue with Google
-              </button>
-              <button className="auth-social" onClick={() => handleProvider('apple')} disabled={disabled}>
-                <AppleIcon /> Continue with Apple
-              </button>
+              {/* Social login first (spec §2) — not relevant while resetting */}
+              {mode !== 'forgot' && (
+                <>
+                  <button className="auth-social" onClick={() => handleProvider('google')} disabled={disabled}>
+                    <GoogleIcon /> Continue with Google
+                  </button>
+                  <button className="auth-social" onClick={() => handleProvider('apple')} disabled={disabled}>
+                    <AppleIcon /> Continue with Apple
+                  </button>
 
-              <div className="auth-divider">OR</div>
+                  <div className="auth-divider">OR</div>
+                </>
+              )}
 
               {error && <div className="error-msg" role="alert">{error}</div>}
 
@@ -194,6 +224,7 @@ export default function Login() {
                 />
               </div>
 
+              {mode !== 'forgot' && (
               <div className="input-group">
                 <label className="input-label" htmlFor="auth-password">Password</label>
                 <div style={{ position: 'relative' }}>
@@ -252,6 +283,21 @@ export default function Login() {
                   )
                 )}
               </div>
+              )}
+
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot')}
+                  style={{
+                    alignSelf: 'flex-start', padding: '2px 0', marginTop: -6,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600, color: 'var(--accent)',
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
 
               {mode === 'register' && (
                 <p className="text-xs" style={{ color: 'var(--text-3)', textAlign: 'center', lineHeight: 1.6 }}>
@@ -264,18 +310,20 @@ export default function Login() {
               <button
                 className="btn btn-primary btn-full"
                 onClick={handleSubmit}
-                disabled={disabled || !email || !password || (mode === 'register' && !name.trim())}
+                disabled={disabled || !email || (mode !== 'forgot' && !password) || (mode === 'register' && !name.trim())}
                 style={{ marginTop: 4 }}
               >
                 {loading
-                  ? <><span className="spinner" style={{ marginRight: 8 }} />{mode === 'login' ? 'Signing In…' : 'Creating Account…'}</>
-                  : mode === 'login' ? 'Sign In' : 'Create Account'}
+                  ? <><span className="spinner" style={{ marginRight: 8 }} />{mode === 'login' ? 'Signing In…' : mode === 'forgot' ? 'Sending…' : 'Creating Account…'}</>
+                  : mode === 'login' ? 'Sign In' : mode === 'forgot' ? 'Send Reset Link' : 'Create Account'}
               </button>
             </div>
 
             <div className="auth-switch">
               {mode === 'login' ? (
                 <>Don't have an account? <a onClick={() => switchMode('register')}>Sign Up →</a></>
+              ) : mode === 'forgot' ? (
+                <>Remembered it? <a onClick={() => switchMode('login')}>Sign In →</a></>
               ) : (
                 <>Already have an account? <a onClick={() => switchMode('login')}>Sign In →</a></>
               )}

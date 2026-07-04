@@ -10,6 +10,7 @@ import Lists from './pages/Lists'
 import JoinList from './pages/JoinList'
 
 const ListDetail        = lazy(() => import('./pages/ListDetail'))
+const ResetPassword     = lazy(() => import('./pages/ResetPassword'))
 const Profile           = lazy(() => import('./pages/Profile'))
 const Categories        = lazy(() => import('./pages/Categories'))
 const Terms             = lazy(() => import('./pages/Legal').then(m => ({ default: m.Terms })))
@@ -88,6 +89,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/join/:code" element={<JoinList />} />

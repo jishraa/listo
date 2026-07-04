@@ -12,6 +12,7 @@ interface AuthState {
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signIn: (email: string, password: string) => Promise<string | null>
   signInWithProvider: (provider: 'google' | 'apple') => Promise<string | null>
+  forgotPassword: (email: string) => Promise<string | null>
   changePassword: (newPassword: string) => Promise<string | null>
   signInAsGuest: (displayName: string) => Promise<string | null>
   signOut: () => Promise<void>
@@ -72,6 +73,15 @@ export const useAuthStore = create<AuthState>(set => ({
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin },
+    })
+    return error?.message ?? null
+  },
+
+  forgotPassword: async (email) => {
+    // Sends a recovery email; the link lands on /reset-password with a
+    // recovery session, where changePassword() sets the new one.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
     })
     return error?.message ?? null
   },
