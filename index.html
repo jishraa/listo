@@ -11,6 +11,20 @@
     <meta name="apple-mobile-web-app-title" content="Listo" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#04080f" />
+    <script>
+      // Apply the saved theme before first paint to avoid a dark flash
+      (function () {
+        try {
+          var p = localStorage.getItem('listo-theme')
+          var light = p === 'light' || (p !== 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches)
+          if (light) {
+            document.documentElement.setAttribute('data-theme', 'light')
+            var m = document.querySelector('meta[name="theme-color"]')
+            if (m) m.setAttribute('content', '#f0f5fa')
+          }
+        } catch (e) { /* default dark */ }
+      })()
+    </script>
     <title>Listo</title>
   </head>
   <body>

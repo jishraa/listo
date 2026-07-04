@@ -844,10 +844,7 @@ html[data-theme="light"] body {
 
 /* Auth */
 [data-theme="light"] .auth-page::before {
-  background: radial-gradient(ellipse, rgba(0, 140, 200, 0.09) 0%, transparent 68%);
-}
-[data-theme="light"] .auth-page::after {
-  background: radial-gradient(ellipse, rgba(100, 40, 200, 0.05) 0%, transparent 68%);
+  background: radial-gradient(ellipse, rgba(21, 128, 61, 0.07) 0%, transparent 68%);
 }
 
 [data-theme="light"] .auth-card {
@@ -859,22 +856,13 @@ html[data-theme="light"] body {
     inset 0 1px 0 rgba(255,255,255,0.80);
 }
 
-[data-theme="light"] .auth-logo .logo-icon {
-  background: rgba(21, 128, 61, 0.08);
-  border-color: rgba(21, 128, 61, 0.32);
-  animation: logo-glow-light 3s ease-in-out infinite;
-}
-
-@keyframes logo-glow-light {
-  0%, 100% { box-shadow: 0 0 22px rgba(21,128,61,0.22), inset 0 0 8px rgba(21,128,61,0.05); }
-  50%       { box-shadow: 0 0 36px rgba(21,128,61,0.38), inset 0 0 14px rgba(21,128,61,0.10); }
-}
-
 [data-theme="light"] .auth-logo h1 {
-  background: linear-gradient(130deg, #0088aa 20%, #7c3aed 100%);
+  background: linear-gradient(130deg, #15803d 20%, #0d9488 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+[data-theme="light"] .pw-strength .bar { background: rgba(0, 0, 0, 0.08); }
 
 [data-theme="light"] .auth-switch a { text-shadow: none; }

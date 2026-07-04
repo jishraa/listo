@@ -23,6 +23,9 @@ export function applyTheme(pref: ThemePref) {
   } else {
     document.documentElement.removeAttribute('data-theme')
   }
+  // Keep the browser/PWA status-bar color in sync with the active theme
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', theme === 'light' ? '#f0f5fa' : '#04080f')
 }
 
 interface ThemeStore {
