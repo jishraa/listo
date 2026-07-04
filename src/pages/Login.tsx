@@ -49,6 +49,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [showPw, setShowPw] = useState(false)
+  // Requirements are shown only while the field is focused or invalid (spec)
+  const [pwFocused, setPwFocused] = useState(false)
   const [error, setError] = useState('')
   const [shake, setShake] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -77,6 +79,11 @@ export default function Login() {
 
   const handleSubmit = async () => {
     setError('')
+    // Inline validation — never browser-native popups (form is noValidate)
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
     if (mode === 'forgot') {
       if (!email) return
       setLoading(true)
@@ -152,7 +159,7 @@ export default function Login() {
           />
           {mode === 'register' ? (
             <>
-              <h1>Create your Listo account</h1>
+              <h1>Create your account</h1>
               <p>Start organizing smarter together.</p>
             </>
           ) : mode === 'forgot' ? (
@@ -229,7 +236,7 @@ export default function Login() {
           <>
             {/* Real <form> so browsers and password managers offer to save /
                 autofill credentials (login spec §autofill) */}
-            <form className="auth-form" onSubmit={e => { e.preventDefault(); handleSubmit() }}>
+            <form className="auth-form" noValidate onSubmit={e => { e.preventDefault(); handleSubmit() }}>
               {/* Social login first (spec §2) — not relevant while resetting */}
               {mode !== 'forgot' && (
                 <>
@@ -316,6 +323,8 @@ export default function Login() {
                     disabled={disabled}
                     style={{ paddingRight: 52 }}
                     onChange={e => setPassword(e.target.value)}
+                    onFocus={() => setPwFocused(true)}
+                    onBlur={() => setPwFocused(false)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                   />
                   <button
@@ -332,8 +341,9 @@ export default function Login() {
                   </button>
                 </div>
 
-                {/* Rules while typing; collapse to strength once all pass (spec §5–6) */}
-                {mode === 'register' && password.length > 0 && (
+                {/* Requirements only while the field is focused or invalid;
+                    collapse to strength once all pass (spec) */}
+                {mode === 'register' && (pwFocused || password.length > 0) && (
                   allRulesPass ? (
                     <div className="pw-strength" style={{ color: strengthColor }}>
                       <div className="bar"><div style={{ width: '100%', background: strengthColor }} /></div>
@@ -341,12 +351,16 @@ export default function Login() {
                     </div>
                   ) : (
                     <>
-                      <div className="pw-strength" style={{ color: strengthColor }}>
-                        <div className="bar">
-                          <div style={{ width: `${(rulesPassed.length / PW_RULES.length) * 100}%`, background: strengthColor }} />
+                      {/* Strength meter only once typing starts — an empty
+                          focused field just previews the requirements */}
+                      {password.length > 0 && (
+                        <div className="pw-strength" style={{ color: strengthColor }}>
+                          <div className="bar">
+                            <div style={{ width: `${(rulesPassed.length / PW_RULES.length) * 100}%`, background: strengthColor }} />
+                          </div>
+                          {strength}
                         </div>
-                        {strength}
-                      </div>
+                      )}
                       <div className="pw-rules">
                         {PW_RULES.map(r => {
                           const ok = r.test(password)
@@ -364,10 +378,11 @@ export default function Login() {
               )}
 
               {mode === 'register' && (
-                <p className="text-xs" style={{ color: 'var(--text-3)', textAlign: 'center', lineHeight: 1.6 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'center', lineHeight: 1.7 }}>
                   By creating an account, you agree to our{' '}
-                  <Link to="/terms" style={{ color: 'var(--accent)', fontWeight: 600 }}>Terms of Service</Link> and{' '}
-                  <Link to="/privacy" style={{ color: 'var(--accent)', fontWeight: 600 }}>Privacy Policy</Link>
+                  <Link to="/terms" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '10px 2px', margin: '-10px -2px' }}>Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-block', padding: '10px 2px', margin: '-10px -2px' }}>Privacy Policy</Link>.
                 </p>
               )}
 

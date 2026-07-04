@@ -507,7 +507,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   animation: fade-in 220ms var(--ease);
 }
 
-.auth-logo { text-align: center; margin-bottom: 30px; }
+.auth-logo { text-align: center; margin-bottom: 26px; }
 
 /* Softer logo treatment (spec §3): 15–20% glow, no pulse animation */
 .auth-logo .logo-icon {
