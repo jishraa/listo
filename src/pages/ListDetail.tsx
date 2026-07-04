@@ -87,6 +87,7 @@ export default function ListDetail() {
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
   // Which flow the category picker sheet is serving (add sheet vs row edit)
   const [catPickerFor,     setCatPickerFor]     = useState<'add' | 'edit' | null>(null)
+  const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
@@ -135,7 +136,16 @@ export default function ListDetail() {
     }
   }, [id, isAllComplete])
 
-  useEffect(() => { if (isAllComplete) setShowCompleted(false) }, [isAllComplete])
+  // Auto-collapse the completed section once shopping is nearly done, so
+  // focus stays on the few remaining items (spec §2). Only fires on the
+  // transition into that state — the user can still expand manually after.
+  const doneNow = items.filter(i => i.completed).length
+  const nearlyDone = items.length > 3 && (doneNow / items.length >= 0.8 || (items.length - doneNow) <= 2)
+  const wasNearlyDone = useRef(false)
+  useEffect(() => {
+    if (nearlyDone && !wasNearlyDone.current) setShowCompleted(false)
+    wasNearlyDone.current = nearlyDone
+  }, [nearlyDone])
 
   const allCategories = useCategoriesStore(s2 => s2.categories)
   const cats = list ? allCategories[list.type] : []
@@ -202,9 +212,12 @@ export default function ListDetail() {
   const doneCount = items.filter(i => i.completed).length
   const itemsLeft = items.length - doneCount
   const pct = items.length > 0 ? (doneCount / items.length) * 100 : 0
-  // Contextual progress copy (spec §2)
+  // Only the final pending item gets special treatment (spec §1)
+  const lastItemLeft = itemsLeft === 1 && items.length > 1
+  // Contextual progress copy (spec §6)
   const progressMsg =
     pct >= 100 ? (list?.type === 'shopping' ? 'Shopping complete 🎉' : 'All done 🎉')
+    : lastItemLeft ? 'Only one item left 🎉'
     : pct >= 75 ? 'Almost done'
     : pct >= 50 ? 'Halfway there'
     : pct > 0   ? 'Good start!'
@@ -285,6 +298,8 @@ export default function ListDetail() {
   const renderItem = (item: ListItem) => {
     const isEditing = editingId === item.id
     const cat = item.category ? catById.get(item.category) : null
+    // The single remaining pending item gets a subtle highlight (spec §1)
+    const isFinalItem = lastItemLeft && !item.completed
 
     if (isEditing) return (
       <div key={item.id} style={{
@@ -351,7 +366,16 @@ export default function ListDetail() {
 
     return (
       <SwipeRow key={item.id} onDelete={() => handleDelete(item)}>
-        <div className="flex items-center gap-3" style={{ padding: '12px 14px', background: 'var(--bg-card)' }}>
+        {isFinalItem && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px 0',
+            background: 'var(--accent-dim)', fontSize: 11, fontWeight: 700,
+            color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em',
+          }}>
+            🛒 Last item
+          </div>
+        )}
+        <div className="flex items-center gap-3" style={{ padding: '12px 14px', background: isFinalItem ? 'var(--accent-dim)' : 'var(--bg-card)' }}>
           {/* Checkbox — 44px touch target around the 22px control (spec §17) */}
           <button
             onClick={() => store.toggleItem(list.id, item)}
@@ -395,14 +419,25 @@ export default function ListDetail() {
               )}
             </div>
             {(cat || item.added_by_name || item.completed_by_name) && (
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-3)', marginTop: 1, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {[
-                  cat?.name,
-                  item.completed
+              <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
+                {/* Category as a compact neutral chip (spec §5) */}
+                {cat && (
+                  <span style={{
+                    flexShrink: 0, fontSize: 11, fontWeight: 600, lineHeight: 1,
+                    padding: '3px 7px', borderRadius: 6,
+                    background: item.completed ? 'var(--bg-input)' : `${cat.color}1f`,
+                    color: item.completed ? 'var(--text-3)' : 'var(--text-2)',
+                  }}>{cat.name}</span>
+                )}
+                {(() => {
+                  const who = item.completed
                     ? (item.completed_by_name ? `✓ ${item.completed_by_name}` : null)
-                    : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null),
-                ].filter(Boolean).join(' · ')}
-              </span>
+                    : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null)
+                  return who ? (
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
+                  ) : null
+                })()}
+              </div>
             )}
           </div>
 
@@ -578,14 +613,18 @@ export default function ListDetail() {
         {/* Smart banner (spec §4/§16) — one at a time, only when actionable */}
         {dupeGroups.size > 0 ? (
           <div style={{ padding: '0 16px 8px' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
-              borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)',
-            }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>
-                💡 {dupeIds.size} duplicate {dupeIds.size === 1 ? 'item' : 'items'} on this list
+            <button
+              onClick={() => setDupeReviewOpen(true)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                borderRadius: 10, background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.28)',
+                cursor: 'pointer', textAlign: 'left',
+              }}>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#d97706' }}>
+                ⚠ {dupeGroups.size} duplicate {dupeGroups.size === 1 ? 'item' : 'items'} found
               </span>
-            </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#d97706', flexShrink: 0 }}>Review →</span>
+            </button>
           </div>
         ) : uncategorizedPending.length > 0 && list.type === 'shopping' ? (
           <div style={{ padding: '0 16px 8px' }}>
@@ -615,7 +654,7 @@ export default function ListDetail() {
         <div
           key={`${sortMode}-${[...filterCategories].sort().join(',')}`}
           className="list-fade-in"
-          style={{ padding: '0 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}
+          style={{ padding: '0 16px 140px', display: 'flex', flexDirection: 'column', gap: 12 }}
         >
           {/* Loading skeleton */}
           {rawItems === undefined ? (
@@ -644,11 +683,17 @@ export default function ListDetail() {
                   background: 'linear-gradient(135deg, rgba(22,163,74,0.12) 0%, rgba(22,163,74,0.06) 100%)',
                   border: '1px solid rgba(22,163,74,0.3)',
                 }}>
-                  <p style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>All done! 🎉</p>
+                  <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>
+                    {list.type === 'shopping' ? 'Shopping complete! 🎉' : 'All done! 🎉'}
+                  </p>
                   {completionTime && <p className="text-sm text-muted" style={{ margin: '0 0 14px' }}>Completed {formatCompletedAt(completionTime)}</p>}
+                  {/* Primary next step (spec §9): review what you bought */}
+                  <button onClick={() => setInsightsOpen(true)} className="btn btn-primary btn-full" style={{ marginBottom: 8 }}>
+                    <BarChart2 size={15} /> View Insights
+                  </button>
                   <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                     <button onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}
-                      className="btn btn-primary btn-sm"><Plus size={14} /> Add more</button>
+                      className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>
                     <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
                       <RefreshCw size={13} style={unchecking ? { animation: 'spin 1s linear infinite' } : {}} /> Reset
@@ -705,7 +750,7 @@ export default function ListDetail() {
                     </button>
                   </div>
                   {showCompleted && (
-                    <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.8 }}>
+                    <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.6 }}>
                       {completed.map((item, idx) => (
                         <div key={item.id} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none' }}>
                           {renderItem(item)}
@@ -1160,6 +1205,58 @@ export default function ListDetail() {
         }}
         onClose={() => setCatPickerFor(null)}
       />
+
+      {/* ── Duplicate review (spec §4) ── */}
+      {dupeReviewOpen && (
+        <>
+          <Overlay onClick={() => setDupeReviewOpen(false)} />
+          <div className="sheet" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div className="sheet-handle" />
+            <div style={{ padding: '10px 20px 24px' }}>
+              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Review duplicates</p>
+              <p className="text-sm text-muted" style={{ margin: '0 0 16px' }}>
+                Keep one of each and remove the extras.
+              </p>
+              {dupeGroups.size === 0 ? (
+                <p className="text-sm text-muted" style={{ textAlign: 'center', padding: '16px 0' }}>
+                  No duplicates left 🎉
+                </p>
+              ) : [...dupeGroups.entries()].map(([key, group]) => (
+                <div key={key} style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
+                    {group[0].title} · {group.length}
+                  </p>
+                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    {group.map((it, i) => (
+                      <div key={it.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
+                        background: 'var(--bg-card)', borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                      }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'var(--text)' }}>
+                          {it.title}{it.quantity ? ` · ${it.quantity}` : ''}
+                          {it.completed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
+                        </span>
+                        {i === 0 ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Keep</span>
+                        ) : (
+                          <button
+                            onClick={() => store.deleteItem(list.id, it.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: 'none', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                            <Trash2 size={13} /> Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-secondary btn-full" onClick={() => setDupeReviewOpen(false)} style={{ marginTop: 4 }}>
+                Done
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Undo delete toast ── */}
       {undoItem && (
