@@ -10,7 +10,7 @@ import type { SwipeAction } from '../components/lists/SwipeCard'
 import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
-import { formatRelativeTime } from '../lib/utils'
+import { formatRelativeTime, friendlyName } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
@@ -44,11 +44,19 @@ function ListCard({ list, isPinned, onOpen, items, collab }: {
   const done = items.filter(i => i.completed).length
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   const allDone = total > 0 && done === total
+  const left = total - done
+  // Actionable status, no fractions (spec §4): users shouldn't have to
+  // calculate what's remaining. Untouched lists just state their size.
+  const status =
+    total === 0 ? 'Empty'
+    : allDone ? '✓ Done'
+    : done === 0 ? `${total} ${total === 1 ? 'item' : 'items'}`
+    : `${left} ${left === 1 ? 'item' : 'items'} left`
 
   const typeBgClass = { personal: 'type-bg-personal', tasks: 'type-bg-tasks', shopping: 'type-bg-shopping' }[list.type]
 
   return (
-    <div className="card card-press" style={{ padding: '12px 14px', cursor: 'pointer' }} onClick={onOpen}>
+    <div className="card card-press" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={onOpen}>
       <div className="flex items-center gap-3">
         <div className={typeBgClass} style={{
           width: 46, height: 46, borderRadius: 13,
@@ -64,21 +72,22 @@ function ListCard({ list, isPinned, onOpen, items, collab }: {
               <span style={{ fontWeight: 600, fontSize: 17 }} className="truncate">{list.name}</span>
             </div>
             <span style={{
-              flexShrink: 0, fontSize: 13, fontWeight: allDone ? 700 : 600, fontVariantNumeric: 'tabular-nums',
+              flexShrink: 0, fontSize: 12.5, fontWeight: allDone ? 700 : 600,
               color: allDone ? '#00e087' : 'var(--text-3)',
             }}>
-              {total === 0 ? 'Empty' : allDone ? '✓ Done' : `${done}/${total}`}
+              {status}
             </span>
           </div>
           {/* 2 — Collaboration · updated time, one non-wrapping line */}
           <div className="flex items-center" style={{ gap: 5, marginTop: 4, minWidth: 0 }}>
             {collab && <Users size={12} color="var(--text-3)" style={{ flexShrink: 0 }} />}
             <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {collab ? `${collab} · ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
+              {collab ? `${collab} · updated ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
             </span>
           </div>
-          {/* 3 — Progress, inset to the content column (starts after the icon) */}
-          {total > 0 && (
+          {/* 3 — Progress, inset to the content column; only rendered once
+              progress has started — no empty bars at 0% (spec §progress) */}
+          {done > 0 && (
             <div className="progress-bar" style={{ marginTop: 9, height: 7 }}>
               <div className="progress-fill" style={{
                 width: `${pct}%`,
@@ -246,7 +255,7 @@ export default function Lists() {
 
   const activeCount = visible.filter(l => !isAllDone(l.id)).length
   const sharedCount = visible.filter(l => l.owner_id !== user?.id).length
-  const headerSummary = `${activeCount} Active ${activeCount === 1 ? 'List' : 'Lists'}${sharedCount > 0 ? ` • ${sharedCount} Shared` : ''}`
+  const headerSummary = `${activeCount} active${sharedCount > 0 ? ` · ${sharedCount} shared` : ''}`
 
   const activeAll    = applySort(visible.filter(l => !isAllDone(l.id) && matches(l)))
   const completedAll = applySort(visible.filter(l => isAllDone(l.id) && matches(l)))
@@ -254,17 +263,16 @@ export default function Lists() {
   const archivedAll  = applySort(archived.filter(matches))
   const templatesFiltered = templates.filter(matches)
 
-  // Collaborator label for the card's metadata line (spec §3, §12):
-  // names up to two, then "+N"; four or more others collapses to "N members".
-  // undefined ⇒ personal list ⇒ card shows just "Updated …".
+  // Collaborator label for the card's metadata line (spec): one other member
+  // shows their friendly name ("Anjana", never "anjana1995ks"); more than one
+  // collapses to "N members". undefined ⇒ personal list.
   const collabLabelFor = (list: List): string | undefined => {
     const mem = store.members[list.id] ?? []
     if (mem.length < 2) return undefined
     const others = mem.filter(m => m.user_id !== user?.id).map(m => m.display_name).filter(Boolean)
     if (others.length === 0) return undefined
-    if (others.length >= 4) return `${mem.length} members`
-    const shown = others.slice(0, 2).join(', ')
-    return others.length > 2 ? `${shown} +${others.length - 2}` : shown
+    if (others.length === 1) return friendlyName(others[0])
+    return `${mem.length} members`
   }
 
   const renderCard = (list: List) => {
@@ -357,7 +365,7 @@ export default function Lists() {
           <div>
             <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: -0.6, display: 'block' }}>Lists</span>
             {hasLists && (
-              <span style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2, display: 'block' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'block' }}>
                 {headerSummary}
               </span>
             )}
@@ -392,9 +400,10 @@ export default function Lists() {
           </div>
         )}
 
-        {/* Filter chips */}
+        {/* Filter chips — compact, soft-green active state, never truncate;
+            strip scrolls horizontally on narrow widths (spec §2) */}
         {hasLists && (
-          <div className="flex items-center" style={{ gap: 6, padding: '0 16px 12px', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
+          <div className="flex items-center" style={{ gap: 8, padding: '0 16px 12px', overflowX: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
             {FILTERS.map(f => {
               const active = filter === f.id
               return (
@@ -402,10 +411,11 @@ export default function Lists() {
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   style={{
-                    flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
-                    background: active ? 'var(--accent)' : 'var(--bg-input)',
+                    flexShrink: 0, height: 32, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    background: active ? 'var(--accent-soft)' : 'var(--bg-input)',
                     border: 'none',
-                    color: active ? '#030a14' : 'var(--text-2)',
+                    color: active ? 'var(--accent-text)' : 'var(--text-2)',
                     fontSize: 13, fontWeight: active ? 700 : 500,
                     transition: 'background 0.15s, color 0.15s',
                   }}
@@ -460,14 +470,17 @@ export default function Lists() {
                       </p>
                     ) : (
                       <div className="empty-state" style={{ padding: '28px 0 12px' }}>
-                        <div className="icon">🎉</div>
-                        <h3>No Active Lists</h3>
-                        <p>You're all caught up.</p>
+                        <div className="icon">📝</div>
+                        <h3>No active lists</h3>
+                        <p>Create a list to start planning, shopping, or organizing tasks.</p>
                         <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
                           <Plus size={18} /> Create List
                         </button>
-                        <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
-                          Browse Templates
+                        <button
+                          onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
+                          className="mt-3"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
+                          Browse Templates →
                         </button>
                       </div>
                     )
@@ -480,7 +493,10 @@ export default function Lists() {
                     </>
                   )}
 
-                  {!q && activeAll.length > 0 && activeAll.length < 5 && (
+                  {/* Template nudge only while the workspace is nearly empty
+                      (1–2 active lists); templates otherwise live behind the
+                      + action — never a permanent dashboard card (spec) */}
+                  {!q && activeAll.length > 0 && activeAll.length <= 2 && (
                     <button
                       onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
                       className="card card-press"

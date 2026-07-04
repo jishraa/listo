@@ -22,6 +22,19 @@ export function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// Humanise technical usernames for display: "anjana1995ks" / "anjana@x.com"
+// → "Anjana". Real display names (with spaces / no digits) pass through.
+export function friendlyName(name: string): string {
+  const base = name.split('@')[0].trim()
+  if (!/[0-9_.-]/.test(base)) {
+    // Already a human name — just ensure the first letter is capitalised.
+    return base.charAt(0).toUpperCase() + base.slice(1)
+  }
+  const alpha = base.match(/^[a-zA-Z]+/)?.[0] ?? ''
+  if (alpha.length < 2) return name
+  return alpha.charAt(0).toUpperCase() + alpha.slice(1)
+}
+
 export const LIST_TYPE_LABELS: Record<string, string> = {
   personal: 'Personal',
   tasks: 'Tasks',

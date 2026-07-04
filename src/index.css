@@ -17,7 +17,9 @@
   --text-2: rgba(221, 238, 255, 0.55);
   --text-3: rgba(221, 238, 255, 0.28);
 
-  --border:   rgba(22, 163, 74, 0.08);
+  /* Neutral separators/edges — green is reserved for active states,
+     progress, primary actions and completion feedback (lists spec). */
+  --border:   rgba(255, 255, 255, 0.08);
   --border-2: rgba(22, 163, 74, 0.22);
 
   --shadow-sm: 0 1px 6px rgba(0,0,0,0.45);
@@ -152,8 +154,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 }
 
 .card:hover {
-  border-color: rgba(22, 163, 74, 0.20);
-  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(22,163,74,0.07), inset 0 1px 0 rgba(255,255,255,0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
@@ -365,13 +367,14 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   touch-action: manipulation;
 }
 
-.fab:active { transform: scale(0.89); }
+.fab:active { transform: scale(0.95); }
 
 @media (max-width: 480px) { .fab { right: calc(16px + var(--safe-right)); } }
 
+/* Glow halved (lists spec): the solid green disc is emphasis enough */
 @keyframes fab-pulse {
-  0%, 100% { box-shadow: 0 0 24px rgba(22,163,74,0.50), 0 4px 16px rgba(22,163,74,0.22); }
-  50%       { box-shadow: 0 0 40px rgba(22,163,74,0.75), 0 4px 24px rgba(22,163,74,0.38); }
+  0%, 100% { box-shadow: 0 0 12px rgba(22,163,74,0.25), 0 4px 12px rgba(22,163,74,0.12); }
+  50%       { box-shadow: 0 0 20px rgba(22,163,74,0.38), 0 4px 16px rgba(22,163,74,0.19); }
 }
 
 /* ── Checkbox ────────────────────────────────────────────────── */
@@ -705,7 +708,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   --text-2: rgba(10, 22, 40, 0.58);
   --text-3: rgba(10, 22, 40, 0.32);
 
-  --border:   rgba(21, 128, 61, 0.10);
+  --border:   rgba(0, 0, 0, 0.08);
   --border-2: rgba(21, 128, 61, 0.26);
 
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
@@ -742,12 +745,11 @@ html[data-theme="light"] body {
 /* Card */
 [data-theme="light"] .card {
   box-shadow: var(--shadow-sm);
-  border-color: rgba(21,128,61,0.09);
 }
 
 [data-theme="light"] .card:hover {
-  border-color: rgba(21,128,61,0.20);
-  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(21,128,61,0.06);
+  border-color: rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Buttons */
@@ -810,8 +812,8 @@ html[data-theme="light"] body {
 }
 
 @keyframes fab-pulse-light {
-  0%, 100% { box-shadow: 0 0 18px rgba(21,128,61,0.38), 0 4px 12px rgba(21,128,61,0.18); }
-  50%       { box-shadow: 0 0 30px rgba(21,128,61,0.58), 0 4px 18px rgba(21,128,61,0.30); }
+  0%, 100% { box-shadow: 0 0 9px rgba(21,128,61,0.19), 0 4px 9px rgba(21,128,61,0.09); }
+  50%       { box-shadow: 0 0 15px rgba(21,128,61,0.29), 0 4px 13px rgba(21,128,61,0.15); }
 }
 
 /* Spinner */

@@ -104,7 +104,7 @@ export default function Profile() {
           <Row
             icon={<img src="/yft.png" alt="YFT" style={{ width: 24, height: 24, borderRadius: 6 }} />}
             label="YFT"
-            value="Track Expenses"
+            value="About the app"
             onPress={() => openYft('/about')}
             last
           />
