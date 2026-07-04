@@ -752,8 +752,9 @@ export default function ListDetail() {
                 </div>
               )}
 
-              {/* Category chips — show only auto-detected when not sticky */}
-              {cats.length > 0 && (
+              {/* Category chips — hidden until auto-detect picks one from the
+                  typed item; "Change" (sticky) expands the full set */}
+              {cats.length > 0 && (addCategory || addCatSticky) && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(addCategory && !addCatSticky ? cats.filter(c => c.id === addCategory) : cats).map(c => {
                     const active = addCategory === c.id
