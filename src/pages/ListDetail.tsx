@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, BarChart2, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -406,7 +406,6 @@ export default function ListDetail() {
               <span style={{
                 fontSize: 17, fontWeight: 600,
                 color: item.completed ? 'var(--text-3)' : 'var(--text)',
-                textDecoration: item.completed ? 'line-through' : 'none',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 transition: 'color 200ms ease',
               }}>{item.title}</span>
@@ -689,7 +688,7 @@ export default function ListDetail() {
                   {completionTime && <p className="text-sm text-muted" style={{ margin: '0 0 14px' }}>Completed {formatCompletedAt(completionTime)}</p>}
                   {/* Primary next step (spec §9): review what you bought */}
                   <button onClick={() => setInsightsOpen(true)} className="btn btn-primary btn-full" style={{ marginBottom: 8 }}>
-                    <BarChart2 size={15} /> View Insights
+                    <Sparkles size={15} /> View Insights
                   </button>
                   <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                     <button onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}
@@ -921,7 +920,7 @@ export default function ListDetail() {
             <div style={{ padding: '8px 0 8px' }}>
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
-                { icon: <BarChart2 size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } },
+                { icon: <Sparkles size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
                 isOwner ? { icon: <Copy size={16} />, label: 'Duplicate', hint: '', action: async () => { setMenuOpen(false); await store.duplicateList(list.id) } } : null,
