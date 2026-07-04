@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Eye, EyeOff, Check, ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
@@ -53,8 +53,16 @@ export default function Login() {
   const [shake, setShake] = useState(false)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<'welcome' | 'confirm' | 'reset' | null>(null)
+  // Resend cooldown (seconds) after a reset link is sent
+  const [resendIn, setResendIn] = useState(0)
   const { signIn, signUp, signInWithProvider, forgotPassword } = useAuthStore()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const t = setTimeout(() => setResendIn(s => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendIn])
 
   const rulesPassed = PW_RULES.filter(r => r.test(password))
   const allRulesPass = rulesPassed.length === PW_RULES.length
@@ -76,6 +84,7 @@ export default function Login() {
       setLoading(false)
       if (err) { fail(err); return }
       setSuccess('reset')
+      setResendIn(30)
       return
     }
     if (!email || !password) return
@@ -147,10 +156,15 @@ export default function Login() {
               <p>Start organizing smarter together.</p>
             </>
           ) : mode === 'forgot' ? (
-            <>
-              <h1>Reset your password</h1>
-              <p>Enter your email and we'll send you a reset link.</p>
-            </>
+            // The heading tracks the screen's purpose: request → confirmation
+            success === 'reset' ? (
+              <h1>Check your inbox</h1>
+            ) : (
+              <>
+                <h1>Reset your password</h1>
+                <p>Enter your email and we'll send you a reset link.</p>
+              </>
+            )
           ) : (
             <>
               <h1>Welcome back</h1>
@@ -178,13 +192,35 @@ export default function Login() {
             </button>
           </div>
         ) : success === 'reset' ? (
-          <div className="auth-success">
-            <div className="check"><Check size={26} strokeWidth={2.5} /></div>
-            <p style={{ fontWeight: 700, fontSize: 18 }}>Check your inbox</p>
-            <p className="text-sm text-muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
-              If an account exists for <strong>{email}</strong>,<br />
-              we've sent a password reset link.
+          <div className="auth-success" style={{ padding: '4px 0 8px' }}>
+            {/* Icon sits close to the page heading above — no repeated title */}
+            <div className="check" style={{ marginBottom: 12 }}><Check size={26} strokeWidth={2.5} /></div>
+            <p className="text-sm text-muted" style={{ lineHeight: 1.5 }}>
+              We've sent a reset link to <strong>{email}</strong>.
             </p>
+            <p className="text-sm" style={{ marginTop: 14, color: 'var(--text-3)' }}>
+              Didn't get it?{' '}
+              {resendIn > 0 ? (
+                <span>Resend in {resendIn}s</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const err = await forgotPassword(email)
+                    if (err) { fail(err); return }
+                    setResendIn(30)
+                  }}
+                  style={{
+                    padding: '12px 4px', margin: '-12px -4px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600, color: 'var(--accent)',
+                  }}
+                >
+                  Resend link
+                </button>
+              )}
+            </p>
+            {error && <div className="error-msg" role="alert" style={{ marginTop: 14, textAlign: 'left' }}>{error}</div>}
             <button className="btn btn-secondary btn-full" style={{ marginTop: 20 }} onClick={() => switchMode('login')}>
               Back to Sign In
             </button>
