@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, Gift, Heart, Info, LogOut, Settings2, User, Users } from 'lucide-react'
+import { Gift, Heart, Info, LogOut, Settings2, User, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import Sheet from '../components/ui/Sheet'
 import { openYft } from '../lib/yft'
@@ -15,7 +15,6 @@ const NAV_GROUPS: { title?: string; items: { path: string; label: string; Icon: 
   { title: 'App', items: [
     { path: '/profile/preferences',   label: 'Preferences',   Icon: Settings2 },
     { path: '/profile/collaboration', label: 'Collaboration', Icon: Users },
-    { path: '/profile/insights',      label: 'Insights',      Icon: BarChart2 },
   ]},
   { title: 'Community', items: [
     { path: '/profile/invite',  label: 'Invite Friends', Icon: Gift },

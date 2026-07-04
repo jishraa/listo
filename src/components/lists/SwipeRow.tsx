@@ -17,6 +17,9 @@ export function SwipeRow({ onDelete, children }: Props) {
   const TRIGGER = PEEK * 0.4
 
   const [peeking, setPeeking] = useState(false)
+  // Keep the delete panel hidden at rest — it bleeds a red fringe through the
+  // antialiased edge of the row otherwise.
+  const [engaged, setEngaged] = useState(false)
   const startX = useRef(0)
   const startY = useRef(0)
   const dx = useRef(0)
@@ -47,6 +50,7 @@ export function SwipeRow({ onDelete, children }: Props) {
       if (!locked.current && (adx > 8 || ady > 8)) locked.current = adx > ady ? 'h' : 'v'
       if (locked.current !== 'h') return
       if (e.cancelable) e.preventDefault()
+      setEngaged(true)
       const base = fromPeek.current ? -PEEK : 0
       dx.current = e.touches[0].clientX - startX.current
       setTranslate(Math.max(-PEEK - 40, Math.min(0, base + dx.current)))
@@ -54,7 +58,9 @@ export function SwipeRow({ onDelete, children }: Props) {
     const onTE = () => {
       if (locked.current !== 'h') { locked.current = null; return }
       const final = (fromPeek.current ? -PEEK : 0) + dx.current
-      setPeeking(final <= -TRIGGER)
+      const willPeek = final <= -TRIGGER
+      setPeeking(willPeek)
+      if (!willPeek) setTimeout(() => setEngaged(false), 240)
     }
 
     wrap.addEventListener('touchstart', onTS, { passive: true })
@@ -73,9 +79,10 @@ export function SwipeRow({ onDelete, children }: Props) {
         position: 'absolute', right: 0, top: 0, bottom: 0, width: PEEK,
         display: 'flex', alignItems: 'stretch',
         pointerEvents: peeking ? 'auto' : 'none',
+        visibility: engaged || peeking ? 'visible' : 'hidden',
       }}>
         <button
-          onClick={() => { setPeeking(false); cbsRef.current.onDelete() }}
+          onClick={() => { setPeeking(false); setTimeout(() => setEngaged(false), 240); cbsRef.current.onDelete() }}
           style={{
             flex: 1, border: 'none', cursor: 'pointer',
             background: '#ef4444', color: '#fff',
@@ -87,7 +94,7 @@ export function SwipeRow({ onDelete, children }: Props) {
           <span style={{ fontSize: 10, fontWeight: 700 }}>Delete</span>
         </button>
       </div>
-      <div ref={rowRef} onClick={() => peeking && setPeeking(false)}
+      <div ref={rowRef} onClick={() => { if (peeking) { setPeeking(false); setTimeout(() => setEngaged(false), 240) } }}
         style={{
           // Opaque base under the translucent glass surface, otherwise the
           // red delete panel behind bleeds through the row's edge at rest.

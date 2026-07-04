@@ -5,8 +5,8 @@
   --accent:      #16A34A;
   --accent-dim:  rgba(22, 163, 74, 0.10);
   --accent-mid:  rgba(22, 163, 74, 0.30);
-  --accent-soft: rgba(34, 197, 94, 0.16);
-  --accent-text: #4ade80;
+  --accent-soft: rgba(34, 197, 94, 0.12);
+  --accent-text: #45d07c;
   --accent-glow: 0 0 20px rgba(22, 163, 74, 0.40), 0 0 6px rgba(22, 163, 74, 0.15);
 
   --bg:      #04080f;
@@ -308,7 +308,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .progress-bar {
   height: 4px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.11);
   overflow: hidden;
 }
 .progress-fill { transition: width 250ms var(--ease); }
@@ -362,7 +362,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   justify-content: center;
   z-index: 20;
   transition: transform 0.18s var(--ease), filter 0.18s;
-  animation: fab-pulse 3s ease-in-out infinite;
+  /* Static subtle shadow — no pulsing neon; the solid disc is emphasis enough */
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.28), 0 2px 8px rgba(0, 0, 0, 0.35);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -370,12 +371,6 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .fab:active { transform: scale(0.95); }
 
 @media (max-width: 480px) { .fab { right: calc(16px + var(--safe-right)); } }
-
-/* Glow halved (lists spec): the solid green disc is emphasis enough */
-@keyframes fab-pulse {
-  0%, 100% { box-shadow: 0 0 12px rgba(22,163,74,0.25), 0 4px 12px rgba(22,163,74,0.12); }
-  50%       { box-shadow: 0 0 20px rgba(22,163,74,0.38), 0 4px 16px rgba(22,163,74,0.19); }
-}
 
 /* ── Checkbox ────────────────────────────────────────────────── */
 .checkbox {
@@ -802,18 +797,13 @@ html[data-theme="light"] body {
 [data-theme="light"] .sheet-handle { background: rgba(21, 128, 61, 0.22); }
 
 /* Progress */
-[data-theme="light"] .progress-bar { background: rgba(0, 0, 0, 0.07); }
+[data-theme="light"] .progress-bar { background: rgba(0, 0, 0, 0.10); }
 [data-theme="light"] .progress-fill { box-shadow: 0 0 6px rgba(21,128,61,0.35); }
 
 /* FAB */
 [data-theme="light"] .fab {
   color: #ffffff;
-  animation: fab-pulse-light 3s ease-in-out infinite;
-}
-
-@keyframes fab-pulse-light {
-  0%, 100% { box-shadow: 0 0 9px rgba(21,128,61,0.19), 0 4px 9px rgba(21,128,61,0.09); }
-  50%       { box-shadow: 0 0 15px rgba(21,128,61,0.29), 0 4px 13px rgba(21,128,61,0.15); }
+  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.25), 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
 /* Spinner */

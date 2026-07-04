@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
+import { friendlyName } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
@@ -65,6 +66,9 @@ function mergeQuantities(a: string | null | undefined, b: string): string {
   return `${(pa.cross || pb.cross) ? '×' : ''}${Number.isInteger(sum) ? sum : sum.toFixed(1)}${pa.unit || pb.unit}`
 }
 
+// Normalise item titles for display: "rice" → "Rice" (spec: capitalisation).
+const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
 // ── Duplicate analysis (quantity-aware) ──────────────────────
 const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
 
@@ -114,7 +118,7 @@ export default function ListDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const store = useListsStore()
-  const { user } = useAuthStore()
+  const { user, displayName } = useAuthStore()
 
   const list    = store.lists.find(l => l.id === id)
   const rawItems = list ? store.items[list.id] : undefined
@@ -316,10 +320,15 @@ export default function ListDetail() {
   function cancelEdit() { setEditingId(null); setEditTitle(''); setEditQty(''); setEditCategory(null) }
 
   async function commitEdit(item: ListItem) {
-    const t = editTitle.trim()
-    if (!t) { cancelEdit(); return }
-    if (t === item.title && (editQty.trim() || null) === item.quantity && editCategory === item.category) { cancelEdit(); return }
-    await store.updateItem(list!.id, item.id, { title: t, quantity: editQty.trim() || null, category: editCategory })
+    const raw = editTitle.trim()
+    if (!raw) { cancelEdit(); return }
+    // A quantity typed into the title ("Milk 2") is extracted, not stored as
+    // part of the name; the explicit qty field wins when both are set.
+    const parsed = parseItemInput(raw)
+    const t = capitalize(parsed.item)
+    const qty = editQty.trim() || parsed.qty || null
+    if (t === item.title && qty === item.quantity && editCategory === item.category) { cancelEdit(); return }
+    await store.updateItem(list!.id, item.id, { title: t, quantity: qty, category: editCategory })
     cancelEdit()
   }
 
@@ -344,7 +353,9 @@ export default function ListDetail() {
   }
 
   async function handleSheetAdd() {
-    const { item: t, qty } = parseItemInput(addInput)
+    const parsed = parseItemInput(addInput)
+    const t = capitalize(parsed.item)
+    const qty = parsed.qty
     if (!t || !list) return
     const finalCat = addCatSticky ? addCategory : (addCategory ?? detectCategoryIn(cats, t))
     if (qty) {
@@ -529,11 +540,14 @@ export default function ListDetail() {
               )}
             </div>
             {(() => {
-              // Metadata row respects the per-list view prefs (spec §4.2)
+              // Metadata row respects the per-list view prefs (spec §4.2).
+              // "Category · Member" — friendly names, "You" for own items.
               const showCat = cat && viewPrefs.categories
-              const who = !viewPrefs.addedBy ? null : item.completed
-                ? (item.completed_by_name ? `✓ ${item.completed_by_name}` : null)
-                : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null)
+              const person = (n: string) => n === displayName ? 'You' : friendlyName(n)
+              const rawWho = !viewPrefs.addedBy ? null : item.completed
+                ? (item.completed_by_name ? `✓ ${person(item.completed_by_name)}` : null)
+                : (members.length > 1 && item.added_by_name ? person(item.added_by_name) : null)
+              const who = rawWho && showCat && !item.completed ? `· ${rawWho}` : rawWho
               if (!showCat && !who) return null
               return (
                 <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
@@ -553,8 +567,10 @@ export default function ListDetail() {
             })()}
           </div>
 
-          {/* Qty chip (shopping only) */}
-          {list.type === 'shopping' && !item.completed && (
+          {/* Qty chip (shopping only) — shown only when a meaningful quantity
+              exists (no "—" placeholder, no ×1); qty is set via the item text
+              ("Milk 2") or the edit flow */}
+          {list.type === 'shopping' && !item.completed && (item.quantity || qtyEditId === item.id) && (
             qtyEditId === item.id ? (
               <input
                 autoFocus
@@ -585,9 +601,9 @@ export default function ListDetail() {
                   flexShrink: 0, padding: '3px 9px', borderRadius: 99,
                   background: 'var(--bg-input)', border: '1px solid var(--border)',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  color: item.quantity ? 'var(--text-2)' : 'var(--text-3)',
+                  color: 'var(--text-2)',
                 }}
-              >{item.quantity || '—'}</button>
+              >{item.quantity}</button>
             )
           )}
           {list.type === 'shopping' && item.completed && item.quantity && (
@@ -667,7 +683,9 @@ export default function ListDetail() {
               </div>
             ))}
             <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {members.map(m => m.user_id === user?.id ? 'You' : m.display_name).join(', ')}
+              {[...members]
+                .sort((a, b) => (a.user_id === user?.id ? -1 : b.user_id === user?.id ? 1 : 0))
+                .map(m => m.user_id === user?.id ? 'You' : friendlyName(m.display_name)).join(', ')}
             </span>
           </div>
         )}
@@ -829,7 +847,8 @@ export default function ListDetail() {
               {pending.length > 0 && (
                 <>
                   <div className="flex items-center justify-between" style={{ margin: '4px 2px 0' }}>
-                    <span style={sectionLabel}>Pending ({pending.length})</span>
+                    {/* No count here — "N items left" in the header already says it */}
+                    <span style={sectionLabel}>Pending</span>
                   </div>
                   <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     {pending.map((item, idx) => (

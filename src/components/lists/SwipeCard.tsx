@@ -30,6 +30,9 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
 
   // -1 = right actions revealed, 1 = left actions revealed, 0 = closed
   const [state, setState] = useState<-1 | 0 | 1>(0)
+  // Panels stay fully hidden at rest — even behind the card they bleed a
+  // coloured fringe through the antialiased ring of the rounded corners.
+  const [engaged, setEngaged] = useState(false)
   const startX = useRef(0)
   const startY = useRef(0)
   const dx = useRef(0)
@@ -71,6 +74,7 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
       if (!locked.current && (adx > 8 || ady > 8)) locked.current = adx > ady ? 'h' : 'v'
       if (locked.current !== 'h') return
       if (e.cancelable) e.preventDefault()
+      setEngaged(true)
       dx.current = e.touches[0].clientX - startX.current
       const next = Math.max(-rightW - 30, Math.min(leftW + 30, baseRef.current + dx.current))
       setTranslate(next)
@@ -80,7 +84,7 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
       const final = baseRef.current + dx.current
       if (final > leftW * 0.4 && leftW > 0) setState(1)
       else if (final < -rightW * 0.4 && rightW > 0) setState(-1)
-      else { setState(0); setTranslate(0, true) }
+      else { setState(0); setTranslate(0, true); setTimeout(() => setEngaged(false), 240) }
     }
 
     wrap.addEventListener('touchstart', onTS, { passive: true })
@@ -96,7 +100,7 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
   const actionBtn = (a: SwipeAction) => (
     <button
       key={a.label}
-      onClick={() => { setState(0); a.onPress() }}
+      onClick={() => { setState(0); setTimeout(() => setEngaged(false), 240); a.onPress() }}
       style={{
         width: BTN_W, border: 'none', cursor: 'pointer',
         background: a.color, color: '#fff',
@@ -116,6 +120,7 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
           position: 'absolute', left: 0, top: 0, bottom: 0, width: leftW,
           display: 'flex', alignItems: 'stretch',
           pointerEvents: state === 1 ? 'auto' : 'none',
+          visibility: engaged || state !== 0 ? 'visible' : 'hidden',
         }}>
           {leftActions.map(actionBtn)}
         </div>
@@ -125,6 +130,7 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
           position: 'absolute', right: 0, top: 0, bottom: 0, width: rightW,
           display: 'flex', alignItems: 'stretch',
           pointerEvents: state === -1 ? 'auto' : 'none',
+          visibility: engaged || state !== 0 ? 'visible' : 'hidden',
         }}>
           {rightActions.map(actionBtn)}
         </div>
@@ -133,7 +139,11 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
         ref={rowRef}
         onClickCapture={e => {
           // First tap on a revealed card closes it instead of opening the list
-          if (state !== 0) { e.stopPropagation(); e.preventDefault(); setState(0) }
+          if (state !== 0) {
+            e.stopPropagation(); e.preventDefault()
+            setState(0)
+            setTimeout(() => setEngaged(false), 240)
+          }
         }}
         style={{
           willChange: 'transform', transition: 'transform 0.22s ease',

@@ -56,7 +56,7 @@ function ListCard({ list, isPinned, onOpen, items, collab }: {
   const typeBgClass = { personal: 'type-bg-personal', tasks: 'type-bg-tasks', shopping: 'type-bg-shopping' }[list.type]
 
   return (
-    <div className="card card-press" style={{ padding: '14px 16px', cursor: 'pointer' }} onClick={onOpen}>
+    <div className="card card-press" style={{ padding: '16px', cursor: 'pointer' }} onClick={onOpen}>
       <div className="flex items-center gap-3">
         <div className={typeBgClass} style={{
           width: 46, height: 46, borderRadius: 13,
@@ -82,7 +82,7 @@ function ListCard({ list, isPinned, onOpen, items, collab }: {
           <div className="flex items-center" style={{ gap: 5, marginTop: 4, minWidth: 0 }}>
             {collab && <Users size={12} color="var(--text-3)" style={{ flexShrink: 0 }} />}
             <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {collab ? `${collab} · updated ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
+              {collab ? `${collab} · ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
             </span>
           </div>
           {/* 3 — Progress, inset to the content column; only rendered once
@@ -271,7 +271,7 @@ export default function Lists() {
     if (mem.length < 2) return undefined
     const others = mem.filter(m => m.user_id !== user?.id).map(m => m.display_name).filter(Boolean)
     if (others.length === 0) return undefined
-    if (others.length === 1) return friendlyName(others[0])
+    if (others.length === 1) return `Shared with ${friendlyName(others[0])}`
     return `${mem.length} members`
   }
 
@@ -333,7 +333,7 @@ export default function Lists() {
     )
   }
 
-  const sectionLabel = { fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' as const }
+  const sectionLabel = { fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-2)', textTransform: 'uppercase' as const }
 
   return (
     <>
@@ -515,7 +515,7 @@ export default function Lists() {
                     <>
                       <div className="flex items-center justify-between" style={{ padding: '8px 2px 0' }}>
                         <span style={sectionLabel}>Completed · {completedAll.length}</span>
-                        <button onClick={() => setShowCompleted(v => !v)} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'none', cursor: 'pointer' }}>
+                        <button onClick={() => setShowCompleted(v => !v)} style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)', background: 'none', cursor: 'pointer' }}>
                           {showCompleted ? 'Hide ↑' : 'Show ↓'}
                         </button>
                       </div>

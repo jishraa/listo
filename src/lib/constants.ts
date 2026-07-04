@@ -87,7 +87,9 @@ export function parseItemInput(raw: string): { item: string; qty: string } {
   const crossM = raw.match(/(?:×|(?:^|\s)x)\s*(\d+(?:\.\d+)?)\s*$/i)
   if (crossM) {
     const item = raw.slice(0, raw.length - crossM[0].length).trim()
-    if (item) return { item, qty: `×${crossM[1]}` }
+    // A count of 1 is the implicit default — store no quantity (display rule:
+    // quantities only show when greater than 1).
+    if (item) return { item, qty: parseFloat(crossM[1]) === 1 ? '' : `×${crossM[1]}` }
   }
   // Number + unit, e.g. "Rice 2kg" / "Rice 2 kg" / "Milk 1.5L". Multi-char
   // units (kg, mg, ml) come before "g" so they win at the same position.
@@ -102,7 +104,7 @@ export function parseItemInput(raw: string): { item: string; qty: string } {
   const bareM = raw.match(/\s+(\d+(?:\.\d+)?)\s*$/)
   if (bareM) {
     const item = raw.slice(0, raw.length - bareM[0].length).trim()
-    if (item) return { item, qty: `×${bareM[1]}` }
+    if (item) return { item, qty: parseFloat(bareM[1]) === 1 ? '' : `×${bareM[1]}` }
   }
   return { item: raw.trim(), qty: '' }
 }
