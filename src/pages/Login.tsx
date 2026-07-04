@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ListChecks, Eye, EyeOff, Check } from 'lucide-react'
+import { Eye, EyeOff, Check } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 
 // Friendly error copy (spec §7) — never surface raw backend messages.
@@ -111,9 +111,11 @@ export default function Login() {
     <div className="auth-page">
       <div className={`auth-card ${shake ? 'auth-shake' : ''}`}>
         <div className="auth-logo">
-          <div className="logo-icon">
-            <ListChecks size={28} />
-          </div>
+          <img
+            src="/brand.png"
+            alt="Listo"
+            style={{ width: 76, height: 76, display: 'block', margin: '0 auto 18px', boxShadow: '0 6px 22px rgba(22,163,74,0.25)', borderRadius: 18 }}
+          />
           {mode === 'register' ? (
             <>
               <h1>Create your Listo account</h1>
