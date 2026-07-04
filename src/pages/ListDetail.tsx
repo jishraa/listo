@@ -1039,7 +1039,7 @@ export default function ListDetail() {
             <div style={{ padding: '8px 0 8px' }}>
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
-                list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
+                list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '✦', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
                 { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', hint: '', action: () => { setMenuOpen(false); setCustomizeOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
@@ -1060,7 +1060,12 @@ export default function ListDetail() {
                     }}>
                     <span style={{ color: it.danger ? '#ef4444' : 'var(--text-2)' }}>{it.icon}</span>
                     <span style={{ fontSize: 15, fontWeight: 500, color: it.danger ? '#ef4444' : 'var(--text)', flex: 1 }}>{it.label}</span>
-                    {it.hint && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{it.hint}</span>}
+                    {/* ✦ = the single subtle premium indicator (spec §4.3) */}
+                    {it.hint && (
+                      <span style={{ fontSize: it.hint === '✦' ? 14 : 12, color: it.hint === '✦' ? 'var(--accent)' : 'var(--text-3)' }}>
+                        {it.hint}
+                      </span>
+                    )}
                   </button>
                 )
               })}

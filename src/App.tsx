@@ -17,7 +17,6 @@ const Privacy           = lazy(() => import('./pages/Legal').then(m => ({ defaul
 const AccountPage       = lazy(() => import('./pages/profile/Account'))
 const PreferencesPage   = lazy(() => import('./pages/profile/Preferences'))
 const CollaborationPage = lazy(() => import('./pages/profile/Collaboration'))
-const InsightsPage      = lazy(() => import('./pages/profile/Insights'))
 const InvitePage        = lazy(() => import('./pages/profile/Invite'))
 const SupportPage       = lazy(() => import('./pages/profile/Support'))
 const AboutPage         = lazy(() => import('./pages/profile/About'))
@@ -27,7 +26,6 @@ const PROFILE_SUBPAGES: [string, React.ComponentType][] = [
   ['/profile/account', AccountPage],
   ['/profile/preferences', PreferencesPage],
   ['/profile/collaboration', CollaborationPage],
-  ['/profile/insights', InsightsPage],
   ['/profile/invite', InvitePage],
   ['/profile/support', SupportPage],
   ['/profile/about', AboutPage],
