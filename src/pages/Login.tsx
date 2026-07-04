@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, Check } from 'lucide-react'
+import { Eye, EyeOff, Check, ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 
 // Friendly error copy (spec §7) — never surface raw backend messages.
@@ -118,12 +118,28 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      {/* Standard mobile back action while resetting (login spec) */}
+      {mode === 'forgot' && (
+        <button
+          type="button"
+          aria-label="Back to sign in"
+          onClick={() => switchMode('login')}
+          style={{
+            position: 'absolute', top: 'calc(12px + var(--safe-top))', left: 12, zIndex: 2,
+            width: 44, height: 44, borderRadius: 12,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--bg-input)', border: 'none', cursor: 'pointer', color: 'var(--text-2)',
+          }}
+        >
+          <ChevronLeft size={20} />
+        </button>
+      )}
       <div className={`auth-card ${shake ? 'auth-shake' : ''}`}>
         <div className="auth-logo">
           <img
             src="/brand.png"
             alt="Listo"
-            style={{ width: 76, height: 76, display: 'block', margin: '0 auto 18px', boxShadow: '0 6px 22px rgba(22,163,74,0.25)', borderRadius: 18 }}
+            style={{ width: 62, height: 62, display: 'block', margin: '0 auto 20px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', borderRadius: 16 }}
           />
           {mode === 'register' ? (
             <>
@@ -132,13 +148,13 @@ export default function Login() {
             </>
           ) : mode === 'forgot' ? (
             <>
-              <h1>Forgot password?</h1>
-              <p>We'll email you a link to reset it.</p>
+              <h1>Reset your password</h1>
+              <p>Enter your email and we'll send you a reset link.</p>
             </>
           ) : (
             <>
               <h1>Welcome back</h1>
-              <p>Sign in to pick up where you left off.</p>
+              <p>Sign in to continue with Listo.</p>
             </>
           )}
         </div>
@@ -175,14 +191,16 @@ export default function Login() {
           </div>
         ) : (
           <>
-            <div className="auth-form">
+            {/* Real <form> so browsers and password managers offer to save /
+                autofill credentials (login spec §autofill) */}
+            <form className="auth-form" onSubmit={e => { e.preventDefault(); handleSubmit() }}>
               {/* Social login first (spec §2) — not relevant while resetting */}
               {mode !== 'forgot' && (
                 <>
-                  <button className="auth-social" onClick={() => handleProvider('google')} disabled={disabled}>
+                  <button type="button" className="auth-social" aria-label="Continue with Google" onClick={() => handleProvider('google')} disabled={disabled}>
                     <GoogleIcon /> Continue with Google
                   </button>
-                  <button className="auth-social" onClick={() => handleProvider('apple')} disabled={disabled}>
+                  <button type="button" className="auth-social" aria-label="Continue with Apple" onClick={() => handleProvider('apple')} disabled={disabled}>
                     <AppleIcon /> Continue with Apple
                   </button>
 
@@ -216,17 +234,40 @@ export default function Login() {
                   inputMode="email"
                   autoCapitalize="none"
                   autoComplete="email"
+                  enterKeyHint={mode === 'forgot' ? 'done' : 'next'}
                   placeholder="name@example.com"
                   value={email}
                   disabled={disabled}
                   onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter') return
+                    if (mode === 'forgot') { handleSubmit(); return }
+                    // "Next" — move to the password field, don't submit yet
+                    e.preventDefault()
+                    document.getElementById('auth-password')?.focus()
+                  }}
                 />
               </div>
 
               {mode !== 'forgot' && (
               <div className="input-group">
-                <label className="input-label" htmlFor="auth-password">Password</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label className="input-label" htmlFor="auth-password">Password</label>
+                  {mode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode('forgot')}
+                      style={{
+                        // ≥44px tap target without inflating the label row
+                        padding: '12px 0', margin: '-12px 0',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: 13, fontWeight: 600, color: 'var(--accent)',
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <div style={{ position: 'relative' }}>
                   <input
                     id="auth-password"
@@ -234,6 +275,7 @@ export default function Login() {
                     type={showPw ? 'text' : 'password'}
                     placeholder={mode === 'register' ? 'Minimum 8 characters' : '••••••••'}
                     autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                    enterKeyHint="done"
                     value={password}
                     disabled={disabled}
                     style={{ paddingRight: 52 }}
@@ -285,20 +327,6 @@ export default function Login() {
               </div>
               )}
 
-              {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => switchMode('forgot')}
-                  style={{
-                    alignSelf: 'flex-start', padding: '2px 0', marginTop: -6,
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 13, fontWeight: 600, color: 'var(--accent)',
-                  }}
-                >
-                  Forgot password?
-                </button>
-              )}
-
               {mode === 'register' && (
                 <p className="text-xs" style={{ color: 'var(--text-3)', textAlign: 'center', lineHeight: 1.6 }}>
                   By creating an account, you agree to our{' '}
@@ -308,24 +336,24 @@ export default function Login() {
               )}
 
               <button
+                type="submit"
                 className="btn btn-primary btn-full"
-                onClick={handleSubmit}
                 disabled={disabled || !email || (mode !== 'forgot' && !password) || (mode === 'register' && !name.trim())}
-                style={{ marginTop: 4 }}
+                style={{ marginTop: 8 }}
               >
                 {loading
                   ? <><span className="spinner" style={{ marginRight: 8 }} />{mode === 'login' ? 'Signing In…' : mode === 'forgot' ? 'Sending…' : 'Creating Account…'}</>
                   : mode === 'login' ? 'Sign In' : mode === 'forgot' ? 'Send Reset Link' : 'Create Account'}
               </button>
-            </div>
+            </form>
 
             <div className="auth-switch">
               {mode === 'login' ? (
-                <>Don't have an account? <a onClick={() => switchMode('register')}>Sign Up →</a></>
+                <>Don't have an account? <a onClick={() => switchMode('register')}>Sign Up</a></>
               ) : mode === 'forgot' ? (
-                <>Remembered it? <a onClick={() => switchMode('login')}>Sign In →</a></>
+                <>Remembered it? <a onClick={() => switchMode('login')}>Sign In</a></>
               ) : (
-                <>Already have an account? <a onClick={() => switchMode('login')}>Sign In →</a></>
+                <>Already have an account? <a onClick={() => switchMode('login')}>Sign In</a></>
               )}
             </div>
           </>

@@ -233,7 +233,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 
 .input {
   background: var(--bg-input);
-  border: 1.5px solid rgba(22, 163, 74, 0.10);
+  /* Neutral at rest — green only appears on actual focus */
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   font-size: 15px;
@@ -465,13 +466,16 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .auth-page {
   min-height: 100vh;
   min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   padding: calc(24px + var(--safe-top)) 24px calc(24px + var(--safe-bottom));
   position: relative;
-  overflow: hidden;
+  /* Scroll when the soft keyboard shrinks the viewport, so the active input
+     and the Sign In button always stay reachable (login spec). */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Single subtle ambient glow behind the logo only (spec §12) */
@@ -488,24 +492,22 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   pointer-events: none;
 }
 
+/* No outer container (login spec): the form sits on the app background —
+   .auth-card is just a width constraint now. margin:auto centres it while
+   staying scrollable (flex centering would clip the top under a keyboard). */
 .auth-card {
   width: 100%;
   max-width: 400px;
-  background: rgba(5, 12, 25, 0.92);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border-radius: var(--radius-lg);
-  padding: 40px 32px;
-  border: 1px solid rgba(22, 163, 74, 0.15);
-  box-shadow:
-    0 0 0 1px rgba(22, 163, 74, 0.04),
-    0 32px 72px rgba(0, 0, 0, 0.65),
-    inset 0 1px 0 rgba(22, 163, 74, 0.08);
+  padding: 8px 0;
+  /* Upper-middle, not dead centre: cap the top gap so short forms (e.g.
+     forgot password) don't float in a sea of empty space. */
+  margin: clamp(12px, 9vh, 84px) 0 auto;
   position: relative;
   z-index: 1;
+  animation: fade-in 220ms var(--ease);
 }
 
-.auth-logo { text-align: center; margin-bottom: 36px; }
+.auth-logo { text-align: center; margin-bottom: 30px; }
 
 /* Softer logo treatment (spec §3): 15–20% glow, no pulse animation */
 .auth-logo .logo-icon {
@@ -522,14 +524,13 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   color: var(--accent);
 }
 
+/* Heading in primary text colour — green stays reserved for actions/links/
+   focus/success (login spec). */
 .auth-logo h1 {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 800;
-  letter-spacing: -1px;
-  background: linear-gradient(130deg, #16A34A 20%, #14B8A6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: -0.8px;
+  color: var(--text);
 }
 
 .auth-logo p {
@@ -539,13 +540,13 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   letter-spacing: 0.02em;
 }
 
-.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
 
 .auth-switch {
   text-align: center;
   font-size: 14px;
   color: var(--text-3);
-  margin-top: 26px;
+  margin-top: 24px;
 }
 
 .auth-switch a {
@@ -559,21 +560,39 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 }
 
 /* ── Auth v2 (Create Account UX spec) ───────────────────────── */
-/* 56px fields/CTAs, 16px radius, 16px min font (spec §14 / guidelines) */
+/* 54px fields/CTAs (login spec: 52–56px), 16px radius, 16px min font */
 .auth-form .input {
-  height: 56px;
+  height: 54px;
   border-radius: 16px;
   font-size: 16px;
+}
+
+/* Better placeholder contrast + calm focus: green border, no glow ring */
+.auth-form .input::placeholder { color: rgba(221, 238, 255, 0.42); }
+[data-theme="light"] .auth-form .input::placeholder { color: rgba(10, 22, 40, 0.42); }
+.auth-form .input:focus {
+  border-color: var(--accent);
+  box-shadow: none;
+  background: var(--bg-input);
 }
 
 .auth-form .btn {
-  height: 56px;
+  height: 54px;
   border-radius: 16px;
   font-size: 16px;
 }
 
+/* Sign In stays the strongest element, but without neon (login spec) */
+.auth-form .btn-primary {
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.18);
+}
+.auth-form .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.24);
+}
+
 .auth-social {
-  height: 56px;
+  height: 54px;
   border-radius: 16px;
   width: 100%;
   display: flex;
@@ -606,7 +625,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--border-2);
+  background: var(--border);
 }
 
 /* Password rules checklist (spec §6) */
@@ -660,6 +679,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   font-size: 13px;
+  animation: fade-in 180ms var(--ease);
 }
 
 /* ── Utilities ───────────────────────────────────────────────── */
@@ -777,7 +797,7 @@ html[data-theme="light"] body {
 /* Inputs */
 [data-theme="light"] .input {
   background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(21, 128, 61, 0.14);
+  border-color: var(--border);
 }
 
 [data-theme="light"] .input:focus {
@@ -845,21 +865,8 @@ html[data-theme="light"] body {
   background: radial-gradient(ellipse, rgba(21, 128, 61, 0.07) 0%, transparent 68%);
 }
 
-[data-theme="light"] .auth-card {
-  background: rgba(255, 255, 255, 0.94);
-  border-color: rgba(21, 128, 61, 0.15);
-  box-shadow:
-    0 0 0 1px rgba(21,128,61,0.04),
-    0 24px 60px rgba(0,0,0,0.10),
-    inset 0 1px 0 rgba(255,255,255,0.80);
-}
-
-[data-theme="light"] .auth-logo h1 {
-  background: linear-gradient(130deg, #15803d 20%, #0d9488 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* One auth design language across themes (login spec): no card, heading in
+   the theme's primary text colour — only the tokens change. */
 
 [data-theme="light"] .pw-strength .bar { background: rgba(0, 0, 0, 0.08); }
 
