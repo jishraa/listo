@@ -32,7 +32,9 @@ No test suite.
 | `/join/:code` | JoinList | Invite-link landing (no auth guard) |
 | `/` | Lists | Root screen + management hub: filter chips (Active/Shared/Completed/Archived), sort, search (name/member/category), templates. `/lists` and `/insights` redirect here |
 | `/list/:id` | ListDetail | Items, members, share, per-list insights sheet, PDF export (drill-in — renders outside the shell) |
-| `/profile` | Profile | Account, inline Settings (appearance), sign out |
+| `/categories` | Categories | Per-user category management (drill-in) |
+| `/profile` | Profile | Hub only (spec v4): profile card + nav rows + sign out. No inline settings |
+| `/profile/*` | pages/profile/ | Dedicated screens: account, preferences (theme, default type, categories, cloud), collaboration, insights (all cross-list stats live here), invite, about — drill-ins sharing `profile/common.tsx` (SubPage/Section/Row/useEnsureData) |
 
 The two tab pages render inside `AppShell` (`components/layout/`), which owns the bottom nav (Lists / + / Profile), the center-FAB Create List sheet, and lists-store init + items/members loading. Authed routes are wrapped in `AuthGuard` (redirects to `/login`). No lazy loading, except jspdf (report export).
 

@@ -9,6 +9,12 @@ import JoinList from './pages/JoinList'
 import Profile from './pages/Profile'
 import { Terms, Privacy } from './pages/Legal'
 import Categories from './pages/Categories'
+import AccountPage from './pages/profile/Account'
+import PreferencesPage from './pages/profile/Preferences'
+import CollaborationPage from './pages/profile/Collaboration'
+import InsightsPage from './pages/profile/Insights'
+import InvitePage from './pages/profile/Invite'
+import AboutPage from './pages/profile/About'
 import AppShell from './components/layout/AppShell'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -93,6 +99,17 @@ function AppRoutes() {
           </AuthGuard>
         }
       />
+      {/* Profile hub sub-screens (spec v4) */}
+      {([
+        ['/profile/account', <AccountPage />],
+        ['/profile/preferences', <PreferencesPage />],
+        ['/profile/collaboration', <CollaborationPage />],
+        ['/profile/insights', <InsightsPage />],
+        ['/profile/invite', <InvitePage />],
+        ['/profile/about', <AboutPage />],
+      ] as [string, React.ReactElement][]).map(([path, el]) => (
+        <Route key={path} path={path} element={<AuthGuard>{el}</AuthGuard>} />
+      ))}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
