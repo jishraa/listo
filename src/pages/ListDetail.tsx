@@ -65,6 +65,47 @@ function mergeQuantities(a: string | null | undefined, b: string): string {
   return `${(pa.cross || pb.cross) ? '×' : ''}${Number.isInteger(sum) ? sum : sum.toFixed(1)}${pa.unit || pb.unit}`
 }
 
+// ── Duplicate analysis (quantity-aware) ──────────────────────
+const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
+
+// Parse a stored quantity string. "×2" → a count; "2kg" → a unit quantity;
+// null/empty → no quantity. We never invent a unit that isn't there.
+function parseQty(q: string | null | undefined): { count: boolean; num: number; unit: string } | null {
+  if (!q) return null
+  const m = q.trim().replace(/\s+/g, '').match(/^([×x])?(\d+(?:\.\d+)?)([a-zA-Z]*)$/)
+  if (!m) return null
+  const unit = m[3].toLowerCase()
+  return { count: !!m[1] || !unit, num: parseFloat(m[2]), unit }
+}
+
+type DupeKind = 'exact' | 'mergeable' | 'ambiguous'
+interface DupePlan { kind: DupeKind; merged: string | null; mergeLabel: string; suggestMerge: boolean }
+
+// Decide what to suggest for a group of same-named items (spec duplicate logic).
+function analyzeGroup(group: ListItem[]): DupePlan {
+  const parsed = group.map(i => parseQty(i.quantity))
+  if (parsed.every(p => p === null)) {
+    // Milk + Milk → plain duplicate, remove the extras.
+    return { kind: 'exact', merged: null, mergeLabel: 'Remove Duplicate', suggestMerge: true }
+  }
+  if (parsed.every(p => p !== null)) {
+    const ps = parsed as { count: boolean; num: number; unit: string }[]
+    const allCount = ps.every(p => p.count && !p.unit)
+    const unit0 = ps[0].unit
+    const allSameUnit = !!unit0 && ps.every(p => !p.count && p.unit === unit0)
+    if (allCount || allSameUnit) {
+      // ×2 + ×3 → ×5, or 2kg + 5kg → 7kg
+      const sum = ps.reduce((a, p) => a + p.num, 0)
+      const merged = allCount ? `×${fmtNum(sum)}` : `${fmtNum(sum)}${unit0}`
+      return { kind: 'mergeable', merged, mergeLabel: `Merge to ${merged}`, suggestMerge: true }
+    }
+  }
+  // Rice + Rice 5kg, or incompatible units → let the user decide; keep the one
+  // present quantity rather than inventing anything.
+  const firstQty = group.find(i => i.quantity)?.quantity ?? null
+  return { kind: 'ambiguous', merged: firstQty, mergeLabel: 'Merge Items', suggestMerge: false }
+}
+
 function Overlay({ onClick }: { onClick?: () => void }) {
   return <div className="sheet-overlay" onClick={onClick} />
 }
@@ -128,6 +169,9 @@ export default function ListDetail() {
   // Which flow the category picker sheet is serving (add sheet vs row edit)
   const [catPickerFor,     setCatPickerFor]     = useState<'add' | 'edit' | null>(null)
   const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
+  // Group keys staged for their suggested action; absence = keep both.
+  const [dupeSelected,     setDupeSelected]     = useState<Set<string>>(new Set())
+  const [dupeResolved,     setDupeResolved]     = useState(false)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
@@ -323,6 +367,33 @@ export default function ListDetail() {
     setShowMerge(false); setMergeTarget(null); resetAdd()
     await store.updateItem(list.id, mergeTarget.id, { title: mergeTarget.title, quantity: combined, category: mergeTarget.category })
     setPendingAdd(null)
+  }
+
+  function toggleDupe(key: string) {
+    setDupeSelected(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  // Apply every staged group: keep the first item (with merged quantity where
+  // applicable) and remove the rest. Keep-both groups are untouched.
+  async function applyDupePlan() {
+    if (!list) return
+    for (const [key, group] of dupeGroups.entries()) {
+      if (!dupeSelected.has(key)) continue
+      const plan = analyzeGroup(group)
+      const [first, ...rest] = group
+      if (plan.merged && plan.merged !== first.quantity) {
+        await store.updateItem(list.id, first.id, { title: first.title, quantity: plan.merged, category: first.category })
+      }
+      for (const r of rest) await store.deleteItem(list.id, r.id)
+    }
+    setDupeSelected(new Set())
+    setDupeReviewOpen(false)
+    setDupeResolved(true)
+    setTimeout(() => setDupeResolved(false), 2200)
   }
 
   if (!list) return (
@@ -557,6 +628,9 @@ export default function ListDetail() {
   const insTopAdder    = Object.entries(insMemberAdded).sort((a, b) => b[1] - a[1])[0]
   const insTopCompleter = Object.entries(insMemberCompleted).sort((a, b) => b[1] - a[1])[0]
 
+  // Staged duplicate changes (ignores any stale keys not in the current groups)
+  const dupeChanges = [...dupeGroups.keys()].filter(k => dupeSelected.has(k)).length
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -642,7 +716,7 @@ export default function ListDetail() {
         {dupeGroups.size > 0 ? (
           <div style={{ padding: '0 16px 8px' }}>
             <button
-              onClick={() => setDupeReviewOpen(true)}
+              onClick={() => { setDupeSelected(new Set()); setDupeReviewOpen(true) }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
                 borderRadius: 10, background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.28)',
@@ -1291,47 +1365,111 @@ export default function ListDetail() {
             <div style={{ padding: '10px 20px 24px' }}>
               <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Review duplicates</p>
               <p className="text-sm text-muted" style={{ margin: '0 0 16px' }}>
-                Keep one of each and remove the extras.
+                Merge, remove, or keep similar items.
               </p>
               {dupeGroups.size === 0 ? (
                 <p className="text-sm text-muted" style={{ textAlign: 'center', padding: '16px 0' }}>
                   No duplicates left 🎉
                 </p>
-              ) : [...dupeGroups.entries()].map(([key, group]) => (
-                <div key={key} style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
-                    {group[0].title} · {group.length}
-                  </p>
-                  <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    {group.map((it, i) => (
-                      <div key={it.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
-                        background: 'var(--bg-card)', borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                      }}>
-                        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'var(--text)' }}>
-                          {it.title}{it.quantity ? ` · ${it.quantity}` : ''}
-                          {it.completed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
-                        </span>
-                        {i === 0 ? (
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Keep</span>
-                        ) : (
-                          <button
-                            onClick={() => store.deleteItem(list.id, it.id)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: 'none', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-                            <Trash2 size={13} /> Remove
-                          </button>
-                        )}
-                      </div>
-                    ))}
+              ) : [...dupeGroups.entries()].map(([key, group]) => {
+                const plan = analyzeGroup(group)
+                const selected = dupeSelected.has(key)
+                const shared = members.length > 1
+                const keepLabel = group.length > 2 ? 'Keep All' : 'Keep Both'
+                // The destructive removal action is styled red only for exact
+                // duplicates; merges are the neutral accent (spec).
+                const isRemoval = plan.kind === 'exact'
+                return (
+                  <div key={key} style={{ marginBottom: 18 }}>
+                    <div className="flex items-baseline justify-between" style={{ margin: '0 2px 8px' }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{group[0].title}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{group.length} similar items</span>
+                    </div>
+                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      {group.map((it, i) => (
+                        <div key={it.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                          background: 'var(--bg-card)', borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                        }}>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
+                              {it.title}{it.quantity ? ` ${it.quantity}` : ''}
+                              {it.completed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
+                            </span>
+                            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-3)', marginTop: 1 }}>
+                              {i === 0 ? 'Original' : 'Added later'}
+                              {shared && it.added_by_name ? ` · by ${it.added_by_name}` : ''}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Merge preview */}
+                    {selected && plan.merged && (
+                      <p style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, margin: '8px 2px 0' }}>
+                        {group.map(i => `${group[0].title}${i.quantity ? ` ${i.quantity}` : ''}`).join(' + ')} → {group[0].title} {plan.merged}
+                      </p>
+                    )}
+
+                    {/* Contextual actions */}
+                    <div className="flex" style={{ gap: 8, marginTop: 10 }}>
+                      <button
+                        onClick={() => toggleDupe(key)}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                          border: selected
+                            ? 'none'
+                            : `1px solid ${isRemoval ? 'rgba(239,68,68,0.35)' : 'var(--border-2)'}`,
+                          background: selected ? (isRemoval ? '#ef4444' : 'var(--accent)') : 'transparent',
+                          color: selected ? '#fff' : (isRemoval ? '#ef4444' : 'var(--accent)'),
+                        }}>
+                        {isRemoval && <Trash2 size={14} />}{plan.mergeLabel}
+                      </button>
+                      <button
+                        onClick={() => { if (selected) toggleDupe(key) }}
+                        style={{
+                          flex: 1, height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                          border: !selected ? '1px solid var(--border-2)' : 'none',
+                          background: !selected ? 'var(--bg-input)' : 'transparent',
+                          color: 'var(--text-2)',
+                        }}>
+                        {keepLabel}
+                      </button>
+                    </div>
+
+                    {/* Suggested hint */}
+                    {plan.suggestMerge && !selected && (
+                      <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '6px 2px 0' }}>
+                        <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Suggested:</span> {plan.mergeLabel}
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
-              <button className="btn btn-secondary btn-full" onClick={() => setDupeReviewOpen(false)} style={{ marginTop: 4 }}>
-                Done
+                )
+              })}
+              <button
+                className="btn btn-primary btn-full"
+                onClick={() => dupeChanges > 0 ? applyDupePlan() : setDupeReviewOpen(false)}
+                style={{ marginTop: 4 }}>
+                {dupeChanges === 0 ? 'Done' : dupeChanges === 1 ? 'Apply Changes' : `Apply ${dupeChanges} Changes`}
               </button>
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Duplicates resolved toast ── */}
+      {dupeResolved && (
+        <div className="list-fade-in" style={{
+          position: 'fixed', bottom: 84, left: 16, right: 16, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          background: 'var(--bg-card)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid var(--border)', borderRadius: 16, padding: '13px 16px', boxShadow: 'var(--shadow)',
+        }}>
+          <Check size={16} color="var(--accent)" strokeWidth={2.5} />
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Duplicates resolved</span>
+        </div>
       )}
 
       {/* ── Undo delete toast ── */}
