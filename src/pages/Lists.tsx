@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
+import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore, ArrowUpDown, Check, Users, FileText, Sparkles, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
@@ -9,11 +9,12 @@ import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
+import { exportListReport } from '../lib/report'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
 type Filter = 'active' | 'shared' | 'completed' | 'archived'
-type Sort = 'recent' | 'alpha' | 'created' | 'items'
+type Sort = 'recent' | 'alpha' | 'created' | 'items' | 'progress'
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'active',    label: 'Active' },
@@ -23,15 +24,18 @@ const FILTERS: { id: Filter; label: string }[] = [
 ]
 
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'recent',  label: 'Recently Updated' },
-  { id: 'alpha',   label: 'Alphabetical' },
-  { id: 'created', label: 'Created Date' },
-  { id: 'items',   label: 'Most Items' },
+  { id: 'recent',   label: 'Recently Updated' },
+  { id: 'alpha',    label: 'Alphabetical' },
+  { id: 'created',  label: 'Recently Created' },
+  { id: 'items',    label: 'Most Items' },
+  { id: 'progress', label: 'Least Progress' },
 ]
+
+const SORT_KEY = 'listo-lists-sort'
 
 function ListCard({
   list, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare,
-  onSaveTemplate, onArchive, onUnarchive, items, membersCount = 0,
+  onSaveTemplate, onArchive, onUnarchive, onExport, items, membersCount = 0,
 }: {
   list: List; isPinned: boolean; items: { completed: boolean }[]; membersCount?: number
   onOpen: () => void
@@ -41,6 +45,7 @@ function ListCard({
   onRename?: () => void; onDuplicate?: () => void; onDelete?: () => void
   onLeave?: () => void; onShare?: () => void
   onSaveTemplate?: () => void; onArchive?: () => void; onUnarchive?: () => void
+  onExport?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const total = items.length
@@ -53,9 +58,9 @@ function ListCard({
   return (
     <>
       <div
-        className="card"
+        className="card card-press"
         style={{
-          padding: '14px 16px', cursor: 'pointer',
+          padding: '11px 14px', cursor: 'pointer',
           ...(isPinned && { borderColor: 'rgba(22,163,74,0.28)', boxShadow: '0 0 0 1px rgba(22,163,74,0.10)' }),
           ...(allDone  && !isPinned && { borderColor: 'rgba(0,230,140,0.22)' }),
         }}
@@ -74,8 +79,9 @@ function ListCard({
               <span style={{ fontWeight: 600, fontSize: 15 }} className="truncate">{list.name}</span>
             </div>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-sm" style={{ color: allDone ? '#00e087' : 'var(--text-2)', fontWeight: allDone ? 600 : 400 }}>
-                {total === 0 ? 'Empty' : allDone ? '✓ All done' : `${done}/${total} done`}
+              {/* Remaining work first — users care about what's left (spec §5) */}
+              <span className="text-sm" style={{ color: allDone ? '#00e087' : 'var(--text-2)', fontWeight: allDone ? 600 : 500 }}>
+                {total === 0 ? 'Empty' : allDone ? '✓ All done' : `${total - done} ${total - done === 1 ? 'item' : 'items'} left`}
               </span>
               <span className="text-xs text-hint flex items-center" style={{ gap: 8 }}>
                 {membersCount > 1 && (
@@ -83,7 +89,7 @@ function ListCard({
                     <Users size={11} /> {membersCount}
                   </span>
                 )}
-                {formatRelativeTime(list.updated_at)}
+                Updated {formatRelativeTime(list.updated_at)}
               </span>
             </div>
             {total > 0 && (
@@ -137,6 +143,11 @@ function ListCard({
           {onSaveTemplate && (
             <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onSaveTemplate(); setMenuOpen(false) }}>
               <LayoutTemplate size={16} /> Save as template
+            </button>
+          )}
+          {onExport && (
+            <button className="btn btn-secondary btn-full" style={{ justifyContent: 'flex-start', gap: 12 }} onClick={() => { onExport(); setMenuOpen(false) }}>
+              <FileText size={16} /> Export Report
             </button>
           )}
           {onArchive && (
@@ -211,6 +222,7 @@ export default function Lists() {
 
   const [shareTarget, setShareTarget] = useState<List | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createStep, setCreateStep] = useState<'templates' | 'custom'>('templates')
   const [renameTarget, setRenameTarget] = useState<List | null>(null)
   const [renameInput, setRenameInput] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<List | null>(null)
@@ -220,7 +232,11 @@ export default function Lists() {
   const [filter, setFilter] = useState<Filter>(
     () => FILTERS.some(f => f.id === urlFilter) ? urlFilter as Filter : 'active'
   )
-  const [sort, setSort] = useState<Sort>('recent')
+  // Last sort choice is remembered across visits (spec §3)
+  const [sort, setSort] = useState<Sort>(() => {
+    const st = localStorage.getItem(SORT_KEY)
+    return SORTS.some(o => o.id === st) ? st as Sort : 'recent'
+  })
   const [sortOpen, setSortOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -284,6 +300,13 @@ export default function Lists() {
     alpha:   (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
     created: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     items:   (a, b) => (store.items[b.id]?.length ?? 0) - (store.items[a.id]?.length ?? 0),
+    progress: (a, b) => {
+      const pct = (l: List) => {
+        const its = store.items[l.id] ?? []
+        return its.length === 0 ? 1 : its.filter(i => i.completed).length / its.length
+      }
+      return pct(a) - pct(b)
+    },
   }
 
   // Pins always float; the user's manual order only applies in Recent mode
@@ -319,6 +342,13 @@ export default function Lists() {
     return (store.items[l.id] ?? []).some(i => i.category && categoryNames.get(i.category)?.includes(q))
   }
 
+  const activeCount = visible.filter(l => !isAllDone(l.id)).length
+  const sharedCount = visible.filter(l => l.owner_id !== user?.id).length
+  const headerSummary = [
+    `${activeCount} Active`,
+    ...(sharedCount > 0 ? [`${sharedCount} Shared`] : []),
+  ].join(' • ')
+
   const activeAll    = applySort(visible.filter(l => !isAllDone(l.id) && matches(l)))
   const completedAll = applySort(visible.filter(l => isAllDone(l.id) && matches(l)))
   const sharedAll    = applySort(visible.filter(l => l.owner_id !== user?.id && matches(l)))
@@ -337,6 +367,9 @@ export default function Lists() {
         onOpen={() => navigate(`/list/${list.id}`)}
         onPin={() => togglePin(list.id)}
         onMoveTop={() => moveToTop(list.id)}
+        onExport={(store.items[list.id] ?? []).length > 0
+          ? () => exportListReport(list, store.items[list.id] ?? [], store.members[list.id] ?? [])
+          : undefined}
         {...(isOwner
           ? {
               // Sharing is owner-only: the sheet rotates the invite code
@@ -412,9 +445,16 @@ export default function Lists() {
           </div>
         )}
 
-        {/* Header */}
-        <div style={{ padding: '20px 16px 14px' }} className="flex items-center justify-between">
-          <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: -0.6 }}>Lists</span>
+        {/* Header — counts give context (spec §1) */}
+        <div style={{ padding: '20px 16px 12px' }} className="flex items-center justify-between">
+          <div>
+            <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: -0.6, display: 'block' }}>Lists</span>
+            {hasLists && (
+              <span style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2, display: 'block' }}>
+                {headerSummary}
+              </span>
+            )}
+          </div>
           {hasLists && (
             <div className="flex items-center" style={{ gap: 2 }}>
               <button
@@ -455,10 +495,10 @@ export default function Lists() {
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   style={{
-                    flexShrink: 0, padding: '6px 14px', borderRadius: 99, cursor: 'pointer',
+                    flexShrink: 0, height: 34, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
                     background: active ? 'var(--accent)' : 'var(--bg-input)',
-                    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                    color: active ? '#fff' : 'var(--text-2)',
+                    border: 'none',
+                    color: active ? '#030a14' : 'var(--text-2)',
                     fontSize: 13, fontWeight: active ? 700 : 500,
                     transition: 'background 0.15s, color 0.15s',
                   }}
@@ -494,8 +534,11 @@ export default function Lists() {
               <div className="icon">📋</div>
               <h3>No lists yet</h3>
               <p>Create your first list or start from a template.</p>
-              <button className="btn btn-primary mt-4" onClick={() => setCreateOpen(true)}>
-                <Plus size={18} /> Create a List
+              <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
+                <Plus size={18} /> Create List
+              </button>
+              <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
+                Browse Templates
               </button>
             </div>
           ) : (
@@ -514,6 +557,21 @@ export default function Lists() {
                       <span style={{ ...sectionLabel, padding: '8px 2px 0', display: 'block' }}>Templates</span>
                       {templatesFiltered.map(renderTemplate)}
                     </>
+                  )}
+
+                  {!q && activeAll.length > 0 && activeAll.length < 3 && (
+                    <button
+                      onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
+                      className="card card-press"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <Sparkles size={17} color="var(--accent)" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 14, fontWeight: 600 }}>Need inspiration?</p>
+                        <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 2 }}>Browse ready-made templates</p>
+                      </div>
+                      <ChevronRight size={15} color="var(--text-3)" style={{ flexShrink: 0 }} />
+                    </button>
                   )}
 
                   {completedAll.length > 0 && (
@@ -558,7 +616,7 @@ export default function Lists() {
         </div>
       </div>
 
-      <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} />
+      <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} initialStep={createStep} />
 
       {shareTarget && (
         <ShareListSheet
@@ -575,7 +633,7 @@ export default function Lists() {
               key={s.id}
               className="btn btn-secondary btn-full"
               style={{ justifyContent: 'space-between' }}
-              onClick={() => { setSort(s.id); setSortOpen(false) }}
+              onClick={() => { setSort(s.id); localStorage.setItem(SORT_KEY, s.id); setSortOpen(false) }}
             >
               {s.label}
               {sort === s.id && <Check size={16} color="var(--accent)" strokeWidth={2.5} />}

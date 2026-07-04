@@ -307,6 +307,11 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
+.progress-fill { transition: width 250ms var(--ease); }
+
+/* Card press feedback (lists spec §15) */
+.card-press { transition: transform 120ms ease; }
+.card-press:active { transform: scale(0.98); }
 
 .progress-fill {
   height: 100%;
