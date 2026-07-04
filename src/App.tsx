@@ -19,6 +19,7 @@ const PreferencesPage   = lazy(() => import('./pages/profile/Preferences'))
 const CollaborationPage = lazy(() => import('./pages/profile/Collaboration'))
 const InsightsPage      = lazy(() => import('./pages/profile/Insights'))
 const InvitePage        = lazy(() => import('./pages/profile/Invite'))
+const SupportPage       = lazy(() => import('./pages/profile/Support'))
 const AboutPage         = lazy(() => import('./pages/profile/About'))
 
 // Profile hub sub-screens (spec v4) — same guard + layout, mapped by path.
@@ -28,6 +29,7 @@ const PROFILE_SUBPAGES: [string, React.ComponentType][] = [
   ['/profile/collaboration', CollaborationPage],
   ['/profile/insights', InsightsPage],
   ['/profile/invite', InvitePage],
+  ['/profile/support', SupportPage],
   ['/profile/about', AboutPage],
 ]
 
