@@ -61,6 +61,14 @@ export async function exportListReport(list: List, items: ListItem[], members: L
     margin: { left: 14, right: 14 },
   })
 
+  // Companion footer (YFT integration spec §4) — shopping lists only
+  if (list.type === 'shopping') {
+    const y = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 260
+    doc.setFontSize(9)
+    doc.setTextColor(110, 110, 110)
+    doc.text('Next step: track this month\'s grocery budget in YFT — yft.grk766.workers.dev', 14, Math.min(y + 12, 285))
+  }
+
   const filename = `${list.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'list'}-report.pdf`
   const blob = doc.output('blob')
   const file = new File([blob], filename, { type: 'application/pdf' })

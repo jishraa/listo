@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart2, Gift, Info, LogOut, Settings2, User, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import Sheet from '../components/ui/Sheet'
+import { openYft } from '../lib/yft'
 import { Section, Row } from './profile/common'
 
 // Profile hub (spec v4): profile card + one navigation group. All detail
@@ -89,6 +90,17 @@ export default function Profile() {
               last={i === NAV_ITEMS.length - 1}
             />
           ))}
+        </Section>
+
+        {/* Companion apps (YFT integration spec §6) */}
+        <Section title="Apps">
+          <Row
+            icon={<span style={{ fontSize: 16 }}>📊</span>}
+            label="YFT"
+            value="Track Expenses"
+            onPress={() => openYft('')}
+            last
+          />
         </Section>
 
         {/* Sign out — isolated, outlined red, confirmed */}

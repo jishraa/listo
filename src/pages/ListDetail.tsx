@@ -8,6 +8,7 @@ import type { ListItem } from '../types'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { exportListReport } from '../lib/report'
+import { openYft } from '../lib/yft'
 import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
@@ -647,6 +648,24 @@ export default function ListDetail() {
                       <Share2 size={13} /> Share
                     </button>}
                   </div>
+                  {/* Companion nudge — shopping done → record the expense in YFT */}
+                  {list.type === 'shopping' && (
+                    <button
+                      onClick={() => openYft('/tracker/monthly')}
+                      style={{
+                        width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                        background: 'var(--bg-input)', border: '1px solid var(--border)',
+                      }}>
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>📊</span>
+                      <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)' }}>
+                        Record today's shopping expense?
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
+                        Track in YFT →
+                      </span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1093,6 +1112,28 @@ export default function ListDetail() {
 
               {insTotal === 0 && (
                 <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 14, padding: '16px 0' }}>Add some items to see insights.</p>
+              )}
+
+              {/* Companion card (YFT integration spec §1/§5) — shopping only */}
+              {list.type === 'shopping' && (
+                <button
+                  onClick={() => openYft('/tracker/monthly')}
+                  className="card card-press"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <span style={{
+                    width: 38, height: 38, borderRadius: 11, flexShrink: 0, fontSize: 17,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--accent-dim)',
+                  }}>📊</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Track Grocery Spending</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+                      Shopping organized — track what you spend each month.
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Open in YFT →</span>
+                </button>
               )}
             </div>
           </div>
