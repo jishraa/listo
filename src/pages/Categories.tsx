@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useCategoriesStore, makeCategoryId } from '../store/useCategoriesStore'
 import type { ListCategory } from '../lib/constants'
@@ -15,15 +15,21 @@ const TYPE_TABS: { id: ListType; label: string }[] = [
 
 const COLOR_SWATCHES = ['#16A34A', '#1D9E75', '#06B6D4', '#3B82F6', '#A855F7', '#EC4899', '#EF4444', '#F59E0B', '#EAB308', '#6B7280']
 
+const EMOJI_PRESETS: Record<ListType, string[]> = {
+  shopping: ['🛒', '🍎', '🥛', '🍗', '🌾', '❄️', '🥤', '🍿', '🧻', '🧴', '🐟', '🍞', '🧀', '🍫', '💊', '🧹'],
+  tasks:    ['💼', '🏠', '🛵', '❤️', '💰', '🎉', '📚', '⚡', '🧾', '📞', '🖥️', '🔧', '📅', '✈️'],
+  personal: ['💡', '📝', '⭐', '✈️', '📌', '🎬', '🎵', '🎁', '📷', '🍽️', '🏋️', '🌱'],
+}
+
 interface Draft {
   id: string | null // null = new category
   name: string
   emoji: string
   color: string
-  keywords: string
+  keywords: string[]
 }
 
-const emptyDraft = (): Draft => ({ id: null, name: '', emoji: '🏷️', color: COLOR_SWATCHES[0], keywords: '' })
+const emptyDraft = (): Draft => ({ id: null, name: '', emoji: '🏷️', color: COLOR_SWATCHES[0], keywords: [] })
 
 export default function Categories() {
   const navigate = useNavigate()
@@ -37,6 +43,7 @@ export default function Categories() {
 
   const [tab, setTab] = useState<ListType>('shopping')
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [keywordInput, setKeywordInput] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -46,21 +53,40 @@ export default function Categories() {
 
   const openEdit = (c: ListCategory) => {
     setConfirmingDelete(false)
-    setDraft({ id: c.id, name: c.name, emoji: c.emoji, color: c.color, keywords: c.keywords.join(', ') })
+    setKeywordInput('')
+    setDraft({ id: c.id, name: c.name, emoji: c.emoji, color: c.color, keywords: [...c.keywords] })
   }
-  const openAdd = () => { setConfirmingDelete(false); setDraft(emptyDraft()) }
+  const openAdd = () => { setConfirmingDelete(false); setKeywordInput(''); setDraft(emptyDraft()) }
+
+  // Turns the pending input into a keyword tag (Enter, comma, or blur)
+  const commitKeyword = () => {
+    if (!draft) return
+    const k = keywordInput.trim().toLowerCase().replace(/,/g, '')
+    setKeywordInput('')
+    if (!k || draft.keywords.includes(k)) return
+    setDraft({ ...draft, keywords: [...draft.keywords, k] })
+  }
+  const removeKeyword = (k: string) => {
+    if (!draft) return
+    setDraft({ ...draft, keywords: draft.keywords.filter(x => x !== k) })
+  }
 
   const handleSave = async () => {
     if (!draft || !draft.name.trim() || saving) return
     setSaving(true)
+    // Include anything still sitting in the input box
+    const pending = keywordInput.trim().toLowerCase().replace(/,/g, '')
+    const keywords = pending && !draft.keywords.includes(pending)
+      ? [...draft.keywords, pending] : draft.keywords
     await saveCategory(tab, {
       id: draft.id ?? makeCategoryId(draft.name),
       name: draft.name.trim().slice(0, 30),
       emoji: (draft.emoji.trim() || '🏷️').slice(0, 4),
       color: draft.color,
-      keywords: draft.keywords.split(',').map(k => k.trim().toLowerCase()).filter(Boolean),
+      keywords,
     })
     setSaving(false)
+    setKeywordInput('')
     setDraft(null)
   }
 
@@ -156,58 +182,125 @@ export default function Categories() {
       <Sheet open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? 'Edit Category' : 'New Category'}>
         {draft && (
           <div className="sheet-body">
-            <div className="flex gap-2">
-              <div className="input-group" style={{ width: 76, flexShrink: 0 }}>
-                <label className="input-label">Emoji</label>
-                <input
-                  className="input"
-                  value={draft.emoji}
-                  onChange={e => setDraft({ ...draft, emoji: e.target.value })}
-                  maxLength={4}
-                  style={{ textAlign: 'center', fontSize: 20 }}
-                />
-              </div>
-              <div className="input-group" style={{ flex: 1 }}>
-                <label className="input-label">Name</label>
-                <input
-                  className="input"
-                  placeholder="e.g. Baby care"
-                  value={draft.name}
-                  onChange={e => setDraft({ ...draft, name: e.target.value })}
-                  maxLength={30}
-                  autoFocus={!draft.id}
-                />
+            <div className="input-group">
+              <label className="input-label">Category name</label>
+              <input
+                className="input"
+                placeholder="e.g. Baby care"
+                value={draft.name}
+                onChange={e => setDraft({ ...draft, name: e.target.value })}
+                maxLength={30}
+                autoFocus={!draft.id}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Required to create category</span>
+            </div>
+
+            {/* Icon — preset tiles, horizontal scroll */}
+            <div className="input-group">
+              <label className="input-label">Icon</label>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 } as React.CSSProperties}>
+                {[...new Set([draft.emoji, ...EMOJI_PRESETS[tab]])].map(e => {
+                  const active = draft.emoji === e
+                  return (
+                    <button
+                      key={e}
+                      onClick={() => setDraft({ ...draft, emoji: e })}
+                      style={{
+                        width: 42, height: 42, borderRadius: 12, flexShrink: 0, fontSize: 19,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                        background: active ? 'var(--accent)' : 'var(--bg-input)',
+                        border: 'none',
+                        transition: 'background 150ms ease',
+                      }}
+                    >{e}</button>
+                  )
+                })}
               </div>
             </div>
 
+            {/* Color — circles with a check on the selected one */}
             <div className="input-group">
               <label className="input-label">Color</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {COLOR_SWATCHES.map(col => (
-                  <button
-                    key={col}
-                    onClick={() => setDraft({ ...draft, color: col })}
-                    aria-label={`Color ${col}`}
-                    style={{
-                      width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
-                      background: col,
-                      border: draft.color === col ? '3px solid var(--text)' : '3px solid transparent',
-                    }}
-                  />
-                ))}
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 } as React.CSSProperties}>
+                {COLOR_SWATCHES.map(col => {
+                  const active = draft.color === col
+                  return (
+                    <button
+                      key={col}
+                      onClick={() => setDraft({ ...draft, color: col })}
+                      aria-label={`Color ${col}`}
+                      style={{
+                        width: 38, height: 38, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
+                        background: col, border: active ? '2.5px solid var(--text)' : '2.5px solid transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {active && <Check size={16} strokeWidth={3} color="#fff" />}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
             <div className="input-group">
-              <label className="input-label">Keywords (comma separated — used for auto-detect)</label>
-              <textarea
-                className="input"
-                value={draft.keywords}
-                onChange={e => setDraft({ ...draft, keywords: e.target.value })}
-                placeholder="milk, cheese, butter"
-                rows={3}
-                style={{ resize: 'vertical', minHeight: 70, paddingTop: 10, fontFamily: 'inherit' }}
-              />
+              <label className="input-label">Keywords</label>
+              <div
+                onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement)?.focus()}
+                style={{
+                  display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+                  minHeight: 48, padding: '8px 12px', borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg-input)', border: '1.5px solid rgba(22, 163, 74, 0.10)',
+                  cursor: 'text',
+                }}
+              >
+                {draft.keywords.map(k => (
+                  <span key={k} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '4px 6px 4px 10px', borderRadius: 99,
+                    background: `${draft.color}1f`, fontSize: 13, fontWeight: 500, color: 'var(--text)',
+                  }}>
+                    {k}
+                    <button
+                      onClick={e => { e.stopPropagation(); removeKeyword(k) }}
+                      aria-label={`Remove ${k}`}
+                      style={{
+                        width: 18, height: 18, borderRadius: 99, border: 'none', cursor: 'pointer',
+                        background: 'rgba(0,0,0,0.25)', color: 'var(--text-2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                      }}
+                    >
+                      <X size={11} strokeWidth={2.5} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  value={keywordInput}
+                  onChange={e => {
+                    // A typed comma commits the tag immediately
+                    if (e.target.value.includes(',')) {
+                      setKeywordInput(e.target.value)
+                      setTimeout(commitKeyword, 0)
+                    } else {
+                      setKeywordInput(e.target.value)
+                    }
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); commitKeyword() }
+                    if (e.key === 'Backspace' && !keywordInput && draft.keywords.length > 0) {
+                      removeKeyword(draft.keywords[draft.keywords.length - 1])
+                    }
+                  }}
+                  onBlur={commitKeyword}
+                  placeholder="＋ add"
+                  style={{
+                    flex: 1, minWidth: 70, border: 'none', outline: 'none',
+                    background: 'transparent', color: 'var(--text)', fontSize: 14, padding: '4px 2px',
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                Items containing these words auto-sort into this category.
+              </span>
             </div>
 
             <button className="btn btn-primary btn-full" onClick={handleSave} disabled={!draft.name.trim() || saving}>
