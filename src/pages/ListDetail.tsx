@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -26,6 +26,19 @@ function pillStyle(active: boolean): CSSProperties {
     fontSize: 13, fontWeight: active ? 700 : 500,
     transition: 'background 160ms ease, color 160ms ease',
   }
+}
+
+// Per-list view preferences (spec §4.2) — persisted under listo-view-<id>
+// only while "remember" is on; otherwise they last for the session.
+type ViewPrefs = { categories: boolean; addedBy: boolean; autoExpand: boolean; remember: boolean }
+const DEFAULT_VIEW_PREFS: ViewPrefs = { categories: true, addedBy: true, autoExpand: false, remember: true }
+function readViewPrefs(id: string | undefined): ViewPrefs {
+  if (!id) return DEFAULT_VIEW_PREFS
+  try {
+    const raw = localStorage.getItem(`listo-view-${id}`)
+    if (raw) return { ...DEFAULT_VIEW_PREFS, ...JSON.parse(raw) }
+  } catch { /* ignore */ }
+  return DEFAULT_VIEW_PREFS
 }
 
 function formatCompletedAt(iso: string): string {
@@ -96,8 +109,22 @@ export default function ListDetail() {
   const [renaming,         setRenaming]         = useState(false)
   const [renameValue,      setRenameValue]      = useState('')
   const [confirmDelete,    setConfirmDelete]    = useState(false)
-  const [showCompleted,    setShowCompleted]    = useState(false)
+  const [showCompleted,    setShowCompleted]    = useState(() => readViewPrefs(id).autoExpand)
+  const [viewPrefs,        setViewPrefs]        = useState<ViewPrefs>(() => readViewPrefs(id))
+  const [customizeOpen,    setCustomizeOpen]    = useState(false)
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
+
+  function updateViewPref(patch: Partial<ViewPrefs>) {
+    setViewPrefs(prev => {
+      const next = { ...prev, ...patch }
+      if (id) {
+        if (next.remember) localStorage.setItem(`listo-view-${id}`, JSON.stringify(next))
+        else localStorage.removeItem(`listo-view-${id}`)
+      }
+      if ('autoExpand' in patch) setShowCompleted(next.autoExpand)
+      return next
+    })
+  }
   // Which flow the category picker sheet is serving (add sheet vs row edit)
   const [catPickerFor,     setCatPickerFor]     = useState<'add' | 'edit' | null>(null)
   const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
@@ -430,27 +457,29 @@ export default function ListDetail() {
                 }}>Dup</span>
               )}
             </div>
-            {(cat || item.added_by_name || item.completed_by_name) && (
-              <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
-                {/* Category as a compact neutral chip (spec §5) */}
-                {cat && (
-                  <span style={{
-                    flexShrink: 0, fontSize: 11, fontWeight: 600, lineHeight: 1,
-                    padding: '3px 7px', borderRadius: 6,
-                    background: item.completed ? 'var(--bg-input)' : `${cat.color}1f`,
-                    color: item.completed ? 'var(--text-3)' : 'var(--text-2)',
-                  }}>{cat.name}</span>
-                )}
-                {(() => {
-                  const who = item.completed
-                    ? (item.completed_by_name ? `✓ ${item.completed_by_name}` : null)
-                    : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null)
-                  return who ? (
+            {(() => {
+              // Metadata row respects the per-list view prefs (spec §4.2)
+              const showCat = cat && viewPrefs.categories
+              const who = !viewPrefs.addedBy ? null : item.completed
+                ? (item.completed_by_name ? `✓ ${item.completed_by_name}` : null)
+                : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null)
+              if (!showCat && !who) return null
+              return (
+                <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
+                  {showCat && (
+                    <span style={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 600, lineHeight: 1,
+                      padding: '3px 7px', borderRadius: 6,
+                      background: item.completed ? 'var(--bg-input)' : `${cat!.color}1f`,
+                      color: item.completed ? 'var(--text-3)' : 'var(--text-2)',
+                    }}>{cat!.name}</span>
+                  )}
+                  {who && (
                     <span style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
-                  ) : null
-                })()}
-              </div>
-            )}
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Qty chip (shopping only) */}
@@ -918,6 +947,7 @@ export default function ListDetail() {
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
                 list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
+                { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', hint: '', action: () => { setMenuOpen(false); setCustomizeOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
                 isOwner ? { icon: <Copy size={16} />, label: 'Duplicate', hint: '', action: async () => { setMenuOpen(false); await store.duplicateList(list.id) } } : null,
@@ -941,6 +971,51 @@ export default function ListDetail() {
                   </button>
                 )
               })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Customize List View (spec §4.2) ── */}
+      {customizeOpen && (
+        <>
+          <Overlay onClick={() => setCustomizeOpen(false)} />
+          <div className="sheet">
+            <div className="sheet-handle" />
+            <div style={{ padding: '6px 20px 22px' }}>
+              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 2px' }}>Customize List View</p>
+              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 12px' }}>Choose what shows on each item.</p>
+              {([
+                { key: 'categories', title: 'Categories', desc: 'Show item categories' },
+                { key: 'addedBy', title: 'Added By', desc: 'Show who added each item' },
+                { key: 'autoExpand', title: 'Completed Items', desc: 'Automatically expand completed items' },
+                { key: 'remember', title: 'Remember for this list', desc: 'Save these choices for next time' },
+              ] as const).map(row => {
+                const on = viewPrefs[row.key]
+                return (
+                  <div key={row.key} className="flex items-center justify-between" style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                      <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{row.title}</p>
+                      <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{row.desc}</p>
+                    </div>
+                    <button
+                      role="switch" aria-checked={on} aria-label={row.title}
+                      onClick={() => updateViewPref({ [row.key]: !on })}
+                      style={{
+                        flexShrink: 0, width: 46, height: 28, borderRadius: 99, border: 'none', cursor: 'pointer',
+                        background: on ? 'var(--accent)' : 'var(--bg-input)',
+                        position: 'relative', transition: 'background 180ms ease',
+                      }}>
+                      <span style={{
+                        position: 'absolute', top: 3, left: on ? 21 : 3,
+                        width: 22, height: 22, borderRadius: '50%', background: '#fff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 180ms var(--ease)',
+                      }} />
+                    </button>
+                  </div>
+                )
+              })}
+              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={() => setCustomizeOpen(false)}>Done</button>
             </div>
           </div>
         </>
