@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Gift, KeyRound, LogOut, Mail, Monitor, Moon, Pencil, Sun, User, Users } from 'lucide-react'
+import { ChevronRight, Gift, KeyRound, LogOut, Mail, Monitor, Moon, Pencil, Sun, Tag, User, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useThemeStore } from '../store/useThemeStore'
 import type { ThemePref } from '../store/useThemeStore'
@@ -225,6 +225,7 @@ export default function Profile() {
               })}
             </div>
           </div>
+          <SettingsRow icon={<Tag size={16} />} label="Manage Categories" onPress={() => navigate('/categories')} />
           <div style={{ padding: '14px 16px' }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>Default List Type</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>

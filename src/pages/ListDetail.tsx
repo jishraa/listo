@@ -5,10 +5,12 @@ import { ArrowLeft, ArrowUpDown, BarChart2, Check, FileText, MoreVertical, Penci
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
-import { LIST_CATEGORIES, detectCategory, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
+import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
+import { useCategoriesStore } from '../store/useCategoriesStore'
 import { exportListReport } from '../lib/report'
 import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
+import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -82,6 +84,8 @@ export default function ListDetail() {
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [showCompleted,    setShowCompleted]    = useState(false)
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
+  // Which flow the category picker sheet is serving (add sheet vs row edit)
+  const [catPickerFor,     setCatPickerFor]     = useState<'add' | 'edit' | null>(null)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
@@ -92,8 +96,18 @@ export default function ListDetail() {
     const s = localStorage.getItem(`listo-sort-${id}`)
     return (s === 'alpha' || s === 'category') ? s : 'date'
   })
+  // Transient "✓ added" confirmation in the add sheet
+  const [addedToast, setAddedToast] = useState<string | null>(null)
+  const addedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function flashAddedToast(title: string) {
+    setAddedToast(title)
+    if (addedToastTimer.current) clearTimeout(addedToastTimer.current)
+    addedToastTimer.current = setTimeout(() => setAddedToast(null), 2200)
+  }
+  useEffect(() => () => { if (addedToastTimer.current) clearTimeout(addedToastTimer.current) }, [])
 
   useEffect(() => {
     if (!id) return
@@ -122,19 +136,21 @@ export default function ListDetail() {
 
   useEffect(() => { if (isAllComplete) setShowCompleted(false) }, [isAllComplete])
 
+  const allCategories = useCategoriesStore(s2 => s2.categories)
+  const cats = list ? allCategories[list.type] : []
+
   // Auto-detect category
   useEffect(() => {
     if (!list || addCatSticky) return
     const { item } = parseItemInput(addInput)
     if (!item) { setAddCategory(null); return }
     const t = setTimeout(() => {
-      const detected = detectCategory(item, list.type)
+      const detected = detectCategoryIn(allCategories[list.type], item)
       if (detected) setAddCategory(detected)
     }, 250)
     return () => clearTimeout(t)
-  }, [addInput, list, addCatSticky])
+  }, [addInput, list, addCatSticky, allCategories])
 
-  const cats = list ? LIST_CATEGORIES[list.type] : []
   const catById = useMemo(() => new Map(cats.map(c => [c.id, c])), [cats])
 
   const usedCatIds = useMemo(() => {
@@ -232,7 +248,7 @@ export default function ListDetail() {
   async function handleSheetAdd() {
     const { item: t, qty } = parseItemInput(addInput)
     if (!t || !list) return
-    const finalCat = addCatSticky ? addCategory : (addCategory ?? detectCategory(t, list.type))
+    const finalCat = addCatSticky ? addCategory : (addCategory ?? detectCategoryIn(cats, t))
     if (qty) {
       const existing = items.find(i => !i.completed && i.title.toLowerCase() === t.toLowerCase() && i.quantity)
       if (existing) {
@@ -243,6 +259,7 @@ export default function ListDetail() {
     resetAdd(); setAddFlashing(true)
     await store.addItem(list.id, t, qty, finalCat ?? null)
     setAddFlashing(false)
+    flashAddedToast(t)
     setTimeout(() => addInputRef.current?.focus(), 60)
   }
 
@@ -302,18 +319,20 @@ export default function ListDetail() {
           )}
         </div>
         <div className="flex items-center justify-between">
-          {list.type === 'shopping' && cats.length > 0 ? (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-              {cats.map(c => (
-                <button key={c.id} onClick={() => setEditCategory(editCategory === c.id ? null : c.id)}
-                  style={{
-                    padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    background: editCategory === c.id ? c.color : 'var(--bg-input)',
-                    color: editCategory === c.id ? '#fff' : 'var(--text-2)',
-                    border: `1px solid ${editCategory === c.id ? c.color : 'rgba(255,255,255,0.07)'}`,
-                  }}>{c.name}</button>
-              ))}
-            </div>
+          {cats.length > 0 ? (
+            <button
+              onClick={() => setCatPickerFor('edit')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: editCategory && catById.get(editCategory) ? `${catById.get(editCategory)!.color}1f` : 'var(--bg-input)',
+                color: editCategory ? 'var(--text)' : 'var(--text-3)',
+                border: 'none',
+              }}>
+              {editCategory && catById.get(editCategory)
+                ? <>{catById.get(editCategory)!.emoji} {catById.get(editCategory)!.name}</>
+                : '＋ Category'}
+            </button>
           ) : <div />}
           <div className="flex gap-2" style={{ marginLeft: 8, flexShrink: 0 }}>
             <button onClick={() => commitEdit(item)}
@@ -695,6 +714,24 @@ export default function ListDetail() {
           <div className="sheet">
             <div className="sheet-handle" />
             <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p style={{ fontSize: 17, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Add Item</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '2px 0 0' }}>to {list.name}</p>
+                </div>
+                {/* "✓ added" confirmation — auto-hides after ~2s */}
+                {addedToast && (
+                  <span className="list-fade-in" style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                    padding: '5px 12px', borderRadius: 99, maxWidth: '55%',
+                    background: 'var(--accent-dim)', color: 'var(--accent)',
+                    fontSize: 13, fontWeight: 600,
+                  }}>
+                    <Check size={14} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
+                  </span>
+                )}
+              </div>
               <div style={{ position: 'relative' }}>
                 <div className="flex gap-2">
                   <input
@@ -752,31 +789,30 @@ export default function ListDetail() {
                 </div>
               )}
 
-              {/* Category chips — hidden until auto-detect picks one from the
-                  typed item; "Change" (sticky) expands the full set */}
-              {cats.length > 0 && (addCategory || addCatSticky) && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {(addCategory && !addCatSticky ? cats.filter(c => c.id === addCategory) : cats).map(c => {
-                    const active = addCategory === c.id
-                    return (
-                      <button key={c.id}
-                        onClick={() => { setAddCategory(active ? null : c.id); setAddCatSticky(true) }}
-                        style={{
-                          padding: '4px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                          background: active ? c.color : 'var(--bg-input)',
-                          color: active ? '#fff' : 'var(--text-2)',
-                          border: `1px solid ${active ? c.color : 'var(--border)'}`,
-                          transition: 'all 0.15s',
-                        }}>{c.name}</button>
-                    )
-                  })}
-                  {addCategory && !addCatSticky && (
-                    <button onClick={() => setAddCatSticky(true)}
-                      style={{ padding: '4px 10px', borderRadius: 100, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: '1px solid var(--border)' }}>
+              {/* Category — hidden until auto-detect picks one from the typed
+                  item; Change opens the dedicated picker sheet */}
+              {cats.length > 0 && addCategory && (() => {
+                const c = catById.get(addCategory)
+                if (!c) return null
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '4px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600,
+                      background: `${c.color}1f`, color: 'var(--text)',
+                    }}>{c.emoji} {c.name}</span>
+                    <button onClick={() => setCatPickerFor('add')}
+                      style={{ padding: '6px 10px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-2)', border: 'none' }}>
                       Change
                     </button>
-                  )}
-                </div>
+                  </div>
+                )
+              })()}
+              {cats.length > 0 && !addCategory && parsedInput.item && (
+                <button onClick={() => setCatPickerFor('add')}
+                  style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: 'none' }}>
+                  ＋ Category
+                </button>
               )}
             </div>
           </div>
@@ -795,7 +831,7 @@ export default function ListDetail() {
                 Existing: <strong>{mergeTarget.quantity || '—'}</strong> · Adding: <strong>{pendingAdd.qty}</strong> → Combined: <strong>{mergeQuantities(mergeTarget.quantity, pendingAdd.qty)}</strong>
               </p>
               <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd() }}>Add Separate</button>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(pendingAdd.title) }}>Add Separate</button>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleMerge}>Merge Qty</button>
               </div>
             </div>
@@ -1066,6 +1102,18 @@ export default function ListDetail() {
       {shareOpen && (
         <ShareListSheet list={list} members={members} onClose={() => setShareOpen(false)} />
       )}
+
+      {/* ── Category picker ── */}
+      <CategoryPickerSheet
+        open={catPickerFor !== null}
+        categories={cats}
+        selected={catPickerFor === 'edit' ? editCategory : addCategory}
+        onSelect={id => {
+          if (catPickerFor === 'edit') setEditCategory(id)
+          else { setAddCategory(id); setAddCatSticky(true) }
+        }}
+        onClose={() => setCatPickerFor(null)}
+      />
 
       {/* ── Undo delete toast ── */}
       {undoItem && (

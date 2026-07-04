@@ -45,6 +45,7 @@ The two tab pages render inside `AppShell` (`components/layout/`), which owns th
 | `useAuthStore` | Session, user, `displayName`, `isGuest` (Supabase anonymous auth), signOut |
 | `useListsStore` | Lists, items, members; Supabase CRUD + realtime; templates (`saveAsTemplate`/`createFromTemplate`) and archiving (`setArchived`) |
 | `useThemeStore` | `pref: 'light' \| 'dark' \| 'system'`; `applyTheme()` sets `data-theme` on `<html>` |
+| `useCategoriesStore` | Per-user category customization (seeded from `LIST_CATEGORIES` defaults, persisted as JSONB in `user_categories`, migration v6); managed at `/categories`. Use `detectCategoryIn(cats, text)` with store categories, not the static `detectCategory` |
 
 Go through store helpers for Supabase access; don't call Supabase directly from components.
 

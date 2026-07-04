@@ -1,10 +1,6 @@
 import type { List, ListItem, ListMember } from '../types'
-import { LIST_CATEGORIES } from './constants'
+import { useCategoriesStore } from '../store/useCategoriesStore'
 import { LIST_TYPE_LABELS } from './utils'
-
-const CATEGORY_NAMES = new Map(
-  Object.values(LIST_CATEGORIES).flat().map(c => [c.id, c.name])
-)
 
 const GREEN: [number, number, number] = [22, 163, 74]
 
@@ -19,6 +15,9 @@ export async function exportListReport(list: List, items: ListItem[], members: L
 
   const doc = new jsPDF()
   const pageW = doc.internal.pageSize.getWidth()
+  const categoryNames = new Map(
+    Object.values(useCategoriesStore.getState().categories).flat().map(c => [c.id, c.name])
+  )
 
   // Brand header band
   doc.setFillColor(...GREEN)
@@ -51,7 +50,7 @@ export async function exportListReport(list: List, items: ListItem[], members: L
       String(idx + 1),
       i.title,
       i.quantity ?? '',
-      i.category ? (CATEGORY_NAMES.get(i.category) ?? '') : '',
+      i.category ? (categoryNames.get(i.category) ?? '') : '',
       i.completed ? 'Done' : 'Pending',
       i.added_by_name,
     ]),

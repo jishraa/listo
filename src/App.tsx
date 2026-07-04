@@ -8,6 +8,7 @@ import ListDetail from './pages/ListDetail'
 import JoinList from './pages/JoinList'
 import Profile from './pages/Profile'
 import { Terms, Privacy } from './pages/Legal'
+import Categories from './pages/Categories'
 import AppShell from './components/layout/AppShell'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -75,12 +76,20 @@ function AppRoutes() {
         <Route path="/insights" element={<Navigate to="/" replace />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
-      {/* Drill-in page — full-screen, own header, no bottom nav */}
+      {/* Drill-in pages — full-screen, own header, no bottom nav */}
       <Route
         path="/list/:id"
         element={
           <AuthGuard>
             <ListDetail />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/categories"
+        element={
+          <AuthGuard>
+            <Categories />
           </AuthGuard>
         }
       />

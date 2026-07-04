@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Share2, Search, X, Pin, ArrowUp, Copy, Pencil, Trash2, LogOut, LayoutTemplate, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
@@ -9,7 +9,7 @@ import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { formatRelativeTime } from '../lib/utils'
-import { LIST_CATEGORIES } from '../lib/constants'
+import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
 type Filter = 'active' | 'shared' | 'completed' | 'archived'
@@ -28,11 +28,6 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'created', label: 'Created Date' },
   { id: 'items',   label: 'Most Items' },
 ]
-
-// Category display names across all list types, for search matching
-const CATEGORY_NAMES = new Map(
-  Object.values(LIST_CATEGORIES).flat().map(c => [c.id, c.name.toLowerCase()])
-)
 
 function ListCard({
   list, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare,
@@ -203,6 +198,13 @@ export default function Lists() {
     }
   }
 
+  // Category display names (user-customized) for search matching
+  const allCategories = useCategoriesStore(s2 => s2.categories)
+  const categoryNames = useMemo(
+    () => new Map(Object.values(allCategories).flat().map(c => [c.id, c.name.toLowerCase()])),
+    [allCategories],
+  )
+
   // ?filter=shared etc. lets other screens (e.g. Profile) deep-link a view
   const [searchParams] = useSearchParams()
   const urlFilter = searchParams.get('filter')
@@ -314,7 +316,7 @@ export default function Lists() {
     if (!q) return true
     if (l.name.toLowerCase().includes(q)) return true
     if ((store.members[l.id] ?? []).some(m => m.display_name.toLowerCase().includes(q))) return true
-    return (store.items[l.id] ?? []).some(i => i.category && CATEGORY_NAMES.get(i.category)?.includes(q))
+    return (store.items[l.id] ?? []).some(i => i.category && categoryNames.get(i.category)?.includes(q))
   }
 
   const activeAll    = applySort(visible.filter(l => !isAllDone(l.id) && matches(l)))
