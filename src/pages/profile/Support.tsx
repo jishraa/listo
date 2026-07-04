@@ -1,22 +1,19 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, Star, Gift, MessageCircle } from 'lucide-react'
 import { SubPage, Section, Row } from './common'
 
-// Fill these when the real channels exist. Empty SUPPORT_URL shows a gentle
-// "coming soon" note rather than a dead link — support is always optional and
-// never pressured (spec UX rules).
-const SUPPORT_URL = ''
-const FEEDBACK_EMAIL = 'hello@listo.app'
+// India-friendly support via UPI (no signup). The deep link opens the user's
+// UPI app on mobile with the amount left for them to enter; the VPA is also
+// shown so desktop / manual payers can send directly. Support is optional.
+const UPI_VPA = 'grk766@okicici'
+const SUPPORT_URL = `upi://pay?pa=${encodeURIComponent(UPI_VPA)}&pn=${encodeURIComponent('Listo')}&cu=INR`
+const FEEDBACK_EMAIL = 'grk766@gmail.com'
 
 export default function SupportPage() {
   const navigate = useNavigate()
-  const [note, setNote] = useState<string | null>(null)
 
-  const handleSupport = () => {
-    if (SUPPORT_URL) window.open(SUPPORT_URL, '_blank', 'noopener,noreferrer')
-    else setNote('Support options are coming soon — thank you for the love! 💚')
-  }
+  // Custom-scheme deep links must navigate (window.open is blocked for upi://).
+  const handleSupport = () => { window.location.href = SUPPORT_URL }
   const mailTo = (subject: string) => {
     window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}`
   }
@@ -42,7 +39,9 @@ export default function SupportPage() {
         <button className="btn btn-primary btn-full" style={{ marginTop: 20, height: 52 }} onClick={handleSupport}>
           <Heart size={16} fill="#fff" /> Support Development
         </button>
-        {note && <p className="text-sm" style={{ color: 'var(--accent)', marginTop: 12, fontWeight: 600 }}>{note}</p>}
+        <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 12 }}>
+          Opens your UPI app · or pay to <span style={{ color: 'var(--text-2)', fontWeight: 600 }}>{UPI_VPA}</span>
+        </p>
       </div>
 
       {/* Other ways to help — inclusive of non-financial support */}

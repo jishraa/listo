@@ -14,6 +14,11 @@ export default function AboutPage() {
         />
         <p style={{ fontWeight: 800, fontSize: 18, marginTop: 12, letterSpacing: -0.3 }}>Listo</p>
         <p className="text-sm" style={{ color: 'var(--text-3)', marginTop: 2 }}>Smart lists for everyday life</p>
+        <p className="text-sm" style={{ color: 'var(--text-2)', marginTop: 12, lineHeight: 1.55, maxWidth: 300, marginInline: 'auto' }}>
+          Listo makes planning and shopping simpler. Create collaborative to-do and
+          shopping lists, check items off in real time, and stay in sync with family
+          and friends — wherever you are.
+        </p>
       </div>
       <Section>
         <Row icon={<Info size={17} />} label="Version" value="1.0.0" />
