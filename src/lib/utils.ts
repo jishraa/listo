@@ -4,19 +4,22 @@ export function generateInviteCode(): string {
   return Array.from(arr, b => b.toString(36)).join('').slice(0, 8)
 }
 
+// Contextual labels (lists spec v3 §9): minutes only for recent activity,
+// then calendar-based Today / Yesterday / N days ago.
 export function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60000)
 
   if (minutes < 1) return 'just now'
   if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7) return `${days}d ago`
-  return date.toLocaleDateString()
+
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(date)) / 86400000)
+  if (dayDiff === 0) return 'today'
+  if (dayDiff === 1) return 'yesterday'
+  if (dayDiff < 7) return `${dayDiff} days ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 export const LIST_TYPE_LABELS: Record<string, string> = {

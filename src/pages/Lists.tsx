@@ -5,6 +5,8 @@ import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
 import ShareListSheet from '../components/lists/ShareListSheet'
+import { SwipeCard } from '../components/lists/SwipeCard'
+import type { SwipeAction } from '../components/lists/SwipeCard'
 import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -76,14 +78,14 @@ function ListCard({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="flex items-center gap-2">
               {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ filter: 'drop-shadow(0 0 4px rgba(22,163,74,0.6))' }} />}
-              <span style={{ fontWeight: 600, fontSize: 15 }} className="truncate">{list.name}</span>
+              <span style={{ fontWeight: 600, fontSize: 17 }} className="truncate">{list.name}</span>
             </div>
             <div className="flex items-center justify-between mt-2">
               {/* Remaining work first — users care about what's left (spec §5) */}
-              <span className="text-sm" style={{ color: allDone ? '#00e087' : 'var(--text-2)', fontWeight: allDone ? 600 : 500 }}>
+              <span style={{ fontSize: 14, color: allDone ? '#00e087' : 'var(--text-2)', fontWeight: allDone ? 600 : 500 }}>
                 {total === 0 ? 'Empty' : allDone ? '✓ All done' : `${total - done} ${total - done === 1 ? 'item' : 'items'} left`}
               </span>
-              <span className="text-xs text-hint flex items-center" style={{ gap: 8 }}>
+              <span className="text-hint flex items-center" style={{ gap: 8, fontSize: 13 }}>
                 {membersCount > 1 && (
                   <span className="flex items-center" style={{ gap: 3 }}>
                     <Users size={11} /> {membersCount}
@@ -344,10 +346,7 @@ export default function Lists() {
 
   const activeCount = visible.filter(l => !isAllDone(l.id)).length
   const sharedCount = visible.filter(l => l.owner_id !== user?.id).length
-  const headerSummary = [
-    `${activeCount} Active`,
-    ...(sharedCount > 0 ? [`${sharedCount} Shared`] : []),
-  ].join(' • ')
+  const headerSummary = `${activeCount} Active ${activeCount === 1 ? 'List' : 'Lists'}${sharedCount > 0 ? ` • ${sharedCount} Shared` : ''}`
 
   const activeAll    = applySort(visible.filter(l => !isAllDone(l.id) && matches(l)))
   const completedAll = applySort(visible.filter(l => isAllDone(l.id) && matches(l)))
@@ -357,9 +356,19 @@ export default function Lists() {
 
   const renderCard = (list: List) => {
     const isOwner = list.owner_id === user?.id
+    const swipeLeft: SwipeAction[] = [
+      { label: pinnedIds.has(list.id) ? 'Unpin' : 'Pin', icon: <Pin size={16} />, color: '#3B82F6', onPress: () => togglePin(list.id) },
+      ...(isOwner ? [{ label: 'Share', icon: <Share2 size={16} />, color: '#16A34A', onPress: () => setShareTarget(list) }] : []),
+    ]
+    const swipeRight: SwipeAction[] = isOwner
+      ? [
+          { label: 'Archive', icon: <Archive size={16} />, color: '#F59E0B', onPress: () => store.setArchived(list.id, true) },
+          { label: 'Delete',  icon: <Trash2 size={16} />,  color: '#EF4444', onPress: () => setDeleteTarget(list) },
+        ]
+      : [{ label: 'Leave', icon: <LogOut size={16} />, color: '#EF4444', onPress: () => store.leaveList(list.id) }]
     return (
+      <SwipeCard key={list.id} leftActions={swipeLeft} rightActions={swipeRight}>
       <ListCard
-        key={list.id}
         list={list}
         isPinned={pinnedIds.has(list.id)}
         items={store.items[list.id] ?? []}
@@ -382,6 +391,7 @@ export default function Lists() {
             }
           : { onLeave: () => store.leaveList(list.id) })}
       />
+      </SwipeCard>
     )
   }
 
@@ -495,7 +505,7 @@ export default function Lists() {
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   style={{
-                    flexShrink: 0, height: 34, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
+                    flexShrink: 0, height: 36, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
                     background: active ? 'var(--accent)' : 'var(--bg-input)',
                     border: 'none',
                     color: active ? '#030a14' : 'var(--text-2)',
@@ -547,9 +557,23 @@ export default function Lists() {
                 <>
                   {activeAll.map(renderCard)}
                   {activeAll.length === 0 && (
-                    <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '24px 0' }}>
-                      {q ? <>No lists match "<strong>{search}</strong>"</> : 'No active lists — everything is done! 🎉'}
-                    </p>
+                    q ? (
+                      <p className="text-muted text-sm" style={{ textAlign: 'center', padding: '24px 0' }}>
+                        No lists match "<strong>{search}</strong>"
+                      </p>
+                    ) : (
+                      <div className="empty-state" style={{ padding: '28px 0 12px' }}>
+                        <div className="icon">🎉</div>
+                        <h3>No Active Lists</h3>
+                        <p>You're all caught up.</p>
+                        <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
+                          <Plus size={18} /> Create List
+                        </button>
+                        <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
+                          Browse Templates
+                        </button>
+                      </div>
+                    )
                   )}
 
                   {templatesFiltered.length > 0 && (
@@ -559,7 +583,7 @@ export default function Lists() {
                     </>
                   )}
 
-                  {!q && activeAll.length > 0 && activeAll.length < 3 && (
+                  {!q && activeAll.length > 0 && activeAll.length < 5 && (
                     <button
                       onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
                       className="card card-press"
