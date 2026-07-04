@@ -270,12 +270,12 @@ export default function Lists() {
   const renderCard = (list: List) => {
     const isOwner = list.owner_id === user?.id
     const swipeLeft: SwipeAction[] = [
-      { label: pinnedIds.has(list.id) ? 'Unpin' : 'Pin', icon: <Pin size={16} />, color: '#3B82F6', onPress: () => togglePin(list.id) },
+      { label: pinnedIds.has(list.id) ? 'Unpin' : 'Pin', icon: <Pin size={16} />, color: '#475569', onPress: () => togglePin(list.id) },
       ...(isOwner ? [{ label: 'Share', icon: <Share2 size={16} />, color: '#16A34A', onPress: () => setShareTarget(list) }] : []),
     ]
     const swipeRight: SwipeAction[] = isOwner
       ? [
-          { label: 'Archive', icon: <Archive size={16} />, color: '#F59E0B', onPress: () => store.setArchived(list.id, true) },
+          { label: 'Archive', icon: <Archive size={16} />, color: '#475569', onPress: () => store.setArchived(list.id, true) },
           { label: 'Delete',  icon: <Trash2 size={16} />,  color: '#EF4444', onPress: () => setDeleteTarget(list) },
         ]
       : [{ label: 'Leave', icon: <LogOut size={16} />, color: '#EF4444', onPress: () => store.leaveList(list.id) }]
