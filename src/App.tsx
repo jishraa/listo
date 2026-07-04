@@ -1,21 +1,43 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/useAuthStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
+import AppShell from './components/layout/AppShell'
+// Entry screens stay eager; everything reachable one tap deeper is lazy so
+// the initial bundle only carries login + the lists workspace.
 import Login from './pages/Login'
 import Lists from './pages/Lists'
-import ListDetail from './pages/ListDetail'
 import JoinList from './pages/JoinList'
-import Profile from './pages/Profile'
-import { Terms, Privacy } from './pages/Legal'
-import Categories from './pages/Categories'
-import AccountPage from './pages/profile/Account'
-import PreferencesPage from './pages/profile/Preferences'
-import CollaborationPage from './pages/profile/Collaboration'
-import InsightsPage from './pages/profile/Insights'
-import InvitePage from './pages/profile/Invite'
-import AboutPage from './pages/profile/About'
-import AppShell from './components/layout/AppShell'
+
+const ListDetail        = lazy(() => import('./pages/ListDetail'))
+const Profile           = lazy(() => import('./pages/Profile'))
+const Categories        = lazy(() => import('./pages/Categories'))
+const Terms             = lazy(() => import('./pages/Legal').then(m => ({ default: m.Terms })))
+const Privacy           = lazy(() => import('./pages/Legal').then(m => ({ default: m.Privacy })))
+const AccountPage       = lazy(() => import('./pages/profile/Account'))
+const PreferencesPage   = lazy(() => import('./pages/profile/Preferences'))
+const CollaborationPage = lazy(() => import('./pages/profile/Collaboration'))
+const InsightsPage      = lazy(() => import('./pages/profile/Insights'))
+const InvitePage        = lazy(() => import('./pages/profile/Invite'))
+const AboutPage         = lazy(() => import('./pages/profile/About'))
+
+// Profile hub sub-screens (spec v4) — same guard + layout, mapped by path.
+const PROFILE_SUBPAGES: [string, React.ComponentType][] = [
+  ['/profile/account', AccountPage],
+  ['/profile/preferences', PreferencesPage],
+  ['/profile/collaboration', CollaborationPage],
+  ['/profile/insights', InsightsPage],
+  ['/profile/invite', InvitePage],
+  ['/profile/about', AboutPage],
+]
+
+function PageLoader() {
+  return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+    </div>
+  )
+}
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuthStore()
@@ -63,6 +85,7 @@ function AppRoutes() {
   }, [])
 
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/terms" element={<Terms />} />
@@ -106,19 +129,12 @@ function AppRoutes() {
           </AuthGuard>
         }
       />
-      {/* Profile hub sub-screens (spec v4) */}
-      {([
-        ['/profile/account', <AccountPage />],
-        ['/profile/preferences', <PreferencesPage />],
-        ['/profile/collaboration', <CollaborationPage />],
-        ['/profile/insights', <InsightsPage />],
-        ['/profile/invite', <InvitePage />],
-        ['/profile/about', <AboutPage />],
-      ] as [string, React.ReactElement][]).map(([path, el]) => (
-        <Route key={path} path={path} element={<AuthGuard>{el}</AuthGuard>} />
+      {PROFILE_SUBPAGES.map(([path, Page]) => (
+        <Route key={path} path={path} element={<AuthGuard><Page /></AuthGuard>} />
       ))}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   )
 }
 
