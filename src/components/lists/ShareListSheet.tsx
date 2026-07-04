@@ -203,8 +203,14 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
         }}>
           <p style={{ flex: 1, fontSize: 13.5, lineHeight: 1.5, color: 'var(--text)', margin: 0, wordBreak: 'break-word' }}>
             {message}{' '}
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-              {generating ? '…' : shareUrl}
+            {/* The raw URL is never shown (spec §5.1/§5.3) — it's still attached
+                to every share/copy action below, just not exposed as text. */}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle',
+              color: 'var(--accent)', fontWeight: 600, fontSize: 12.5,
+              background: 'var(--accent-dim)', padding: '1px 8px', borderRadius: 99,
+            }}>
+              🔗 {generating ? 'preparing link…' : 'invite link'}
             </span>
           </p>
           <button
