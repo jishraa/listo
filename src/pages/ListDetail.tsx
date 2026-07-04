@@ -81,7 +81,6 @@ export default function ListDetail() {
   const [renameValue,      setRenameValue]      = useState('')
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [showCompleted,    setShowCompleted]    = useState(false)
-  const [showCategories,   setShowCategories]   = useState(false)
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [unchecking,       setUnchecking]       = useState(false)
@@ -159,6 +158,9 @@ export default function ListDetail() {
   const dupeIds = useMemo(() => {
     const s = new Set<string>(); dupeGroups.forEach(g => g.forEach(i => s.add(i.id))); return s
   }, [dupeGroups])
+  const uncategorizedPending = useMemo(
+    () => items.filter(i => !i.completed && !i.category), [items]
+  )
 
   // Suggestions
   const parsedInput = useMemo(() => parseItemInput(addInput), [addInput])
@@ -180,7 +182,16 @@ export default function ListDetail() {
 
   const pending   = sorted.filter(i => !i.completed)
   const completed = sorted.filter(i => i.completed)
-  const pct = items.length > 0 ? (items.filter(i => i.completed).length / items.length) * 100 : 0
+  const doneCount = items.filter(i => i.completed).length
+  const itemsLeft = items.length - doneCount
+  const pct = items.length > 0 ? (doneCount / items.length) * 100 : 0
+  // Contextual progress copy (spec §2)
+  const progressMsg =
+    pct >= 100 ? (list?.type === 'shopping' ? 'Shopping complete 🎉' : 'All done 🎉')
+    : pct >= 75 ? 'Almost done'
+    : pct >= 50 ? 'Halfway there'
+    : pct > 0   ? 'Good start!'
+    : "Let's get started"
 
   // ── Handlers ────────────────────────────────────────────────
   function startEdit(item: ListItem) {
@@ -271,8 +282,7 @@ export default function ListDetail() {
             maxLength={200}
             style={{
               flex: 1, height: 40, borderRadius: 8, padding: '0 12px',
-              background: 'rgba(22,163,74,0.06)', border: '1.5px solid var(--accent)',
-              boxShadow: '0 0 0 3px rgba(22,163,74,0.12)',
+              background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
               color: 'var(--text)', fontSize: 15, outline: 'none',
             }}
           />
@@ -321,30 +331,36 @@ export default function ListDetail() {
 
     return (
       <SwipeRow key={item.id} onDelete={() => handleDelete(item)}>
-        <div className="flex items-center gap-3" style={{ padding: '14px 16px', background: 'var(--bg-card)' }}>
-          {/* Checkbox */}
+        <div className="flex items-center gap-3" style={{ padding: '12px 14px', background: 'var(--bg-card)' }}>
+          {/* Checkbox — 44px touch target around the 22px control (spec §17) */}
           <button
             onClick={() => store.toggleItem(list.id, item)}
+            aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
             style={{
-              flexShrink: 0, width: 22, height: 22, borderRadius: '50%',
+              flexShrink: 0, width: 40, height: 40, margin: -9,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer',
+            }}
+          >
+            <span style={{
+              width: 22, height: 22, borderRadius: '50%',
               border: `2px solid ${item.completed ? 'var(--accent)' : 'var(--border-2)'}`,
               background: item.completed ? 'var(--accent)' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 180ms ease', cursor: 'pointer',
-            }}
-          >
-            {item.completed && <Check size={12} strokeWidth={3} style={{ color: '#fff' }} />}
+              transition: 'all 180ms ease',
+            }}>
+              {item.completed && <Check size={12} strokeWidth={3} style={{ color: '#fff' }} />}
+            </span>
           </button>
 
-          {/* Title area — tap to edit */}
+          {/* Title area — tap to edit. 17px/600 title, one 13px metadata line (spec §5/§13) */}
           <div
             onClick={() => { if (!item.completed) { cancelEdit(); startEdit(item) } }}
             style={{ flex: 1, minWidth: 0, cursor: item.completed ? 'default' : 'pointer' }}
           >
             <div className="flex items-center gap-2">
-              {cat && <span style={{ width: 7, height: 7, borderRadius: '50%', background: cat.color, flexShrink: 0, display: 'inline-block' }} />}
               <span style={{
-                fontSize: 15, fontWeight: 500,
+                fontSize: 17, fontWeight: 600,
                 color: item.completed ? 'var(--text-3)' : 'var(--text)',
                 textDecoration: item.completed ? 'line-through' : 'none',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -354,16 +370,18 @@ export default function ListDetail() {
                 <span style={{
                   flexShrink: 0, fontSize: 10, fontWeight: 600,
                   color: '#d97706', background: 'rgba(217,119,6,0.12)',
-                  border: '0.5px solid #fcd34d', borderRadius: 99, padding: '2px 6px',
+                  borderRadius: 99, padding: '2px 6px',
                 }}>Dup</span>
               )}
             </div>
-            {cat && showCategories && (
-              <span style={{ fontSize: 11, color: cat.color, fontWeight: 600, marginTop: 1, display: 'block' }}>{cat.name}</span>
-            )}
-            {(item.added_by_name || item.completed_by_name) && (
-              <span style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1, display: 'block' }}>
-                {item.completed ? `✓ ${item.completed_by_name}` : `by ${item.added_by_name}`}
+            {(cat || item.added_by_name || item.completed_by_name) && (
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-3)', marginTop: 1, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {[
+                  cat?.name,
+                  item.completed
+                    ? (item.completed_by_name ? `✓ ${item.completed_by_name}` : null)
+                    : (members.length > 1 && item.added_by_name ? `by ${item.added_by_name}` : null),
+                ].filter(Boolean).join(' · ')}
               </span>
             )}
           </div>
@@ -389,8 +407,7 @@ export default function ListDetail() {
                 maxLength={20}
                 style={{
                   flexShrink: 0, width: 58, height: 28, borderRadius: 99, padding: '0 8px',
-                  textAlign: 'center', background: 'rgba(22,163,74,0.08)', border: '1.5px solid var(--accent)',
-                  boxShadow: '0 0 0 3px rgba(22,163,74,0.12)',
+                  textAlign: 'center', background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
                   color: 'var(--text)', fontSize: 14, fontWeight: 600, outline: 'none',
                 }}
               />
@@ -453,11 +470,6 @@ export default function ListDetail() {
           <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {list.emoji} {list.name}
           </p>
-          {items.length > 0 && (
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>
-              {items.filter(i => i.completed).length} of {items.length} done
-            </p>
-          )}
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
       </div>
@@ -481,31 +493,40 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Progress bar */}
+        {/* Compact contextual progress (spec §1–2): one line + 4px bar,
+            bar hidden until something is completed */}
         {items.length > 0 && (
-          <div style={{ padding: '12px 16px 8px' }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Progress</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
-                {Math.round(pct)}% · {pending.length} {pending.length === 1 ? 'item left' : 'items left'}
+          <div style={{ padding: '10px 16px 8px' }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: doneCount > 0 ? 6 : 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: isAllComplete ? 'var(--accent)' : 'var(--text-2)' }}>
+                {progressMsg}
               </span>
+              {!isAllComplete && (
+                <span style={{ fontSize: 13, fontWeight: 500, color: doneCount > 0 ? 'var(--accent)' : 'var(--text-3)' }}>
+                  {itemsLeft} {itemsLeft === 1 ? 'item' : 'items'} left{doneCount > 0 ? ` • ${Math.round(pct)}%` : ''}
+                </span>
+              )}
             </div>
-            <div className="progress-bar" style={{ height: 6 }}>
-              <div className="progress-fill" style={{ width: `${pct}%`, background: isAllComplete ? '#22c55e' : 'var(--accent)' }} />
-            </div>
+            {doneCount > 0 && (
+              <div className="progress-bar" style={{ height: 4 }}>
+                <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--accent)', transition: 'width 250ms var(--ease)' }} />
+              </div>
+            )}
           </div>
         )}
 
         {/* Category filter strip */}
         {list.type === 'shopping' && usedCatIds.size > 0 && (
           <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' as const }}>
+            {/* Lightweight pills (spec §3/§9): filled green when active,
+                neutral background otherwise — no outlines, no glow */}
             <button onClick={() => setFilterCategories(new Set())} style={{
-              flexShrink: 0, padding: '5px 14px', borderRadius: 99, cursor: 'pointer',
-              background: filterCategories.size === 0 ? 'var(--accent)' : 'transparent',
+              flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 99, cursor: 'pointer',
+              background: filterCategories.size === 0 ? 'var(--accent)' : 'var(--bg-input)',
               color: filterCategories.size === 0 ? '#030a14' : 'var(--text-2)',
-              border: filterCategories.size === 0 ? 'none' : '1px solid var(--border-2)',
+              border: 'none',
               fontSize: 13, fontWeight: filterCategories.size === 0 ? 700 : 500,
-              boxShadow: filterCategories.size === 0 ? '0 0 10px rgba(22,163,74,0.35)' : 'none',
+              transition: 'background 150ms ease, color 150ms ease',
             }}>All</button>
             {cats.filter(c => usedCatIds.has(c.id)).map(c => {
               const active = filterCategories.has(c.id)
@@ -513,31 +534,46 @@ export default function ListDetail() {
                 <button key={c.id} onClick={() => setFilterCategories(prev => {
                   const next = new Set(prev); active ? next.delete(c.id) : next.add(c.id); return next
                 })} style={{
-                  flexShrink: 0, padding: '5px 14px', borderRadius: 99, cursor: 'pointer',
-                  background: active ? 'var(--accent)' : 'transparent',
+                  flexShrink: 0, height: 34, padding: '0 14px', borderRadius: 99, cursor: 'pointer',
+                  background: active ? 'var(--accent)' : 'var(--bg-input)',
                   color: active ? '#030a14' : 'var(--text-2)',
-                  border: active ? 'none' : '1px solid var(--border-2)',
+                  border: 'none',
                   fontSize: 13, fontWeight: active ? 700 : 500,
-                  boxShadow: active ? '0 0 10px rgba(22,163,74,0.35)' : 'none',
+                  transition: 'background 150ms ease, color 150ms ease',
                 }}>{c.name}</button>
               )
             })}
           </div>
         )}
 
-        {/* Duplicate banner */}
-        {dupeGroups.size > 0 && (
+        {/* Smart banner (spec §4/§16) — one at a time, only when actionable */}
+        {dupeGroups.size > 0 ? (
           <div style={{ padding: '0 16px 8px' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
-              borderRadius: 10, background: 'rgba(217,119,6,0.08)', border: '0.5px solid #fcd34d',
+              borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)',
             }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#d97706' }}>
-                {dupeIds.size} items appear more than once
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>
+                💡 {dupeIds.size} duplicate {dupeIds.size === 1 ? 'item' : 'items'} on this list
               </span>
             </div>
           </div>
-        )}
+        ) : uncategorizedPending.length > 0 && list.type === 'shopping' ? (
+          <div style={{ padding: '0 16px 8px' }}>
+            <button
+              onClick={() => { cancelEdit(); startEdit(uncategorizedPending[0]) }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)',
+                cursor: 'pointer', textAlign: 'left',
+              }}>
+              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>
+                ⚠ {uncategorizedPending.length} uncategorized {uncategorizedPending.length === 1 ? 'item' : 'items'}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>Categorize →</span>
+            </button>
+          </div>
+        ) : null}
 
         {/* Error banner */}
         {store.lastError && (
@@ -547,7 +583,11 @@ export default function ListDetail() {
           </div>
         )}
 
-        <div style={{ padding: '0 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          key={`${sortMode}-${[...filterCategories].sort().join(',')}`}
+          className="list-fade-in"
+          style={{ padding: '0 16px 100px', display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
           {/* Loading skeleton */}
           {rawItems === undefined ? (
             <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -595,15 +635,7 @@ export default function ListDetail() {
               {pending.length > 0 && (
                 <>
                   <div className="flex items-center justify-between" style={{ margin: '4px 2px 0' }}>
-                    <span style={sectionLabel}>Pending · {pending.length}</span>
-                    {list.type === 'shopping' && cats.length > 0 && (
-                      <button onClick={() => setShowCategories(v => !v)} style={{
-                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 99, cursor: 'pointer',
-                        border: `1px solid ${showCategories ? 'rgba(22,163,74,0.3)' : 'var(--border)'}`,
-                        background: showCategories ? 'rgba(22,163,74,0.08)' : 'transparent',
-                        color: showCategories ? 'var(--accent)' : 'var(--text-3)',
-                      }}>{showCategories ? 'Hide Categories' : 'Show Categories'}</button>
-                    )}
+                    <span style={sectionLabel}>Pending ({pending.length})</span>
                   </div>
                   <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     {pending.map((item, idx) => (
@@ -619,10 +651,10 @@ export default function ListDetail() {
               {completed.length > 0 && (
                 <>
                   <div className="flex items-center justify-between" style={{ margin: '4px 2px 0' }}>
-                    <span style={sectionLabel}>Completed · {completed.length}</span>
+                    <span style={sectionLabel}>Completed ({completed.length})</span>
                     <button onClick={() => setShowCompleted(v => !v)}
-                      style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'none', cursor: 'pointer' }}>
-                      {showCompleted ? 'Hide ↑' : 'Show ↓'}
+                      style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', background: 'none', cursor: 'pointer', padding: '8px 4px', margin: '-8px -4px' }}>
+                      {showCompleted ? 'Hide ▲' : 'Show ▼'}
                     </button>
                   </div>
                   {showCompleted && (
@@ -641,8 +673,18 @@ export default function ListDetail() {
         </div>
       </div>
 
-      {/* FAB */}
-      <button className="fab" onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}>
+      {/* FAB — morphs away while the add sheet is open (spec §7) */}
+      <button
+        className="fab"
+        aria-label="Add item"
+        onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}
+        style={{
+          transform: showAdd ? 'scale(0.5)' : 'none',
+          opacity: showAdd ? 0 : 1,
+          pointerEvents: showAdd ? 'none' : 'auto',
+          transition: 'transform 220ms var(--ease), opacity 220ms var(--ease)',
+        }}
+      >
         <Plus size={24} />
       </button>
 
