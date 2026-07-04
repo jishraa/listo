@@ -6,7 +6,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
-import { friendlyName } from '../lib/utils'
+import { friendlyName, formatRelativeTime } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
@@ -286,6 +286,47 @@ export default function ListDetail() {
     const pool = list.type === 'shopping' ? GROCERY_VOCAB : []
     return pool.filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q).slice(0, 5)
   }, [parsedInput, list])
+
+  // Frequent items from the user's own history across lists — shown as
+  // one-tap add chips while the field is empty (recommended additions §2).
+  const frequentItems = useMemo(() => {
+    const counts = new Map<string, number>()
+    Object.values(store.items).flat().forEach(i => {
+      const k = i.title.trim().toLowerCase()
+      if (k) counts.set(k, (counts.get(k) ?? 0) + 1)
+    })
+    const pendingHere = new Set(items.filter(i => !i.completed).map(i => i.title.toLowerCase()))
+    return [...counts.entries()]
+      .filter(([t, n]) => n >= 2 && !pendingHere.has(t))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([t]) => capitalize(t))
+  }, [store.items, items])
+
+  async function addFrequent(title: string) {
+    if (!list) return
+    await store.addItem(list.id, title, '', detectCategoryIn(cats, title) ?? null)
+    flashAddedToast(title)
+    addInputRef.current?.focus()
+  }
+
+  // Latest change by another member — a subtle shared-list activity hint
+  // ("Anjana added Milk · 2m ago"), not a full activity feed (additions §6).
+  const lastActivity = useMemo(() => {
+    if (members.length < 2) return null
+    let best: { who: string; verb: string; what: string; at: string } | null = null
+    for (const i of items) {
+      if (i.added_by_name && i.added_by_name !== displayName && (!best || i.created_at > best.at)) {
+        best = { who: i.added_by_name, verb: 'added', what: i.title, at: i.created_at }
+      }
+      if (i.completed && i.completed_by_name && i.completed_by_name !== displayName && i.completed_at && (!best || i.completed_at > best.at)) {
+        best = { who: i.completed_by_name, verb: 'completed', what: i.title, at: i.completed_at }
+      }
+    }
+    // Only surface recent activity (last 24h) — older isn't "news"
+    if (!best || Date.now() - new Date(best.at).getTime() > 86_400_000) return null
+    return `${friendlyName(best.who)} ${best.verb} ${best.what} · ${formatRelativeTime(best.at)}`
+  }, [items, members.length, displayName])
 
   // Sorted + filtered items
   const visible = filterCategories.size === 0 ? items : items.filter(i => i.category && filterCategories.has(i.category))
@@ -690,6 +731,13 @@ export default function ListDetail() {
           </div>
         )}
 
+        {/* Subtle shared-list activity hint — no heavy feed (additions §6) */}
+        {lastActivity && (
+          <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, padding: '5px 16px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {lastActivity}
+          </p>
+        )}
+
         {/* Compact contextual progress (spec §1–2): one line + 4px bar,
             bar hidden until something is completed */}
         {items.length > 0 && (
@@ -816,7 +864,7 @@ export default function ListDetail() {
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>
                     <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-                      <RefreshCw size={13} style={unchecking ? { animation: 'spin 1s linear infinite' } : {}} /> Reset
+                      <RefreshCw size={13} style={unchecking ? { animation: 'spin 1s linear infinite' } : {}} /> Reuse list
                     </button>
                     {isOwner && <button onClick={() => setShareOpen(true)} className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
                       <Share2 size={13} /> Share
@@ -970,6 +1018,30 @@ export default function ListDetail() {
                   <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
                 </span>
+              )}
+
+              {/* Frequent items — one-tap add while the field is empty */}
+              {!addInput && frequentItems.length > 0 && (
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
+                    Frequent
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {frequentItems.map(t => (
+                      <button
+                        key={t}
+                        onClick={() => addFrequent(t)}
+                        style={{
+                          height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
+                          background: 'var(--bg-input)', border: '1px solid var(--border)',
+                          fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        + {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {/* Parsed qty badge */}
