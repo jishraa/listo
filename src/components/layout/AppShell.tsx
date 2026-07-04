@@ -50,7 +50,9 @@ export default function AppShell() {
   }
 
   return (
-    <div className="app-container">
+    // Tab pages have no .header, so the shell applies the status-bar
+    // safe-area inset (drill-in pages handle it via .header's --safe-top).
+    <div className="app-container" style={{ paddingTop: 'var(--safe-top)' }}>
       <Outlet />
 
       <nav className="bottom-nav">

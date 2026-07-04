@@ -1,76 +1,59 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ListChecks, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
-import type { List } from '../types'
 
+// Joining goes through the redeem_list_invite RPC (SECURITY DEFINER) via
+// store.joinByCode — RLS blocks strangers from reading the lists table
+// directly, so the invite can't be previewed before redeeming.
 export default function JoinList() {
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
   const { user, displayName, signInAsGuest } = useAuthStore()
-  const { getListByInviteCode, joinList } = useListsStore()
+  const joinByCode = useListsStore(s => s.joinByCode)
 
-  const [list, setList] = useState<List | null>(null)
   const [nameInput, setNameInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [resolving, setResolving] = useState(true)
 
-  useEffect(() => {
-    const resolve = async () => {
-      if (!code || !/^[a-z0-9]{6,12}$/.test(code)) {
-        setError('Invalid invite link.')
-        setResolving(false)
-        return
-      }
-      const found = await getListByInviteCode(code)
-      if (!found) {
-        setError('This invite link is invalid or has expired.')
-      } else {
-        setList(found)
-      }
-      setResolving(false)
-    }
-    resolve()
-  }, [code])
+  const validCode = !!code && /^[a-z0-9]{6,12}$/.test(code)
 
   const handleJoin = async () => {
-    if (!list) return
+    if (!code || loading) return
     setError('')
-    const name = user ? displayName : nameInput.trim()
+    const name = user ? (displayName || user.email?.split('@')[0] || 'User') : nameInput.trim()
     if (!name) { setError('Please enter your name.'); return }
     setLoading(true)
 
     if (!user) {
       const err = await signInAsGuest(nameInput.trim())
-      if (err) { setError(err); setLoading(false); return }
+      if (err) { setError('Could not start a guest session — try again.'); setLoading(false); return }
     }
 
     const { user: freshUser } = useAuthStore.getState()
-    if (!freshUser) { setError('Could not create guest session.'); setLoading(false); return }
+    if (!freshUser) { setError('Could not start a session — try again.'); setLoading(false); return }
 
-    const err = await joinList(list.id, freshUser.id, name)
-    if (err) { setError(err); setLoading(false); return }
+    // joinByCode reads identity from the lists store — make sure it's set
+    // even when the store hasn't been initialized yet (fresh guest).
+    useListsStore.setState({ userId: freshUser.id, displayName: name })
 
-    navigate(`/list/${list.id}`)
+    const res = await joinByCode(code)
+    setLoading(false)
+    if (res.success && res.list) {
+      navigate(`/list/${res.list.id}`, { replace: true })
+    } else {
+      setError(res.message)
+    }
   }
 
-  if (resolving) {
-    return (
-      <div className="auth-page">
-        <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
-      </div>
-    )
-  }
-
-  if (error && !list) {
+  if (!validCode) {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🔗</div>
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>Link not found</h2>
-          <p className="text-muted text-sm mt-2">{error}</p>
+          <p className="text-muted text-sm mt-2">This invite link is invalid or has expired.</p>
           <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Go Home</button>
         </div>
       </div>
@@ -87,24 +70,21 @@ export default function JoinList() {
           <h1>Listo</h1>
         </div>
 
-        {list && (
-          <div
-            style={{
-              background: 'var(--bg-input)',
-              borderRadius: 'var(--radius)',
-              padding: '16px',
-              marginBottom: 20,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 36 }}>{list.emoji}</div>
-            <p style={{ fontWeight: 700, fontSize: 16, marginTop: 8 }}>{list.name}</p>
-            <p className="text-sm text-muted mt-2">
-              <Users size={13} style={{ display: 'inline', marginRight: 4 }} />
-              You've been invited to collaborate
-            </p>
-          </div>
-        )}
+        <div
+          style={{
+            background: 'var(--bg-input)',
+            borderRadius: 'var(--radius)',
+            padding: '18px 16px',
+            marginBottom: 20,
+            textAlign: 'center',
+          }}
+        >
+          <Users size={26} style={{ color: 'var(--accent)' }} />
+          <p style={{ fontWeight: 700, fontSize: 16, marginTop: 10 }}>You've been invited</p>
+          <p className="text-sm text-muted mt-2">
+            Join the shared list to add items and check things off together.
+          </p>
+        </div>
 
         {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
 
@@ -119,7 +99,7 @@ export default function JoinList() {
               disabled={loading}
               style={{ opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? <span className="spinner" /> : `Join "${list?.name}"`}
+              {loading ? <span className="spinner" /> : 'Join List'}
             </button>
           </div>
         ) : (

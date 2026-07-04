@@ -33,8 +33,6 @@ interface ListsState {
   deleteItem: (listId: string, itemId: string) => Promise<void>
   uncheckAll: (listId: string) => Promise<void>
   removeMember: (listId: string, memberId: string) => Promise<void>
-  getListByInviteCode: (code: string) => Promise<List | null>
-  joinList: (listId: string, userId: string, displayName: string) => Promise<string | null>
   joinByCode: (code: string) => Promise<{ success: boolean; message: string; list?: List }>
   regenerateInvite: (listId: string) => Promise<string | null>
   subscribeToList: (listId: string) => () => void
@@ -322,21 +320,6 @@ export const useListsStore = create<ListsState>((set, get) => ({
     set({ members: { ...get().members, [listId]: prev.filter(m => m.id !== memberId) } })
     const { error } = await supabase.rpc('remove_list_member', { p_list_id: listId, p_member_id: memberId })
     if (error) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't remove member" })
-  },
-
-  getListByInviteCode: async (code) => {
-    const { data } = await supabase.from('lists').select('*').eq('invite_code', code).maybeSingle()
-    return data as List | null
-  },
-
-  joinList: async (listId, userId, displayName) => {
-    const { data: existing } = await supabase
-      .from('list_members').select('id').eq('list_id', listId).eq('user_id', userId).maybeSingle()
-    if (existing) return null
-    const { error } = await supabase.from('list_members').insert({
-      list_id: listId, user_id: userId, role: 'collaborator', display_name: displayName,
-    })
-    return error?.message ?? null
   },
 
   joinByCode: async (code) => {
