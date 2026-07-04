@@ -135,7 +135,12 @@ export function SwipeCard({ leftActions = [], rightActions = [], children }: Pro
           // First tap on a revealed card closes it instead of opening the list
           if (state !== 0) { e.stopPropagation(); e.preventDefault(); setState(0) }
         }}
-        style={{ willChange: 'transform', transition: 'transform 0.22s ease' }}
+        style={{
+          willChange: 'transform', transition: 'transform 0.22s ease',
+          // The card is translucent glass; without an opaque backing the
+          // coloured action panels bleed through its edges at rest.
+          background: 'var(--bg)', borderRadius: 'var(--radius)',
+        }}
       >
         {children}
       </div>
