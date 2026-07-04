@@ -315,6 +315,17 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .card-press { transition: transform 120ms ease; }
 .card-press:active { transform: scale(0.98); }
 
+/* Respect the OS "Reduce Motion" setting (spec §6.10): keep essential
+   feedback but strip large transitions, springs and looping animations. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .progress-fill {
   height: 100%;
   border-radius: 99px;
