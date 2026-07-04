@@ -490,6 +490,13 @@ export default function ListDetail() {
           <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {list.emoji} {list.name}
           </p>
+          {/* Shared lists keep the live done-count in the header so members
+              see collective progress at a glance (personal lists stay compact) */}
+          {members.length > 1 && items.length > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>
+              {doneCount} of {items.length} done
+            </p>
+          )}
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
       </div>
@@ -509,7 +516,9 @@ export default function ListDetail() {
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{m.display_name[0]?.toUpperCase()}</span>
               </div>
             ))}
-            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{members.length} members</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {members.map(m => m.user_id === user?.id ? 'You' : m.display_name).join(', ')}
+            </span>
           </div>
         )}
 
@@ -657,7 +666,7 @@ export default function ListDetail() {
                         padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
                         background: 'var(--bg-input)', border: '1px solid var(--border)',
                       }}>
-                      <span style={{ fontSize: 16, flexShrink: 0 }}>📊</span>
+                      <img src="/yft.png" alt="YFT" style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0 }} />
                       <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)' }}>
                         Record today's shopping expense?
                       </span>
@@ -1121,11 +1130,7 @@ export default function ListDetail() {
                   className="card card-press"
                   style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}
                 >
-                  <span style={{
-                    width: 38, height: 38, borderRadius: 11, flexShrink: 0, fontSize: 17,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'var(--accent-dim)',
-                  }}>📊</span>
+                  <img src="/yft.png" alt="YFT" style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Track Grocery Spending</span>
                     <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>

@@ -37,9 +37,10 @@ const SORT_KEY = 'listo-lists-sort'
 
 function ListCard({
   list, isPinned, onOpen, onPin, onMoveTop, onRename, onDuplicate, onDelete, onLeave, onShare,
-  onSaveTemplate, onArchive, onUnarchive, onExport, items, membersCount = 0,
+  onSaveTemplate, onArchive, onUnarchive, onExport, items, membersCount = 0, sharedInfo,
 }: {
   list: List; isPinned: boolean; items: { completed: boolean }[]; membersCount?: number
+  sharedInfo?: string
   onOpen: () => void
   // Menu actions render only when provided, so each section (active /
   // template / archived) passes just the actions that apply to it.
@@ -94,6 +95,14 @@ function ListCard({
                 Updated {formatRelativeTime(list.updated_at)}
               </span>
             </div>
+            {sharedInfo && (
+              <div className="flex items-center mt-1" style={{ gap: 5 }}>
+                <Users size={11} color="var(--text-3)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sharedInfo}
+                </span>
+              </div>
+            )}
             {total > 0 && (
               <div className="progress-bar mt-2">
                 <div className="progress-fill" style={{
@@ -354,6 +363,19 @@ export default function Lists() {
   const archivedAll  = applySort(archived.filter(matches))
   const templatesFiltered = templates.filter(matches)
 
+  const sharedInfoFor = (list: List): string | undefined => {
+    const mem = store.members[list.id] ?? []
+    if (mem.length < 2) return undefined
+    if (list.owner_id === user?.id) {
+      const others = mem.filter(m => m.user_id !== user?.id).map(m => m.display_name)
+      if (others.length === 0) return undefined
+      const shown = others.slice(0, 2).join(', ')
+      return `Shared with ${shown}${others.length > 2 ? ` +${others.length - 2}` : ''}`
+    }
+    const owner = mem.find(m => m.role === 'owner')?.display_name
+    return owner ? `Shared by ${owner}` : undefined
+  }
+
   const renderCard = (list: List) => {
     const isOwner = list.owner_id === user?.id
     const swipeLeft: SwipeAction[] = [
@@ -373,6 +395,7 @@ export default function Lists() {
         isPinned={pinnedIds.has(list.id)}
         items={store.items[list.id] ?? []}
         membersCount={(store.members[list.id] ?? []).length}
+        sharedInfo={sharedInfoFor(list)}
         onOpen={() => navigate(`/list/${list.id}`)}
         onPin={() => togglePin(list.id)}
         onMoveTop={() => moveToTop(list.id)}

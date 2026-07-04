@@ -4,7 +4,7 @@ import { BarChart2, Gift, Info, LogOut, Settings2, User, Users } from 'lucide-re
 import { useAuthStore } from '../store/useAuthStore'
 import Sheet from '../components/ui/Sheet'
 import { openYft } from '../lib/yft'
-import { Section, Row } from './profile/common'
+import { SubPage, Section, Row } from './profile/common'
 
 // Profile hub (spec v4): profile card + one navigation group. All detail
 // lives in dedicated screens under /profile/*.
@@ -34,12 +34,8 @@ export default function Profile() {
   const initials = displayName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
 
   return (
-    <div className="page">
-      <div style={{ padding: '24px 16px 4px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.5 }}>Profile</h1>
-      </div>
-
-      <div className="page-padded" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <SubPage title="Profile">
+      <>
         {/* Profile card — identity only, stats live in Insights */}
         <div className="card" style={{ textAlign: 'center', padding: '26px 20px' }}>
           <div style={{
@@ -95,7 +91,7 @@ export default function Profile() {
         {/* Companion apps (YFT integration spec §6) */}
         <Section title="Apps">
           <Row
-            icon={<span style={{ fontSize: 16 }}>📊</span>}
+            icon={<img src="/yft.png" alt="YFT" style={{ width: 24, height: 24, borderRadius: 6 }} />}
             label="YFT"
             value="Track Expenses"
             onPress={() => openYft('')}
@@ -116,7 +112,6 @@ export default function Profile() {
           <LogOut size={17} />
           {isGuest ? 'Leave (clear session)' : 'Sign Out'}
         </button>
-      </div>
 
       {/* Sign out confirmation */}
       <Sheet open={confirmSignOut} onClose={() => setConfirmSignOut(false)}>
@@ -138,6 +133,7 @@ export default function Profile() {
           </div>
         </div>
       </Sheet>
-    </div>
+      </>
+    </SubPage>
   )
 }

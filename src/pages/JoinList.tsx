@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ListChecks, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 
@@ -39,12 +39,24 @@ export default function JoinList() {
     useListsStore.setState({ userId: freshUser.id, displayName: name })
 
     const res = await joinByCode(code)
-    setLoading(false)
     if (res.success && res.list) {
+      setLoading(false)
       navigate(`/list/${res.list.id}`, { replace: true })
-    } else {
-      setError(res.message)
+      return
     }
+
+    // Already a member (or the owner): don't strand them on an error —
+    // members can read the list row, so resolve it and go straight there.
+    if (res.message === 'Already joined' || res.message === 'You already own this list') {
+      await useListsStore.getState().refreshLists()
+      const known = useListsStore.getState().lists.find(l => l.invite_code === code)
+      setLoading(false)
+      navigate(known ? `/list/${known.id}` : '/', { replace: true })
+      return
+    }
+
+    setLoading(false)
+    setError(res.message)
   }
 
   if (!validCode) {
@@ -64,10 +76,11 @@ export default function JoinList() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="logo-icon">
-            <ListChecks size={28} />
-          </div>
-          <h1>Listo</h1>
+          <img
+            src="/brand.png"
+            alt="Listo"
+            style={{ width: 76, height: 76, display: 'block', margin: '0 auto', boxShadow: '0 6px 22px rgba(22,163,74,0.25)', borderRadius: 18 }}
+          />
         </div>
 
         <div

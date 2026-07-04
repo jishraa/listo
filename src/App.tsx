@@ -80,7 +80,6 @@ function AppRoutes() {
         {/* Old dashboard/insights URLs — Lists is the root screen now */}
         <Route path="/lists" element={<Navigate to="/" replace />} />
         <Route path="/insights" element={<Navigate to="/" replace />} />
-        <Route path="/profile" element={<Profile />} />
       </Route>
       {/* Drill-in pages — full-screen, own header, no bottom nav */}
       <Route
@@ -96,6 +95,14 @@ function AppRoutes() {
         element={
           <AuthGuard>
             <Categories />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <AuthGuard>
+            <Profile />
           </AuthGuard>
         }
       />
