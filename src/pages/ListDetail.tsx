@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -313,7 +313,7 @@ export default function ListDetail() {
     resetAdd(); setAddFlashing(true)
     await store.addItem(list.id, t, qty, finalCat ?? null)
     setAddFlashing(false)
-    flashAddedToast(t)
+    flashAddedToast(qty ? `${t} ${qty}` : t)
     setTimeout(() => addInputRef.current?.focus(), 60)
   }
 
@@ -564,7 +564,7 @@ export default function ListDetail() {
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {list.emoji} {list.name}
+            {list.name}
           </p>
           {/* Live remaining-count under the title — the single source of the
               "items left" info (spec §1.3), shown for personal and shared alike */}
@@ -1258,7 +1258,7 @@ export default function ListDetail() {
                       Record this shopping expense in YFT and keep an eye on your monthly budget.
                     </span>
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>Track Spending in YFT →</span>
+                  <ChevronRight size={18} color="var(--text-3)" style={{ flexShrink: 0 }} />
                 </button>
               )}
             </div>

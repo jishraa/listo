@@ -82,15 +82,27 @@ export function getCategoryMeta(type: ListType, catId: string | null): ListCateg
 }
 
 export function parseItemInput(raw: string): { item: string; qty: string } {
-  const crossM = raw.match(/(\s*[×x]\s*\d+(?:\.\d+)?)\s*$/i)
+  // Explicit count: "Milk x2" / "Milk ×2" → "×N". The × symbol may sit against
+  // the word, but a bare ASCII "x" must be its own token so "Xbox 2" is safe.
+  const crossM = raw.match(/(?:×|(?:^|\s)x)\s*(\d+(?:\.\d+)?)\s*$/i)
   if (crossM) {
     const item = raw.slice(0, raw.length - crossM[0].length).trim()
-    if (item) return { item, qty: crossM[1].trim() }
+    if (item) return { item, qty: `×${crossM[1]}` }
   }
-  const unitM = raw.match(/\s+(\d+(?:\.\d+)?\s*(?:kg|g|l(?:itre)?s?|ml|lb(?:s)?|oz|pcs?|pieces?|packs?|unit(?:s)?|doz(?:en)?))\s*$/i)
+  // Number + unit, e.g. "Rice 2kg" / "Rice 2 kg" / "Milk 1.5L". Multi-char
+  // units (kg, mg, ml) come before "g" so they win at the same position.
+  const unitM = raw.match(/\s+(\d+(?:\.\d+)?)\s*(kg|mg|g|litres?|l|ml|lbs?|oz|pcs?|pieces?|packs?|box(?:es)?|units?|doz(?:en)?)\s*$/i)
   if (unitM) {
     const item = raw.slice(0, raw.length - unitM[0].length).trim()
-    if (item) return { item, qty: unitM[1].trim() }
+    // Preserve the unit's casing (2L stays 2L) but drop the inner space.
+    if (item) return { item, qty: `${unitM[1]}${unitM[2]}` }
+  }
+  // Bare trailing number, e.g. "Apple 3" / "Eggs 12" → ×N (spec §2.3–2.4).
+  // We only treat it as a count, never invent a unit the user didn't type.
+  const bareM = raw.match(/\s+(\d+(?:\.\d+)?)\s*$/)
+  if (bareM) {
+    const item = raw.slice(0, raw.length - bareM[0].length).trim()
+    if (item) return { item, qty: `×${bareM[1]}` }
   }
   return { item: raw.trim(), qty: '' }
 }
