@@ -124,6 +124,7 @@ export default function JoinList() {
                 className="input"
                 placeholder="Jane Doe"
                 value={nameInput}
+                maxLength={50}
                 onChange={e => setNameInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
                 autoFocus

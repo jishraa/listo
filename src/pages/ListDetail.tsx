@@ -14,6 +14,7 @@ import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 import ShoppingInsights from '../components/lists/ShoppingInsights'
+import { useEnsureData } from './profile/common'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -120,6 +121,9 @@ export default function ListDetail() {
   const navigate = useNavigate()
   const store = useListsStore()
   const { user, displayName } = useAuthStore()
+  // Drill-in page renders outside AppShell — on a direct load / refresh the
+  // lists store is empty and the page would hang on "Loading…" forever.
+  useEnsureData()
 
   const list    = store.lists.find(l => l.id === id)
   const rawItems = list ? store.items[list.id] : undefined

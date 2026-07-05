@@ -158,8 +158,10 @@ export const useListsStore = create<ListsState>((set, get) => ({
   renameList: async (listId, name) => {
     const trimmed = name.trim().slice(0, 100)
     if (!trimmed) return
-    set({ lists: get().lists.map(l => l.id === listId ? { ...l, name: trimmed } : l) })
-    await supabase.from('lists').update({ name: trimmed }).eq('id', listId)
+    const prev = get().lists
+    set({ lists: prev.map(l => l.id === listId ? { ...l, name: trimmed } : l) })
+    const { error } = await supabase.from('lists').update({ name: trimmed }).eq('id', listId)
+    if (error) set({ lists: prev, lastError: "Couldn't rename — try again" })
   },
 
   deleteList: async (listId) => {
@@ -248,7 +250,18 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
   leaveList: async (listId) => {
     const { userId } = get()
-    await supabase.from('list_members').delete().eq('list_id', listId).eq('user_id', userId)
+    // Requires the "members can leave" delete policy (migration v9);
+    // .select() makes RLS silently deleting 0 rows detectable.
+    const { data, error } = await supabase
+      .from('list_members')
+      .delete()
+      .eq('list_id', listId)
+      .eq('user_id', userId)
+      .select('id')
+    if (error || (data ?? []).length === 0) {
+      set({ lastError: "Couldn't leave the list — try again" })
+      return
+    }
     set({
       lists: get().lists.filter(l => l.id !== listId),
       items: Object.fromEntries(Object.entries(get().items).filter(([k]) => k !== listId)),

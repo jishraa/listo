@@ -17,9 +17,13 @@ Paste each file's contents into the SQL Editor and run. Each is idempotent
 | 4 | `supabase-migration-v4.sql` | `list_items.completed_at` (+ backfill) | Recent Activity / shared progress can't order completions |
 | 5 | `supabase-migration-v5.sql` | `redeem_list_invite` rotates the code on join | Invite links stay reusable (not single-use) |
 | 6 | `supabase-migration-v6.sql` | `user_categories` table + RLS | Custom category edits are session-only |
+| 7 | `supabase-migration-v7.sql` | `is_list_member()` SECURITY DEFINER fn (RLS recursion fix) | Shared-member visibility broken (42P17) |
+| 8 | `supabase-migration-v8.sql` | Drops the lists↔members policy cycle left by v7 | Lists don't load after v7 |
+| 9 | `supabase-migration-v9.sql` | **Security hardening**: drops the collaborator lists-UPDATE policy (ownership-takeover hole), adds the members-can-leave delete policy, requires auth in `redeem_list_invite` | Collaborators can hijack lists via raw API; "Leave list" silently fails; invite codes burnable without auth |
 
-> If you're setting up fresh, run 1→6 top to bottom.
-> If the project is already live, run only the ones you haven't yet (v3–v6).
+> If you're setting up fresh, run 1→9 top to bottom.
+> If the project is already live, run only the ones you haven't yet.
+> **v9 is a security fix — run it as soon as possible.**
 
 ## 2. Auth settings — Authentication → Providers / Settings
 
