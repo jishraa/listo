@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -18,6 +18,7 @@ import ShoppingInsights from '../components/lists/ShoppingInsights'
 import DuplicateReviewSheet from '../components/lists/DuplicateReviewSheet'
 import AddItemSheet from '../components/lists/AddItemSheet'
 import BeforeYouGoSheet from '../components/lists/BeforeYouGoSheet'
+import ShopMode from '../components/lists/ShopMode'
 import { useEnsureData } from '../hooks/useEnsureData'
 
 type SortMode = 'date' | 'alpha' | 'category'
@@ -183,6 +184,8 @@ export default function ListDetail() {
   // List Memory — "your regulars" to seed a fresh list in one tap.
   const memHistory = useMemoryStore(s => s.history)
   const regulars = useMemo(() => regularsOf(memHistory, new Set(), 8), [memHistory])
+
+  const [shopModeOpen, setShopModeOpen] = useState(false)
 
   // "Before you go" — regulars not on this list yet (present = pending + done).
   const [beforeYouGoOpen, setBeforeYouGoOpen] = useState(false)
@@ -563,6 +566,11 @@ export default function ListDetail() {
             </p>
           )}
         </div>
+        {list.type === 'shopping' && canEdit && items.length > 0 && (
+          <button className="btn btn-ghost btn-sm" aria-label="Shop Mode" onClick={() => setShopModeOpen(true)}>
+            <ShoppingCart size={20} />
+          </button>
+        )}
         <button className="btn btn-ghost btn-sm" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
       </div>
 
@@ -853,6 +861,14 @@ export default function ListDetail() {
         suggestions={forgotten}
       />
 
+      <ShopMode
+        open={shopModeOpen}
+        onClose={() => setShopModeOpen(false)}
+        list={list}
+        items={items}
+        cats={cats}
+      />
+
       {/* ── Menu ── */}
       {menuOpen && (
         <>
@@ -863,6 +879,7 @@ export default function ListDetail() {
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
                 list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '✦', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
+                list.type === 'shopping' && canEdit && items.length > 0 ? { icon: <ShoppingCart size={16} />, label: 'Shop Mode', hint: '', action: () => { setMenuOpen(false); setShopModeOpen(true) } } : null,
                 list.type === 'shopping' && canEdit ? { icon: <ShoppingBag size={16} />, label: 'Before you go', hint: '', action: () => { setMenuOpen(false); setBeforeYouGoOpen(true) } } : null,
                 { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', hint: '', action: () => { setMenuOpen(false); setCustomizeOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
