@@ -23,8 +23,9 @@ Paste each file's contents into the SQL Editor and run. Each is idempotent
 | 10 | `supabase-migration-v10.sql` | **Share permissions**: `lists.invite_role`, `viewer` role, item-write policies gated to non-viewers via `can_edit_list()`, `set_member_role()` RPC, redeem joins at the link's level | "View only" sharing does nothing — everyone invited can still edit |
 | 11 | `supabase-migration-v11.sql` | **Invite-code isolation**: moves the invite secret to an owner-only `list_invites` table, adds `rotate_invite()` / `member_list_id_for_code()` RPCs, redeem reads/rotates it, drops `invite_code`/`invite_role`/`invite_expires_at` from `lists` | Any collaborator can read the raw invite code and re-share the list to outsiders |
 | 12 | `supabase-migration-v12.sql` | **Invite preview**: `invite_preview()` SECURITY DEFINER fn returning non-secret list info (name, emoji, owner, member count) for a valid code, callable by anon | Shared-link visitors can't see which list they're joining before authenticating |
+| 13 | `supabase-migration-v13.sql` | **Collaborator re-sort**: `touch_list()` SECURITY DEFINER fn so any member can bump `lists.updated_at` when they change items | Shared lists don't re-sort / "updated X ago" goes stale when a collaborator (not the owner) makes the change |
 
-> If you're setting up fresh, run 1→12 top to bottom.
+> If you're setting up fresh, run 1→13 top to bottom.
 > If the project is already live, run only the ones you haven't yet.
 > **v9 is a security fix — run it as soon as possible.**
 

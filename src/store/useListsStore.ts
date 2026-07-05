@@ -78,8 +78,10 @@ function bumpUpdatedAt(listId: string, get: Get, set: Set) {
   const list = get().lists.find(l => l.id === listId)
   const prev = list?.updated_at
   set({ lists: get().lists.map(l => l.id === listId ? { ...l, updated_at: now } : l) })
-  if (list?.owner_id !== get().userId) return
-  supabase.from('lists').update({ updated_at: now }).eq('id', listId).then(({ error }) => {
+  // Via RPC so collaborators (who can't UPDATE lists directly since v9) still
+  // re-sort a shared list when they change items. touch_list only bumps the
+  // timestamp and only for members.
+  supabase.rpc('touch_list', { p_list_id: listId }).then(({ error }) => {
     if (error) set({ lists: get().lists.map(l => l.id === listId ? { ...l, updated_at: prev ?? now } : l) })
   })
 }

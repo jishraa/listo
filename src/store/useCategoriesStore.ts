@@ -13,6 +13,9 @@ interface CategoriesState {
   lastError: string | null
   clearError: () => void
   init: (userId: string) => Promise<void>
+  // Reset to shipped defaults — called on sign-out so the next account never
+  // sees the previous user's custom categories.
+  reset: () => void
   // Adds (new id) or updates (existing id) a category
   saveCategory: (type: ListType, cat: ListCategory) => Promise<void>
   deleteCategory: (type: ListType, id: string) => Promise<void>
@@ -41,6 +44,7 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
   loaded: false,
   lastError: null,
   clearError: () => set({ lastError: null }),
+  reset: () => set({ categories: cloneDefaults(), userId: '', loaded: false, lastError: null }),
 
   init: async (userId) => {
     if (get().userId === userId && get().loaded) return

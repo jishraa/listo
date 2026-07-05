@@ -25,8 +25,11 @@ export default function AppShell() {
 
   useEffect(() => {
     if (!user) return
-    const name = (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
-    store.init(user.id, name || displayName)
+    // Prefer the resolved display name (guests: their chosen name from the
+    // join screen; members: their profile name) so a re-init never overwrites
+    // a guest's identity with the "User" fallback.
+    const name = displayName || (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
+    store.init(user.id, name)
     useCategoriesStore.getState().init(user.id)
   }, [user])
 

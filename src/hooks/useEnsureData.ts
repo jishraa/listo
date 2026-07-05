@@ -11,8 +11,11 @@ export function useEnsureData() {
 
   useEffect(() => {
     if (!user) return
-    const name = (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
-    store.init(user.id, name || displayName)
+    // Prefer the resolved display name (guests keep the name they entered on
+    // the join screen) over the "User" fallback so a direct-load re-init never
+    // clobbers a guest's identity — otherwise their items show as "User".
+    const name = displayName || (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
+    store.init(user.id, name)
     useCategoriesStore.getState().init(user.id)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
