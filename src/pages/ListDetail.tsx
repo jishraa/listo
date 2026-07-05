@@ -214,6 +214,20 @@ export default function ListDetail() {
 
   const catById = useMemo(() => new Map(cats.map(c => [c.id, c])), [cats])
 
+  // Completion summary — what the finished trip covered (from data in render).
+  const tripSummary = useMemo(() => {
+    const byCat = new Map<string, number>()
+    let uncategorized = 0
+    for (const i of items) {
+      if (i.category && catById.has(i.category)) byCat.set(i.category, (byCat.get(i.category) ?? 0) + 1)
+      else uncategorized++
+    }
+    const chips = [...byCat.entries()]
+      .map(([id, n]) => ({ cat: catById.get(id)!, n }))
+      .sort((a, b) => b.n - a.n)
+    return { count: items.length, aisles: byCat.size + (uncategorized > 0 ? 1 : 0), chips }
+  }, [items, catById])
+
   const usedCatIds = useMemo(() => {
     const s = new Set<string>()
     items.forEach(i => { if (i.category) s.add(i.category) })
@@ -746,7 +760,27 @@ export default function ListDetail() {
                   <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>
                     {list.type === 'shopping' ? 'Shopping complete! 🎉' : 'All done! 🎉'}
                   </p>
-                  {completionTime && <p className="text-sm text-muted" style={{ margin: '0 0 14px' }}>Completed {formatCompletedAt(completionTime)}</p>}
+                  {/* Trip summary — what this run covered */}
+                  <p className="text-sm" style={{ color: 'var(--text-2)', margin: '0 0 2px' }}>
+                    {list.type === 'shopping'
+                      ? <>You picked up <strong>{tripSummary.count} {tripSummary.count === 1 ? 'item' : 'items'}</strong>{tripSummary.aisles > 1 ? <> across <strong>{tripSummary.aisles} aisles</strong></> : null}.</>
+                      : <>You completed <strong>{tripSummary.count} {tripSummary.count === 1 ? 'item' : 'items'}</strong>.</>}
+                  </p>
+                  {completionTime && <p className="text-sm text-muted" style={{ margin: '0 0 12px' }}>Completed {formatCompletedAt(completionTime)}</p>}
+                  {/* Category breakdown chips (shopping) */}
+                  {list.type === 'shopping' && tripSummary.chips.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 14px' }}>
+                      {tripSummary.chips.slice(0, 6).map(({ cat, n }) => (
+                        <span key={cat.id} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
+                          background: `${cat.color}1f`, padding: '3px 9px', borderRadius: 99,
+                        }}>
+                          {cat.emoji} {cat.name} · {n}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {/* Primary next step (spec §9): review what you bought */}
                   <button onClick={() => setInsightsOpen(true)} className="btn btn-primary btn-full" style={{ marginBottom: 8 }}>
                     <Sparkles size={15} /> View Insights
