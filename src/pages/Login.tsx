@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { Eye, EyeOff, Check, ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 
@@ -51,6 +51,11 @@ export default function Login() {
   const [resendIn, setResendIn] = useState(0)
   const { signIn, signUp, signInWithProvider, forgotPassword } = useAuthStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Where to land after auth. Only same-app paths are honored (e.g. resuming a
+  // shared-list join at /join/:code); anything off-path falls back to Home.
+  const rawNext = searchParams.get('next') ?? ''
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -94,7 +99,7 @@ export default function Login() {
       const err = await signIn(email, password)
       setLoading(false)
       if (err) fail(err)
-      else navigate('/')
+      else navigate(next)
     } else {
       const { error: err, needsConfirmation } = await signUp(email, password, name.trim())
       setLoading(false)
@@ -102,16 +107,18 @@ export default function Login() {
       if (needsConfirmation) {
         setSuccess('confirm')
       } else {
-        // Success flow (spec §10): brief welcome, then straight to Home
+        // Success flow (spec §10): brief welcome, then on to Home (or the
+        // pending destination, e.g. resuming a shared-list join)
         setSuccess('welcome')
-        setTimeout(() => navigate('/'), 1400)
+        setTimeout(() => navigate(next), 1400)
       }
     }
   }
 
   const handleProvider = async (provider: 'google') => {
     setError('')
-    const err = await signInWithProvider(provider)
+    // Return to the pending destination after the OAuth round-trip.
+    const err = await signInWithProvider(provider, window.location.origin + next)
     if (err) fail(err)
     // On success the browser redirects away; nothing else to do here.
   }

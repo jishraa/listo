@@ -1,9 +1,3 @@
-export function generateInviteCode(): string {
-  const arr = new Uint8Array(6)
-  crypto.getRandomValues(arr)
-  return Array.from(arr, b => b.toString(36)).join('').slice(0, 8)
-}
-
 // Contextual labels (lists spec v3 §9): minutes only for recent activity,
 // then calendar-based Today / Yesterday / N days ago.
 export function formatRelativeTime(dateStr: string): string {

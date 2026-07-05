@@ -153,20 +153,33 @@ interface Props {
 export default function ShareListSheet({ list, members, onClose }: Props) {
   const store = useListsStore()
   const isOwner = list.owner_id === store.userId
-  const [currentCode, setCurrentCode] = useState<string>(list.invite_code ?? '')
+  const [currentCode, setCurrentCode] = useState('')
   const [generating, setGenerating]   = useState(true)
   const [copied, setCopied]           = useState(false)
   const [draftIdx, setDraftIdx]       = useState(() => Math.floor(Math.random() * MESSAGE_DRAFTS.length))
   // The access level this link grants. Owners can switch it; each switch mints
-  // a fresh link so the old level can't be reused.
-  const [access, setAccess] = useState<'collaborator' | 'viewer'>(list.invite_role ?? 'collaborator')
-  // StrictMode double-invoke guard: regenerate once per distinct access level so
-  // the DB, currentCode, and the visible level always agree.
+  // a fresh link so the old level can't be reused. The invite secret is never
+  // sent to non-owners, so it's read/minted lazily here, owner-only.
+  const [access, setAccess] = useState<'collaborator' | 'viewer'>('collaborator')
+  const [seeded, setSeeded] = useState(false)
+  // StrictMode double-invoke guard: mint once per distinct access level so the
+  // DB, currentCode, and the visible level always agree.
   const lastGenAccess = useRef<string | null>(null)
 
+  // Seed the selector from the list's current invite level (owner-only read).
   useEffect(() => {
-    // Only owners can rotate the link / set its level; others just see it.
     if (!isOwner) { setGenerating(false); return }
+    let cancelled = false
+    store.getInvite(list.id)
+      .then(inv => { if (!cancelled) { if (inv) setAccess(inv.role); setSeeded(true) } })
+      .catch(() => { if (!cancelled) setSeeded(true) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Once seeded, mint a fresh link at the selected level; re-mint on change.
+  useEffect(() => {
+    if (!isOwner || !seeded) return
     if (lastGenAccess.current === access) return
     lastGenAccess.current = access
     setGenerating(true)
@@ -175,7 +188,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
       setGenerating(false)
     }).catch(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [access, isOwner])
+  }, [access, seeded, isOwner])
 
   const joinUrl   = currentCode ? `${window.location.origin}/join/${currentCode}` : ''
   const shareUrl  = joinUrl

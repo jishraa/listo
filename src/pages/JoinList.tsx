@@ -1,23 +1,58 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users } from 'lucide-react'
+import { ChevronLeft, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
+import { friendlyName } from '../lib/utils'
+import type { InvitePreview } from '../types'
 
-// Joining goes through the redeem_list_invite RPC (SECURITY DEFINER) via
-// store.joinByCode — RLS blocks strangers from reading the lists table
-// directly, so the invite can't be previewed before redeeming.
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.46a5.53 5.53 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.57-5.17 3.57-8.82z"/>
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.87-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.29v3.1A12 12 0 0 0 12 24z"/>
+      <path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28v-3.1H1.29a12 12 0 0 0 0 10.76l3.98-3.1z"/>
+      <path fill="#EA4335" d="M12 4.76c1.76 0 3.35.6 4.6 1.8l3.44-3.44A11.97 11.97 0 0 0 12 0 12 12 0 0 0 1.29 6.62l3.98 3.1C6.22 6.87 8.87 4.76 12 4.76z"/>
+    </svg>
+  )
+}
+
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.78 1.3 10.32.86 1.24 1.89 2.63 3.24 2.58 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.26 3.15-2.51.99-1.44 1.4-2.83 1.42-2.9-.03-.01-2.72-1.04-2.75-4.13zM14.5 4.5c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.56-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.59 3.04-1.46z"/>
+    </svg>
+  )
+}
+
+// Shared-link join flow: preview the invite (safe, non-secret RPC), then let
+// the visitor pick how to enter — Google / Apple / account / guest. Guest is
+// only offered here, never on the normal Login screen.
 export default function JoinList() {
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
-  const { user, displayName, signInAsGuest } = useAuthStore()
-  const joinByCode = useListsStore(s => s.joinByCode)
+  const { user, displayName, signInAsGuest, signInWithProvider } = useAuthStore()
+  const { joinByCode, getInvitePreview } = useListsStore()
 
+  const [preview, setPreview] = useState<InvitePreview | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(true)
+  const [phase, setPhase] = useState<'choices' | 'guest'>('choices')
   const [nameInput, setNameInput] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const validCode = !!code && /^[a-z0-9]{6,12}$/.test(code)
+
+  // Fetch the preview once for a well-formed code.
+  useEffect(() => {
+    if (!validCode || !code) { setPreviewLoading(false); return }
+    let cancelled = false
+    getInvitePreview(code)
+      .then(p => { if (!cancelled) { setPreview(p); setPreviewLoading(false) } })
+      .catch(() => { if (!cancelled) setPreviewLoading(false) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code])
 
   const handleJoin = async () => {
     if (!code || loading) return
@@ -45,13 +80,14 @@ export default function JoinList() {
       return
     }
 
-    // Already a member (or the owner): don't strand them on an error —
-    // members can read the list row, so resolve it and go straight there.
+    // Already a member (or the owner): don't strand them on an error — resolve
+    // the code to its list id (server-side, only works because they're already
+    // in the list) and go straight there.
     if (res.message === 'Already joined' || res.message === 'You already own this list') {
+      const knownId = await useListsStore.getState().resolveListIdByCode(code)
       await useListsStore.getState().refreshLists()
-      const known = useListsStore.getState().lists.find(l => l.invite_code === code)
       setLoading(false)
-      navigate(known ? `/list/${known.id}` : '/', { replace: true })
+      navigate(knownId ? `/list/${knownId}` : '/', { replace: true })
       return
     }
 
@@ -59,7 +95,16 @@ export default function JoinList() {
     setError(res.message)
   }
 
-  if (!validCode) {
+  const handleProvider = async (provider: 'google' | 'apple') => {
+    setError('')
+    // Return straight back to this invite after the OAuth round-trip so the
+    // join resumes with a real session.
+    const err = await signInWithProvider(provider, `${window.location.origin}/join/${code}`)
+    if (err) setError(err)
+  }
+
+  // Invalid format, or a valid-looking code that resolved to nothing.
+  if (!validCode || (!previewLoading && !preview)) {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>
@@ -83,6 +128,7 @@ export default function JoinList() {
           />
         </div>
 
+        {/* Invite preview */}
         <div
           style={{
             background: 'var(--bg-input)',
@@ -92,16 +138,28 @@ export default function JoinList() {
             textAlign: 'center',
           }}
         >
-          <Users size={26} style={{ color: 'var(--accent)' }} />
-          <p style={{ fontWeight: 700, fontSize: 16, marginTop: 10 }}>You've been invited</p>
-          <p className="text-sm text-muted mt-2">
-            Join the shared list to add items and check things off together.
-          </p>
+          {previewLoading || !preview ? (
+            <div style={{ padding: '8px 0' }}>
+              <Users size={26} style={{ color: 'var(--accent)' }} />
+              <p className="text-sm text-muted mt-2">Loading invite…</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 34, lineHeight: 1 }}>{preview.emoji || '📝'}</div>
+              <p className="text-sm text-muted" style={{ marginTop: 10 }}>You've been invited to join</p>
+              <p style={{ fontWeight: 700, fontSize: 18, marginTop: 2 }}>{preview.name}</p>
+              <p className="text-sm text-muted mt-2">
+                by {friendlyName(preview.ownerName)}
+                {preview.memberCount > 0 && ` · ${preview.memberCount} ${preview.memberCount === 1 ? 'member' : 'members'}`}
+              </p>
+            </>
+          )}
         </div>
 
         {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
 
         {user ? (
+          /* Already signed in (incl. returning from an OAuth redirect) */
           <div>
             <p className="text-muted text-sm" style={{ marginBottom: 16 }}>
               Joining as <strong>{displayName || user.email}</strong>
@@ -115,9 +173,17 @@ export default function JoinList() {
               {loading ? <span className="spinner" /> : 'Join List'}
             </button>
           </div>
-        ) : (
+        ) : phase === 'guest' ? (
+          /* Guest → enter a display name → join */
           <div className="auth-form">
-            <p className="text-muted text-sm">Enter your name to join — no account needed.</p>
+            <button
+              type="button"
+              onClick={() => { setPhase('choices'); setError('') }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 4 }}
+            >
+              <ChevronLeft size={16} /> Other ways to join
+            </button>
+            <p className="text-muted text-sm">Continue as a guest — no account needed.</p>
             <div className="input-group">
               <label className="input-label">Your name</label>
               <input
@@ -137,6 +203,35 @@ export default function JoinList() {
               style={{ opacity: loading || !nameInput.trim() ? 0.6 : 1 }}
             >
               {loading ? <span className="spinner" /> : 'Join List'}
+            </button>
+          </div>
+        ) : (
+          /* Authentication choice */
+          <div className="auth-form">
+            <button type="button" className="auth-social" aria-label="Continue with Google" onClick={() => handleProvider('google')} disabled={loading}>
+              <GoogleIcon /> Continue with Google
+            </button>
+            <button type="button" className="auth-social" aria-label="Continue with Apple" onClick={() => handleProvider('apple')} disabled={loading}>
+              <AppleIcon /> Continue with Apple
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-full"
+              onClick={() => navigate(`/login?next=${encodeURIComponent(`/join/${code}`)}`)}
+              disabled={loading}
+            >
+              Sign In or Create Account
+            </button>
+
+            <div className="auth-divider">OR</div>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-full"
+              onClick={() => setPhase('guest')}
+              disabled={loading}
+            >
+              Continue as Guest
             </button>
           </div>
         )}

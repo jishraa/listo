@@ -21,8 +21,10 @@ Paste each file's contents into the SQL Editor and run. Each is idempotent
 | 8 | `supabase-migration-v8.sql` | Drops the lists↔members policy cycle left by v7 | Lists don't load after v7 |
 | 9 | `supabase-migration-v9.sql` | **Security hardening**: drops the collaborator lists-UPDATE policy (ownership-takeover hole), adds the members-can-leave delete policy, requires auth in `redeem_list_invite` | Collaborators can hijack lists via raw API; "Leave list" silently fails; invite codes burnable without auth |
 | 10 | `supabase-migration-v10.sql` | **Share permissions**: `lists.invite_role`, `viewer` role, item-write policies gated to non-viewers via `can_edit_list()`, `set_member_role()` RPC, redeem joins at the link's level | "View only" sharing does nothing — everyone invited can still edit |
+| 11 | `supabase-migration-v11.sql` | **Invite-code isolation**: moves the invite secret to an owner-only `list_invites` table, adds `rotate_invite()` / `member_list_id_for_code()` RPCs, redeem reads/rotates it, drops `invite_code`/`invite_role`/`invite_expires_at` from `lists` | Any collaborator can read the raw invite code and re-share the list to outsiders |
+| 12 | `supabase-migration-v12.sql` | **Invite preview**: `invite_preview()` SECURITY DEFINER fn returning non-secret list info (name, emoji, owner, member count) for a valid code, callable by anon | Shared-link visitors can't see which list they're joining before authenticating |
 
-> If you're setting up fresh, run 1→10 top to bottom.
+> If you're setting up fresh, run 1→12 top to bottom.
 > If the project is already live, run only the ones you haven't yet.
 > **v9 is a security fix — run it as soon as possible.**
 

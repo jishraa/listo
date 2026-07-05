@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
-import type { List, ListItem, ListMember } from '../types'
-import { generateInviteCode } from '../lib/utils'
+import type { List, ListItem, ListMember, InvitePreview } from '../types'
 // Deferred circular import (sync store also imports this one) — both only
 // touch each other inside functions, never at module top level.
 import { useSyncStore, newOpId, newTempId, isTempId, isNetworkError } from './useSyncStore'
@@ -40,7 +39,14 @@ interface ListsState {
   removeMember: (listId: string, memberId: string) => Promise<void>
   setMemberRole: (listId: string, memberId: string, role: 'collaborator' | 'viewer') => Promise<void>
   joinByCode: (code: string) => Promise<{ success: boolean; message: string; list?: List }>
+  /** Mint a fresh invite link at the given access level; returns the new code. */
   regenerateInvite: (listId: string, role?: 'collaborator' | 'viewer') => Promise<string | null>
+  /** Owner-only: the list's current invite code + level, or null if none/not owner. */
+  getInvite: (listId: string) => Promise<{ code: string; role: 'collaborator' | 'viewer' } | null>
+  /** Resolve a code to a list id, but only for someone already in that list. */
+  resolveListIdByCode: (code: string) => Promise<string | null>
+  /** Non-sensitive preview of a shared link, for the pre-auth join screen. */
+  getInvitePreview: (code: string) => Promise<InvitePreview | null>
   /** The signed-in user's role on a list, or null if not a member. */
   myRole: (listId: string) => ListMember['role'] | null
   subscribeToList: (listId: string) => () => void
@@ -155,10 +161,9 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
 
   createList: async ({ name, type, emoji }) => {
     const { userId, displayName } = get()
-    const inviteCode = generateInviteCode()
     const { data, error } = await supabase
       .from('lists')
-      .insert({ name, type, emoji, owner_id: userId, invite_code: inviteCode })
+      .insert({ name, type, emoji, owner_id: userId })
       .select()
       .single()
     if (error || !data) { set({ lastError: "Couldn't create list — try again" }); return null }
@@ -193,10 +198,9 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { userId, displayName } = get()
     const orig = get().lists.find(l => l.id === listId)
     if (!orig) return
-    const inviteCode = generateInviteCode()
     const { data } = await supabase
       .from('lists')
-      .insert({ name: `${orig.name} (copy)`, type: orig.type, emoji: orig.emoji, owner_id: userId, invite_code: inviteCode })
+      .insert({ name: `${orig.name} (copy)`, type: orig.type, emoji: orig.emoji, owner_id: userId })
       .select()
       .single()
     if (!data) return
@@ -212,7 +216,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (!orig) return
     const { data, error } = await supabase
       .from('lists')
-      .insert({ name: orig.name, type: orig.type, emoji: orig.emoji, owner_id: userId, invite_code: generateInviteCode(), is_template: true })
+      .insert({ name: orig.name, type: orig.type, emoji: orig.emoji, owner_id: userId, is_template: true })
       .select()
       .single()
     if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
@@ -227,7 +231,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { userId, displayName } = get()
     const { data, error } = await supabase
       .from('lists')
-      .insert({ name, type: 'shopping', emoji, owner_id: userId, invite_code: generateInviteCode(), is_template: true })
+      .insert({ name, type: 'shopping', emoji, owner_id: userId, is_template: true })
       .select()
       .single()
     if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
@@ -243,7 +247,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (!tpl) return null
     const { data, error } = await supabase
       .from('lists')
-      .insert({ name: tpl.name, type: tpl.type, emoji: tpl.emoji, owner_id: userId, invite_code: generateInviteCode() })
+      .insert({ name: tpl.name, type: tpl.type, emoji: tpl.emoji, owner_id: userId })
       .select()
       .single()
     if (error || !data) { set({ lastError: "Couldn't create list — try again" }); return null }
@@ -464,11 +468,34 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
   },
 
   regenerateInvite: async (listId, role = 'collaborator') => {
-    const code = generateInviteCode()
-    const { error } = await supabase.from('lists').update({ invite_code: code, invite_role: role }).eq('id', listId)
+    // The invite secret lives on the owner-only list_invites table; minting is
+    // done by a SECURITY DEFINER RPC that verifies ownership and returns the code.
+    const { data, error } = await supabase.rpc('rotate_invite', { p_list_id: listId, p_role: role })
+    if (error || !data) return null
+    return data as string
+  },
+
+  getInvite: async (listId) => {
+    const { data, error } = await supabase
+      .from('list_invites').select('code, role').eq('list_id', listId).maybeSingle()
+    if (error || !data) return null
+    return { code: data.code as string, role: data.role as 'collaborator' | 'viewer' }
+  },
+
+  resolveListIdByCode: async (code) => {
+    const { data, error } = await supabase.rpc('member_list_id_for_code', { p_code: code })
     if (error) return null
-    set({ lists: get().lists.map(l => l.id === listId ? { ...l, invite_code: code, invite_role: role } : l) })
-    return code
+    return (data as string | null) ?? null
+  },
+
+  getInvitePreview: async (code) => {
+    const { data, error } = await supabase.rpc('invite_preview', { p_code: code })
+    const row = Array.isArray(data) ? data[0] : data
+    if (error || !row) return null
+    return {
+      listId: row.list_id, name: row.name, emoji: row.emoji, type: row.type,
+      ownerName: row.owner_name, memberCount: row.member_count,
+    } as InvitePreview
   },
 
   subscribeToList: (listId) => {

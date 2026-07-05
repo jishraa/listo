@@ -28,11 +28,18 @@ export interface List {
   type: ListType
   emoji: string
   owner_id: string
-  invite_code: string
-  invite_role: 'collaborator' | 'viewer'
-  invite_expires_at: string | null
   is_template: boolean
   archived_at: string | null
   created_at: string
   updated_at: string
+}
+
+// Non-sensitive shared-link preview, shown before the visitor authenticates.
+export interface InvitePreview {
+  listId: string
+  name: string
+  emoji: string
+  type: ListType
+  ownerName: string
+  memberCount: number
 }

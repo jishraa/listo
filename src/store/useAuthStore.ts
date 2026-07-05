@@ -13,7 +13,7 @@ interface AuthState {
   init: () => Promise<void>
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
   signIn: (email: string, password: string) => Promise<string | null>
-  signInWithProvider: (provider: 'google' | 'apple') => Promise<string | null>
+  signInWithProvider: (provider: 'google' | 'apple', redirectTo?: string) => Promise<string | null>
   forgotPassword: (email: string) => Promise<string | null>
   changePassword: (newPassword: string) => Promise<string | null>
   signInAsGuest: (displayName: string) => Promise<string | null>
@@ -69,12 +69,13 @@ export const useAuthStore = create<AuthState>(set => ({
     return error?.message ?? null
   },
 
-  signInWithProvider: async (provider) => {
+  signInWithProvider: async (provider, redirectTo) => {
     // Redirect flow: on success the browser leaves the page and returns to
-    // origin with a session; only config errors surface here.
+    // redirectTo (default origin) with a session; only config errors surface
+    // here. The invite flow passes /join/:code so the join resumes after auth.
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: redirectTo ?? window.location.origin },
     })
     return error?.message ?? null
   },
