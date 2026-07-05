@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { useAuthStore } from './store/useAuthStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
 import AppShell from './components/layout/AppShell'
+import UpdateToast from './components/UpdateToast'
 // Entry screens stay eager; everything reachable one tap deeper is lazy so
 // the initial bundle only carries login + the lists workspace.
 import Login from './pages/Login'
@@ -145,6 +146,7 @@ export default function App() {
     <BrowserRouter>
       <ThemeController />
       <AppRoutes />
+      <UpdateToast />
     </BrowserRouter>
   )
 }
