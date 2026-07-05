@@ -37,6 +37,8 @@ interface ListsState {
   updateItem: (listId: string, itemId: string, patch: { title?: string; quantity?: string | null; category?: string | null }) => Promise<void>
   deleteItem: (listId: string, itemId: string) => Promise<void>
   uncheckAll: (listId: string) => Promise<void>
+  /** Remove every item from a list (used to start a fresh next trip). Online-only. */
+  clearItems: (listId: string) => Promise<void>
   removeMember: (listId: string, memberId: string) => Promise<void>
   setMemberRole: (listId: string, memberId: string, role: 'collaborator' | 'viewer') => Promise<void>
   joinByCode: (code: string) => Promise<{ success: boolean; message: string; list?: List }>
@@ -424,6 +426,14 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
         .update({ completed: false, completed_by_name: null }).eq('list_id', listId))
     }
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    else bumpUpdatedAt(listId, get, set)
+  },
+
+  clearItems: async (listId) => {
+    const prev = get().items[listId] ?? []
+    set({ items: { ...get().items, [listId]: [] } })
+    const { error } = await supabase.from('list_items').delete().eq('list_id', listId)
+    if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't clear items — try again" })
     else bumpUpdatedAt(listId, get, set)
   },
 

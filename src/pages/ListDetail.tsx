@@ -19,6 +19,7 @@ import DuplicateReviewSheet from '../components/lists/DuplicateReviewSheet'
 import AddItemSheet from '../components/lists/AddItemSheet'
 import BeforeYouGoSheet from '../components/lists/BeforeYouGoSheet'
 import ShopMode from '../components/lists/ShopMode'
+import NextTripSheet from '../components/lists/NextTripSheet'
 import { useEnsureData } from '../hooks/useEnsureData'
 
 type SortMode = 'date' | 'alpha' | 'category'
@@ -130,7 +131,6 @@ export default function ListDetail() {
   const [editPickerOpen,   setEditPickerOpen]   = useState(false)
   const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
-  const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
     id ? localStorage.getItem(`listo-completed-${id}`) : null
   )
@@ -186,6 +186,7 @@ export default function ListDetail() {
   const regulars = useMemo(() => regularsOf(memHistory, new Set(), 8), [memHistory])
 
   const [shopModeOpen, setShopModeOpen] = useState(false)
+  const [nextTripOpen, setNextTripOpen] = useState(false)
 
   // "Before you go" — regulars not on this list yet (present = pending + done).
   const [beforeYouGoOpen, setBeforeYouGoOpen] = useState(false)
@@ -788,9 +789,9 @@ export default function ListDetail() {
                   <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                     {canEdit && <button onClick={() => setShowAdd(true)}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>}
-                    {canEdit && <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
+                    {canEdit && <button onClick={() => setNextTripOpen(true)}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-                      <RefreshCw size={13} style={unchecking ? { animation: 'spin 1s linear infinite' } : {}} /> Reuse list
+                      <RefreshCw size={13} /> Start next trip
                     </button>}
                     {isOwner && <button onClick={() => setShareOpen(true)} className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
                       <Share2 size={13} /> Share
@@ -903,6 +904,15 @@ export default function ListDetail() {
         cats={cats}
       />
 
+      <NextTripSheet
+        open={nextTripOpen}
+        onClose={() => setNextTripOpen(false)}
+        list={list}
+        items={items}
+        cats={cats}
+        regulars={regulars}
+      />
+
       {/* ── Menu ── */}
       {menuOpen && (
         <>
@@ -921,7 +931,7 @@ export default function ListDetail() {
                 isOwner ? { icon: <Copy size={16} />, label: 'Duplicate', hint: '', action: async () => { setMenuOpen(false); await store.duplicateList(list.id) } } : null,
                 isOwner ? { icon: <LayoutTemplate size={16} />, label: 'Save as Template', hint: '', action: async () => { setMenuOpen(false); await store.saveAsTemplate(list.id) } } : null,
                 isOwner ? { icon: <Share2 size={16} />, label: 'Share', hint: '', action: () => { setMenuOpen(false); setShareOpen(true) } } : null,
-                { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }, disabled: completed.length === 0 },
+                { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); await store.uncheckAll(list.id) }, disabled: completed.length === 0 },
                 isOwner ? { icon: <Trash2 size={16} color="#ef4444" />, label: 'Delete List', hint: '', action: () => { setMenuOpen(false); setConfirmDelete(true) }, danger: true } : null,
               ].filter(Boolean).map((item, i) => {
                 const it = item as { icon: ReactNode; label: string; hint: string; action: () => void; disabled?: boolean; danger?: boolean }
