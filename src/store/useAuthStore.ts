@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { useListsStore } from './useListsStore'
 
 interface AuthState {
   session: Session | null
@@ -101,6 +102,9 @@ export const useAuthStore = create<AuthState>(set => ({
 
   signOut: async () => {
     localStorage.removeItem('listo-display-name')
+    // Wipe the offline cache so the next account never sees this one's data.
+    useListsStore.setState({ lists: [], items: {}, members: {}, userId: '', displayName: '', initialized: false })
+    useListsStore.persist.clearStorage()
     await supabase.auth.signOut()
     set({ session: null, user: null, displayName: '', isGuest: false })
   },

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
 import type { List, ListItem, ListMember } from '../types'
 import { generateInviteCode } from '../lib/utils'
@@ -71,7 +72,7 @@ function bumpUpdatedAt(listId: string, get: Get, set: Set) {
   })
 }
 
-export const useListsStore = create<ListsState>((set, get) => ({
+export const useListsStore = create<ListsState>()(persist((set, get) => ({
   lists: [],
   items: {},
   members: {},
@@ -88,19 +89,26 @@ export const useListsStore = create<ListsState>((set, get) => ({
       set({ displayName })
       return
     }
-    set({ userId, displayName, loading: true, loadError: false })
+    // Cache hydrated from a different account must never leak across users.
+    if (get().userId && get().userId !== userId) {
+      set({ lists: [], items: {}, members: {}, initialized: false })
+    }
+    // Offline-first: hydrated data (same user) renders immediately; the
+    // network pass below refreshes it when reachable.
+    const hasCache = get().userId === userId && get().lists.length > 0
+    set({ userId, displayName, loading: !hasCache, loadError: false, ...(hasCache ? { initialized: true } : {}) })
     try {
       const [ownRes, memberRes] = await Promise.all([
         supabase.from('lists').select('*').eq('owner_id', userId).order('updated_at', { ascending: false }),
         supabase.from('list_members').select('list_id').eq('user_id', userId).neq('role', 'owner'),
       ])
-      if (ownRes.error || memberRes.error) { set({ loading: false, loadError: true }); return }
+      if (ownRes.error || memberRes.error) { set({ loading: false, loadError: !hasCache }); return }
 
       let shared: List[] = []
       if ((memberRes.data ?? []).length > 0) {
         const ids = memberRes.data!.map(r => r.list_id)
         const { data, error } = await supabase.from('lists').select('*').in('id', ids).order('updated_at', { ascending: false })
-        if (error) { set({ loading: false, loadError: true }); return }
+        if (error) { set({ loading: false, loadError: !hasCache }); return }
         shared = (data ?? []) as List[]
       }
 
@@ -109,7 +117,8 @@ export const useListsStore = create<ListsState>((set, get) => ({
 
       set({ lists: all, loading: false, initialized: true })
     } catch {
-      set({ loading: false, loadError: true })
+      // Network unreachable — cached data (if any) keeps the app usable.
+      set({ loading: false, loadError: !hasCache })
     }
   },
 
@@ -270,7 +279,9 @@ export const useListsStore = create<ListsState>((set, get) => ({
   },
 
   loadItems: async (listId) => {
-    const { data } = await supabase.from('list_items').select('*').eq('list_id', listId).order('created_at')
+    const { data, error } = await supabase.from('list_items').select('*').eq('list_id', listId).order('created_at')
+    // Offline / transient failure: keep the cached items rather than wiping.
+    if (error) return
     set({ items: { ...get().items, [listId]: (data ?? []) as ListItem[] } })
   },
 
@@ -403,4 +414,13 @@ export const useListsStore = create<ListsState>((set, get) => ({
       })
     return () => { supabase.removeChannel(channel) }
   },
+}), {
+  // Offline-first cache: lists/items/members render instantly on cold start
+  // and stay readable with no network. Only data is persisted — transient
+  // flags and functions are rebuilt each session.
+  name: 'listo-lists-cache',
+  partialize: (s) => ({
+    lists: s.lists, items: s.items, members: s.members,
+    userId: s.userId, displayName: s.displayName,
+  }),
 }))

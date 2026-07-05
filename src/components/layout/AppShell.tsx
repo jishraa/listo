@@ -31,11 +31,13 @@ export default function AppShell() {
   }, [user])
 
   // Items/members power every tab (Home stats, Insights, Lists progress),
-  // so load them here rather than in any one page.
+  // so load them here rather than in any one page. Always refetch — the
+  // persisted offline cache pre-fills entries, and these calls keep them
+  // fresh (they no-op harmlessly when offline).
   useEffect(() => {
     for (const list of store.lists) {
-      if (!store.items[list.id]) store.loadItems(list.id)
-      if (!store.members[list.id]) store.loadMembers(list.id)
+      store.loadItems(list.id)
+      store.loadMembers(list.id)
     }
   }, [store.lists.length])
 
