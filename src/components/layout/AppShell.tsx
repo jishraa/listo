@@ -17,7 +17,7 @@ const TABS = [
 // has data on direct navigation. Drill-in pages (ListDetail, Join) render
 // outside the shell with their own full-screen layout.
 export default function AppShell() {
-  const { user, displayName } = useAuthStore()
+  const { user, displayName, isGuest } = useAuthStore()
   const store = useListsStore()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -36,15 +36,21 @@ export default function AppShell() {
   // Items/members power every tab (Home stats, Insights, Lists progress),
   // so load them here rather than in any one page. Always refetch — the
   // persisted offline cache pre-fills entries, and these calls keep them
-  // fresh (they no-op harmlessly when offline).
+  // fresh (they no-op harmlessly when offline). Keyed on the id set (not the
+  // count) so a swap that keeps the length still triggers a reload.
+  const listIdsKey = store.lists.map(l => l.id).join(',')
   useEffect(() => {
     for (const list of store.lists) {
       store.loadItems(list.id)
       store.loadMembers(list.id)
     }
-  }, [store.lists.length])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listIdsKey])
 
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
+    // Guests can't own lists — creation would orphan the data when their
+    // anonymous session ends. The FAB is hidden for them; this is a backstop.
+    if (isGuest) return
     const list = await store.createList({ name, type, emoji })
     if (!list) return
     if (templateItems?.length) {
@@ -67,20 +73,25 @@ export default function AppShell() {
             <span>{label}</span>
           </button>
         ))}
-        <button
-          onClick={() => setCreateOpen(true)}
-          aria-label="Create list"
-          style={{
-            width: 52, height: 52, borderRadius: '50%',
-            background: 'var(--accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: 'none', cursor: 'pointer', flexShrink: 0,
-            marginTop: -14,
-            boxShadow: '0 0 20px rgba(22,163,74,0.45)',
-          }}
-        >
-          <Plus size={24} color="#04080f" strokeWidth={2.5} />
-        </button>
+        {/* Guests can't create lists — keep the slot for layout, hide the FAB */}
+        {isGuest ? (
+          <div style={{ width: 52, flexShrink: 0 }} aria-hidden />
+        ) : (
+          <button
+            onClick={() => setCreateOpen(true)}
+            aria-label="Create list"
+            style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: 'var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', cursor: 'pointer', flexShrink: 0,
+              marginTop: -14,
+              boxShadow: '0 0 20px rgba(22,163,74,0.45)',
+            }}
+          >
+            <Plus size={24} color="#04080f" strokeWidth={2.5} />
+          </button>
+        )}
         {TABS.slice(1).map(({ path, label, Icon }) => (
           <button key={path} className={`nav-item ${pathname === path ? 'active' : ''}`} onClick={() => navigate(path)}>
             <Icon size={22} />

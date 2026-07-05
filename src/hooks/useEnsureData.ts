@@ -20,11 +20,13 @@ export function useEnsureData() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  const listIdsKey = store.lists.map(l => l.id).join(',')
   useEffect(() => {
     for (const list of store.lists) {
       if (!store.items[list.id]) store.loadItems(list.id)
       if (!store.members[list.id]) store.loadMembers(list.id)
     }
+  // Keyed on the id set (not the count) so a swap still triggers a reload.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.lists.length])
+  }, [listIdsKey])
 }

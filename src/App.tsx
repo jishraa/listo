@@ -44,8 +44,8 @@ function PageLoader() {
   )
 }
 
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuthStore()
+function AuthGuard({ children, allowGuest = true }: { children: React.ReactNode; allowGuest?: boolean }) {
+  const { user, loading, isGuest } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -63,7 +63,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Guests can only access join pages and list detail if they're already a member
+  // Guests (anonymous sessions) can browse their joined lists and the Profile
+  // tab (to upgrade or leave), but member-only surfaces like Categories opt out
+  // via allowGuest={false} and bounce them back to their lists.
+  if (isGuest && !allowGuest) return <Navigate to="/" replace />
+
   return <>{children}</>
 }
 
@@ -176,7 +180,7 @@ function AppRoutes() {
       <Route
         path="/categories"
         element={
-          <AuthGuard>
+          <AuthGuard allowGuest={false}>
             <Categories />
           </AuthGuard>
         }

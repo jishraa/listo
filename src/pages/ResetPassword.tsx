@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Eye, EyeOff } from 'lucide-react'
+import { Check, Eye, EyeOff, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { supabase } from '../lib/supabase'
+import { PW_RULES, isPasswordValid } from '../lib/password'
 
 // Password-recovery landing — the target of the email reset link. Supabase
 // consumes the link's token into a recovery session on load; from there
@@ -40,7 +41,7 @@ export default function ResetPassword() {
 
   const handleSubmit = async () => {
     setError('')
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (!isPasswordValid(password)) { setError('Please meet all the password requirements.'); return }
     if (password !== confirm) { setError("Passwords don't match."); return }
     setBusy(true)
     const err = await changePassword(password)
@@ -109,6 +110,20 @@ export default function ResetPassword() {
                   {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {/* Same policy as sign-up (shared PW_RULES) */}
+              {password && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 8 }}>
+                  {PW_RULES.map(r => {
+                    const ok = r.test(password)
+                    return (
+                      <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: ok ? 'var(--accent)' : 'var(--text-3)' }}>
+                        {ok ? <Check size={13} strokeWidth={2.5} /> : <X size={13} strokeWidth={2.5} />}
+                        {r.label}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             <div className="input-group">
               <label className="input-label" htmlFor="confirm-password">Confirm password</label>

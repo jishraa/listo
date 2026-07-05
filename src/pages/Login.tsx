@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { Eye, EyeOff, Check, ChevronLeft } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
+import { PW_RULES } from '../lib/password'
 
 // Friendly error copy (spec §7) — never surface raw backend messages.
 function friendlyError(msg: string): string {
@@ -17,12 +18,6 @@ function friendlyError(msg: string): string {
   return 'Unable to verify your account. Try again.'
 }
 
-const PW_RULES = [
-  { id: 'len',     label: 'Minimum 8 characters',   test: (p: string) => p.length >= 8 },
-  { id: 'upper',   label: 'One uppercase letter',   test: (p: string) => /[A-Z]/.test(p) },
-  { id: 'num',     label: 'One number',             test: (p: string) => /\d/.test(p) },
-  { id: 'special', label: 'One special character',  test: (p: string) => /[^A-Za-z0-9]/.test(p) },
-]
 
 function GoogleIcon() {
   return (

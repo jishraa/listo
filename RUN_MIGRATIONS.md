@@ -45,12 +45,20 @@ Paste each file's contents into the SQL Editor and run. Each is idempotent
       Supabase's built-in email sender is rate-limited to a handful per hour and
       is not meant for production signup/reset volume.
 
-## 4. Optional providers (when ready)
+## 4. OAuth providers + redirect URLs
 
-- [ ] **Google** / **Apple** OAuth — the "Continue with Google/Apple" buttons on
-      the login screen are wired to `signInWithOAuth`; enable the providers here
-      and add the OAuth client credentials. Until then they show a friendly
-      "not available yet" message.
+- [ ] **Google** OAuth — the "Continue with Google" button on the login screen
+      and the shared-link join screen is wired to `signInWithOAuth`. Enable the
+      provider here and add the OAuth client credentials. Until then it shows a
+      friendly "not available yet" message.
+- [ ] **Apple** OAuth — "Continue with Apple" appears on the **shared-link join
+      screen** (`/join/:code`). It needs the Apple provider fully configured
+      (Apple Developer Service ID + key) before it works; until then the button
+      surfaces the same friendly message.
+- [ ] **Redirect URLs** (Authentication → URL Configuration) — allowlist the
+      app's paths so the OAuth round-trip returns to the invite/login, e.g.
+      `https://listo.grk766.workers.dev/**`. Without this, Google/Apple sign-in
+      won't come back to `/join/:code`.
 
 ## 5. Rate limits (dev convenience)
 

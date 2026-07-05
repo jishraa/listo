@@ -73,6 +73,26 @@ async function copyItems(fromItems: { title: string; quantity: string | null; ca
   ))
 }
 
+// Fetch a user's owned + shared lists, merged and sorted most-recent-first.
+// Returns null on any query error so callers can decide how to surface it.
+async function fetchAllLists(userId: string): Promise<List[] | null> {
+  const [ownRes, memberRes] = await Promise.all([
+    supabase.from('lists').select('*').eq('owner_id', userId),
+    supabase.from('list_members').select('list_id').eq('user_id', userId).neq('role', 'owner'),
+  ])
+  if (ownRes.error || memberRes.error) return null
+
+  let shared: List[] = []
+  const memberIds = (memberRes.data ?? []).map(r => r.list_id)
+  if (memberIds.length > 0) {
+    const { data, error } = await supabase.from('lists').select('*').in('id', memberIds)
+    if (error) return null
+    shared = (data ?? []) as List[]
+  }
+  return [...(ownRes.data ?? []) as List[], ...shared]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+}
+
 function bumpUpdatedAt(listId: string, get: Get, set: Set) {
   const now = new Date().toISOString()
   const list = get().lists.find(l => l.id === listId)
@@ -112,23 +132,8 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const hasCache = get().userId === userId && get().lists.length > 0
     set({ userId, displayName, loading: !hasCache, loadError: false, ...(hasCache ? { initialized: true } : {}) })
     try {
-      const [ownRes, memberRes] = await Promise.all([
-        supabase.from('lists').select('*').eq('owner_id', userId).order('updated_at', { ascending: false }),
-        supabase.from('list_members').select('list_id').eq('user_id', userId).neq('role', 'owner'),
-      ])
-      if (ownRes.error || memberRes.error) { set({ loading: false, loadError: !hasCache }); return }
-
-      let shared: List[] = []
-      if ((memberRes.data ?? []).length > 0) {
-        const ids = memberRes.data!.map(r => r.list_id)
-        const { data, error } = await supabase.from('lists').select('*').in('id', ids).order('updated_at', { ascending: false })
-        if (error) { set({ loading: false, loadError: !hasCache }); return }
-        shared = (data ?? []) as List[]
-      }
-
-      const all = [...(ownRes.data ?? []) as List[], ...shared]
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-
+      const all = await fetchAllLists(userId)
+      if (all === null) { set({ loading: false, loadError: !hasCache }); return }
       set({ lists: all, loading: false, initialized: true })
     } catch {
       // Network unreachable — cached data (if any) keeps the app usable.
@@ -141,20 +146,8 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (!userId) return
     set({ loading: true })
     try {
-      const [ownRes, memberRes] = await Promise.all([
-        supabase.from('lists').select('*').eq('owner_id', userId).order('updated_at', { ascending: false }),
-        supabase.from('list_members').select('list_id').eq('user_id', userId).neq('role', 'owner'),
-      ])
-      if (ownRes.error || memberRes.error) { set({ loading: false, loadError: true }); return }
-      let shared: List[] = []
-      if ((memberRes.data ?? []).length > 0) {
-        const ids = memberRes.data!.map(r => r.list_id)
-        const { data, error } = await supabase.from('lists').select('*').in('id', ids)
-        if (error) { set({ loading: false, loadError: true }); return }
-        shared = (data ?? []) as List[]
-      }
-      const all = [...(ownRes.data ?? []) as List[], ...shared]
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      const all = await fetchAllLists(userId)
+      if (all === null) { set({ loading: false, loadError: true }); return }
       set({ lists: all, loading: false, initialized: true })
     } catch {
       set({ loading: false, loadError: true })

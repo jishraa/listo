@@ -102,7 +102,7 @@ function ListCard({ list, isPinned, onOpen, items, collab }: {
 }
 
 export default function Lists() {
-  const { user } = useAuthStore()
+  const { user, isGuest } = useAuthStore()
   const store = useListsStore()
   const navigate = useNavigate()
   const installPrompt = useInstallPrompt()
@@ -182,6 +182,7 @@ export default function Lists() {
   }
 
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
+    if (isGuest) return   // guests can't own lists — backstop; CTAs are hidden
     const list = await store.createList({ name, type, emoji })
     if (!list) return
     if (templateItems?.length) {
@@ -449,14 +450,24 @@ export default function Lists() {
           ) : !hasLists ? (
             <div className="empty-state">
               <div className="icon">📋</div>
-              <h3>No lists yet</h3>
-              <p>Create your first list or start from a template.</p>
-              <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
-                <Plus size={18} /> Create List
-              </button>
-              <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
-                Browse Templates
-              </button>
+              {isGuest ? (
+                <>
+                  <h3>No shared lists yet</h3>
+                  <p>Lists people invite you to will appear here. Create a free account to make your own.</p>
+                  <button className="btn btn-primary mt-4" onClick={() => navigate('/profile')}>Create Account</button>
+                </>
+              ) : (
+                <>
+                  <h3>No lists yet</h3>
+                  <p>Create your first list or start from a template.</p>
+                  <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
+                    <Plus size={18} /> Create List
+                  </button>
+                  <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
+                    Browse Templates
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex-col gap-3">
@@ -472,21 +483,27 @@ export default function Lists() {
                       <div className="empty-state" style={{ padding: '28px 0 12px' }}>
                         <div className="icon">📝</div>
                         <h3>No active lists</h3>
-                        <p>Create a list to start planning, shopping, or organizing tasks.</p>
-                        <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
-                          <Plus size={18} /> Create List
-                        </button>
-                        <button
-                          onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
-                          className="mt-3"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
-                          Browse Templates →
-                        </button>
+                        {isGuest ? (
+                          <p>Lists people invite you to will appear here.</p>
+                        ) : (
+                          <>
+                            <p>Create a list to start planning, shopping, or organizing tasks.</p>
+                            <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
+                              <Plus size={18} /> Create List
+                            </button>
+                            <button
+                              onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
+                              className="mt-3"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
+                              Browse Templates →
+                            </button>
+                          </>
+                        )}
                       </div>
                     )
                   )}
 
-                  {templatesFiltered.length > 0 && (
+                  {!isGuest && templatesFiltered.length > 0 && (
                     <>
                       <span style={{ ...sectionLabel, padding: '8px 2px 0', display: 'block' }}>Templates</span>
                       {templatesFiltered.map(renderTemplate)}
@@ -496,7 +513,7 @@ export default function Lists() {
                   {/* Template nudge only while the workspace is nearly empty
                       (1–2 active lists); templates otherwise live behind the
                       + action — never a permanent dashboard card (spec) */}
-                  {!q && activeAll.length > 0 && activeAll.length <= 2 && (
+                  {!isGuest && !q && activeAll.length > 0 && activeAll.length <= 2 && (
                     <button
                       onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
                       className="card card-press"
