@@ -1,7 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/useAuthStore'
+import { useListsStore } from './store/useListsStore'
+import { useSyncStore } from './store/useSyncStore'
 import { useThemeStore, applyTheme } from './store/useThemeStore'
+import { CloudOff, RefreshCw } from 'lucide-react'
 import AppShell from './components/layout/AppShell'
 import UpdateToast from './components/UpdateToast'
 // Entry screens stay eager; everything reachable one tap deeper is lazy so
@@ -62,6 +65,60 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Guests can only access join pages and list detail if they're already a member
   return <>{children}</>
+}
+
+// Connectivity + queue flushing (offline-first part C): tracks online state,
+// replays queued writes on reconnect, and shows a subtle status pill while
+// offline or syncing.
+function SyncController() {
+  const online = useSyncStore(s => s.online)
+  const syncing = useSyncStore(s => s.syncing)
+  const queueLen = useSyncStore(s => s.queue.length)
+
+  useEffect(() => {
+    const sync = useSyncStore.getState()
+    const onOnline = async () => {
+      sync.setOnline(true)
+      await sync.flush()
+      // Pull remote changes made while we were away
+      useListsStore.getState().refreshLists()
+    }
+    const onOffline = () => sync.setOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    // Startup flush: ops left over from a previous offline session
+    sync.flush()
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
+
+  const showSyncing = syncing && queueLen > 0
+  if (online && !showSyncing) return null
+
+  return (
+    <div style={{
+      position: 'fixed', top: 'calc(8px + var(--safe-top))', left: '50%', transform: 'translateX(-50%)',
+      zIndex: 400, display: 'flex', alignItems: 'center', gap: 7,
+      padding: '7px 14px', borderRadius: 99,
+      background: 'var(--bg-card)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+      border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)',
+      fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap',
+    }}>
+      {!online ? (
+        <>
+          <CloudOff size={13} color="#d97706" />
+          Offline{queueLen > 0 ? ` · ${queueLen} pending` : ' — changes will sync'}
+        </>
+      ) : (
+        <>
+          <RefreshCw size={13} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />
+          Syncing {queueLen} {queueLen === 1 ? 'change' : 'changes'}…
+        </>
+      )}
+    </div>
+  )
 }
 
 function ThemeController() {
@@ -145,6 +202,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeController />
+      <SyncController />
       <AppRoutes />
       <UpdateToast />
     </BrowserRouter>

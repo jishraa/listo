@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware'
 import { supabase } from '../lib/supabase'
 import type { List, ListItem, ListMember } from '../types'
 import { generateInviteCode } from '../lib/utils'
+// Deferred circular import (sync store also imports this one) — both only
+// touch each other inside functions, never at module top level.
+import { useSyncStore, newOpId, newTempId, isTempId, isNetworkError } from './useSyncStore'
 
 interface ListsState {
   lists: List[]
@@ -295,12 +298,32 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
 
   addItem: async (listId, title, quantity, category) => {
     const { displayName } = get()
+    // Offline (or the request dies mid-air): apply a temp row locally and
+    // queue the insert — the sync engine swaps in the server row later.
+    const addOffline = () => {
+      const tempId = newTempId()
+      const temp: ListItem = {
+        id: tempId, list_id: listId, title, quantity: quantity || null, completed: false,
+        added_by_name: displayName, completed_by_name: null, completed_at: null,
+        category, sort_order: 0, created_at: new Date().toISOString(),
+      }
+      set({ items: { ...get().items, [listId]: [...(get().items[listId] ?? []), temp] } })
+      useSyncStore.getState().enqueue({
+        kind: 'add', opId: newOpId(), listId, tempId,
+        title, quantity: quantity || null, category, addedByName: displayName,
+      })
+    }
+    if (!useSyncStore.getState().online) { addOffline(); return }
     const { data, error } = await supabase
       .from('list_items')
       .insert({ list_id: listId, title, quantity: quantity || null, category, added_by_name: displayName })
       .select()
       .single()
-    if (error || !data) { set({ lastError: "Couldn't add item — try again" }); return }
+    if (error || !data) {
+      if (isNetworkError(error?.message)) { addOffline(); return }
+      set({ lastError: "Couldn't add item — try again" })
+      return
+    }
     const current = get().items[listId] ?? []
     if (!current.find(i => i.id === (data as ListItem).id))
       set({ items: { ...get().items, [listId]: [...current, data as ListItem] } })
@@ -317,6 +340,10 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     }
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: prev.map(i => i.id === item.id ? { ...i, ...patch } : i) } })
+    if (!useSyncStore.getState().online) {
+      useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId: item.id, patch })
+      return
+    }
     let { error } = await supabase.from('list_items').update(patch).eq('id', item.id)
     // Migration-v4 not applied yet: retry without the timestamp column
     // (PGRST204 = unknown column) so toggling keeps working.
@@ -325,29 +352,65 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
         .update({ completed: patch.completed, completed_by_name: patch.completed_by_name })
         .eq('id', item.id))
     }
-    if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    if (error) {
+      if (isNetworkError(error.message)) {
+        useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId: item.id, patch })
+        return
+      }
+      set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    }
     else bumpUpdatedAt(listId, get, set)
   },
 
   updateItem: async (listId, itemId, patch) => {
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: prev.map(i => i.id === itemId ? { ...i, ...patch } : i) } })
+    if (!useSyncStore.getState().online) {
+      useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId, patch })
+      return
+    }
     const { error } = await supabase.from('list_items').update(patch).eq('id', itemId)
-    if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    if (error) {
+      if (isNetworkError(error.message)) {
+        useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId, patch })
+        return
+      }
+      set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    }
     else bumpUpdatedAt(listId, get, set)
   },
 
   deleteItem: async (listId, itemId) => {
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: prev.filter(i => i.id !== itemId) } })
+    // A temp item never reached the server — just cancel its queued ops.
+    if (isTempId(itemId)) { useSyncStore.getState().dropForItem(itemId); return }
+    if (!useSyncStore.getState().online) {
+      useSyncStore.getState().enqueue({ kind: 'delete', opId: newOpId(), listId, itemId })
+      return
+    }
     const { error } = await supabase.from('list_items').delete().eq('id', itemId)
-    if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't delete — try again" })
+    if (error) {
+      if (isNetworkError(error.message)) {
+        useSyncStore.getState().enqueue({ kind: 'delete', opId: newOpId(), listId, itemId })
+        return
+      }
+      set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't delete — try again" })
+    }
     else bumpUpdatedAt(listId, get, set)
   },
 
   uncheckAll: async (listId) => {
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: prev.map(i => ({ ...i, completed: false, completed_by_name: null, completed_at: null })) } })
+    if (!useSyncStore.getState().online) {
+      // One queued update per completed item — replayed on reconnect.
+      const sync = useSyncStore.getState()
+      const patch = { completed: false, completed_by_name: null, completed_at: null }
+      prev.filter(i => i.completed).forEach(i =>
+        sync.enqueue({ kind: 'update', opId: newOpId(), listId, itemId: i.id, patch }))
+      return
+    }
     let { error } = await supabase.from('list_items')
       .update({ completed: false, completed_by_name: null, completed_at: null }).eq('list_id', listId)
     if (error?.code === 'PGRST204') {
