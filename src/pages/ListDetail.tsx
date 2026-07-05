@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { parseItemInput, detectCategoryIn } from '../lib/constants'
 import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
-import { useMemoryStore, regularsOf } from '../store/useMemoryStore'
+import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../store/useMemoryStore'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
 import { SwipeRow } from '../components/lists/SwipeRow'
@@ -17,6 +17,7 @@ import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 import ShoppingInsights from '../components/lists/ShoppingInsights'
 import DuplicateReviewSheet from '../components/lists/DuplicateReviewSheet'
 import AddItemSheet from '../components/lists/AddItemSheet'
+import BeforeYouGoSheet from '../components/lists/BeforeYouGoSheet'
 import { useEnsureData } from '../hooks/useEnsureData'
 
 type SortMode = 'date' | 'alpha' | 'category'
@@ -61,6 +62,10 @@ function formatCompletedAt(iso: string): string {
 function Overlay({ onClick }: { onClick?: () => void }) {
   return <div className="sheet-overlay" onClick={onClick} />
 }
+
+// Lists that have already shown the auto "Before you go" nudge this session —
+// so completing a list prompts once, never repeatedly.
+const beforeYouGoAutoShown = new Set<string>()
 
 export default function ListDetail() {
   const { id } = useParams<{ id: string }>()
@@ -178,6 +183,27 @@ export default function ListDetail() {
   // List Memory — "your regulars" to seed a fresh list in one tap.
   const memHistory = useMemoryStore(s => s.history)
   const regulars = useMemo(() => regularsOf(memHistory, new Set(), 8), [memHistory])
+
+  // "Before you go" — regulars not on this list yet (present = pending + done).
+  const [beforeYouGoOpen, setBeforeYouGoOpen] = useState(false)
+  const forgotten = useMemo(() => {
+    const present = new Set(items.map(i => memoryKey(i.title)))
+    return forgottenRegulars(memHistory, present, 6)
+  }, [memHistory, items])
+
+  // Auto-nudge on the transition to fully complete: a shopping trip is
+  // wrapping up, so surface forgotten regulars once (never repeatedly).
+  const prevAllComplete = useRef<boolean | null>(null)
+  useEffect(() => {
+    const was = prevAllComplete.current
+    prevAllComplete.current = isAllComplete
+    if (was === false && isAllComplete && list && list.type === 'shopping' && canEdit
+        && forgotten.length > 0 && !beforeYouGoAutoShown.has(list.id)) {
+      beforeYouGoAutoShown.add(list.id)
+      setBeforeYouGoOpen(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAllComplete])
   const addRegular = (m: { name: string; category: string | null; lastQuantity: string | null }) => {
     if (!list) return
     store.addItem(list.id, m.name, m.lastQuantity ?? '', m.category ?? detectCategoryIn(cats, m.name) ?? null)
@@ -819,6 +845,14 @@ export default function ListDetail() {
         cats={cats}
       />
 
+      <BeforeYouGoSheet
+        open={beforeYouGoOpen}
+        onClose={() => setBeforeYouGoOpen(false)}
+        list={list}
+        cats={cats}
+        suggestions={forgotten}
+      />
+
       {/* ── Menu ── */}
       {menuOpen && (
         <>
@@ -829,6 +863,7 @@ export default function ListDetail() {
               {[
                 { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
                 list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '✦', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
+                list.type === 'shopping' && canEdit ? { icon: <ShoppingBag size={16} />, label: 'Before you go', hint: '', action: () => { setMenuOpen(false); setBeforeYouGoOpen(true) } } : null,
                 { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', hint: '', action: () => { setMenuOpen(false); setCustomizeOpen(true) } },
                 { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
                 { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },

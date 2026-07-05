@@ -30,6 +30,12 @@ export const suggestOf = (history: MemoryItem[], prefix: string, exclude: Set<st
     .slice(0, n)
 }
 
+// "Before you go": regulars (bought 2+ times) that aren't on this list yet —
+// the things you usually buy but probably forgot. `presentKeys` are the
+// memoryKeys of every item already on the list (pending or completed).
+export const forgottenRegulars = (history: MemoryItem[], presentKeys: Set<string>, n = 6) =>
+  history.filter(h => h.count >= 2 && !presentKeys.has(h.nameKey)).slice(0, n)
+
 interface MemoryState {
   history: MemoryItem[]
   loaded: boolean
