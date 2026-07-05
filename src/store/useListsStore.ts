@@ -38,8 +38,11 @@ interface ListsState {
   deleteItem: (listId: string, itemId: string) => Promise<void>
   uncheckAll: (listId: string) => Promise<void>
   removeMember: (listId: string, memberId: string) => Promise<void>
+  setMemberRole: (listId: string, memberId: string, role: 'collaborator' | 'viewer') => Promise<void>
   joinByCode: (code: string) => Promise<{ success: boolean; message: string; list?: List }>
-  regenerateInvite: (listId: string) => Promise<string | null>
+  regenerateInvite: (listId: string, role?: 'collaborator' | 'viewer') => Promise<string | null>
+  /** The signed-in user's role on a list, or null if not a member. */
+  myRole: (listId: string) => ListMember['role'] | null
   subscribeToList: (listId: string) => () => void
 }
 
@@ -428,6 +431,20 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (error) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't remove member" })
   },
 
+  setMemberRole: async (listId, memberId, role) => {
+    const prev = get().members[listId] ?? []
+    set({ members: { ...get().members, [listId]: prev.map(m => m.id === memberId ? { ...m, role } : m) } })
+    const { error } = await supabase.rpc('set_member_role', { p_member_id: memberId, p_role: role })
+    if (error) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't change access" })
+  },
+
+  myRole: (listId) => {
+    const { userId } = get()
+    const list = get().lists.find(l => l.id === listId)
+    if (list && list.owner_id === userId) return 'owner'
+    return get().members[listId]?.find(m => m.user_id === userId)?.role ?? null
+  },
+
   joinByCode: async (code) => {
     const { displayName } = get()
     const clean = code.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -446,11 +463,11 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     return { success: true, message: `Joined "${list.name}"`, list }
   },
 
-  regenerateInvite: async (listId) => {
+  regenerateInvite: async (listId, role = 'collaborator') => {
     const code = generateInviteCode()
-    const { error } = await supabase.from('lists').update({ invite_code: code }).eq('id', listId)
+    const { error } = await supabase.from('lists').update({ invite_code: code, invite_role: role }).eq('id', listId)
     if (error) return null
-    set({ lists: get().lists.map(l => l.id === listId ? { ...l, invite_code: code } : l) })
+    set({ lists: get().lists.map(l => l.id === listId ? { ...l, invite_code: code, invite_role: role } : l) })
     return code
   },
 

@@ -5,9 +5,11 @@ import { Trash2 } from 'lucide-react'
 interface Props {
   onDelete: () => void
   children: ReactNode
+  /** Read-only rows (viewers): no swipe-to-delete, no delete panel. */
+  disabled?: boolean
 }
 
-export function SwipeRow({ onDelete, children }: Props) {
+export function SwipeRow({ onDelete, children, disabled = false }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef  = useRef<HTMLDivElement>(null)
   const cbsRef  = useRef({ onDelete })
@@ -36,6 +38,7 @@ export function SwipeRow({ onDelete, children }: Props) {
   useEffect(() => { setTranslate(peeking ? -PEEK : 0, true) }, [peeking])
 
   useEffect(() => {
+    if (disabled) return
     const wrap = wrapRef.current
     if (!wrap) return
 
@@ -71,7 +74,9 @@ export function SwipeRow({ onDelete, children }: Props) {
       wrap.removeEventListener('touchmove',  onTM)
       wrap.removeEventListener('touchend',   onTE)
     }
-  }, [peeking])
+  }, [peeking, disabled])
+
+  if (disabled) return <div style={{ position: 'relative' }}>{children}</div>
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', overflow: 'hidden' }}>

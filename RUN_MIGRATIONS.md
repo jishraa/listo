@@ -20,8 +20,9 @@ Paste each file's contents into the SQL Editor and run. Each is idempotent
 | 7 | `supabase-migration-v7.sql` | `is_list_member()` SECURITY DEFINER fn (RLS recursion fix) | Shared-member visibility broken (42P17) |
 | 8 | `supabase-migration-v8.sql` | Drops the lists↔members policy cycle left by v7 | Lists don't load after v7 |
 | 9 | `supabase-migration-v9.sql` | **Security hardening**: drops the collaborator lists-UPDATE policy (ownership-takeover hole), adds the members-can-leave delete policy, requires auth in `redeem_list_invite` | Collaborators can hijack lists via raw API; "Leave list" silently fails; invite codes burnable without auth |
+| 10 | `supabase-migration-v10.sql` | **Share permissions**: `lists.invite_role`, `viewer` role, item-write policies gated to non-viewers via `can_edit_list()`, `set_member_role()` RPC, redeem joins at the link's level | "View only" sharing does nothing — everyone invited can still edit |
 
-> If you're setting up fresh, run 1→9 top to bottom.
+> If you're setting up fresh, run 1→10 top to bottom.
 > If the project is already live, run only the ones you haven't yet.
 > **v9 is a security fix — run it as soon as possible.**
 

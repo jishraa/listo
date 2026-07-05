@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -75,6 +75,13 @@ export default function ListDetail() {
   const items   = rawItems ?? []
   const members = list ? (store.members[list.id] ?? []) : []
   const isOwner = !!list && list.owner_id === user?.id
+  // A viewer can see the list but never write to it (RLS-enforced; the UI hides
+  // the controls to match). We gate on positively-knowing the user is a viewer,
+  // so owners/collaborators aren't briefly locked out before members load —
+  // the database is the real boundary regardless.
+  const myRole = list ? store.myRole(list.id) : null
+  const isViewer = myRole === 'viewer'
+  const canEdit = !isViewer
 
   // ── Add sheet (extracted to AddItemSheet) ───────────────────
   const [showAdd, setShowAdd] = useState(false)
@@ -352,7 +359,7 @@ export default function ListDetail() {
     )
 
     return (
-      <SwipeRow key={item.id} onDelete={() => handleDelete(item)}>
+      <SwipeRow key={item.id} onDelete={() => handleDelete(item)} disabled={!canEdit}>
         {isFinalItem && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px 0',
@@ -365,12 +372,13 @@ export default function ListDetail() {
         <div className="flex items-center gap-3" style={{ padding: '12px 14px', background: isFinalItem ? 'var(--accent-dim)' : 'var(--bg-card)' }}>
           {/* Checkbox — 44px touch target around the 22px control (spec §17) */}
           <button
-            onClick={() => store.toggleItem(list.id, item)}
+            onClick={() => { if (canEdit) store.toggleItem(list.id, item) }}
+            disabled={!canEdit}
             aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
             style={{
               flexShrink: 0, width: 40, height: 40, margin: -9,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer',
+              background: 'none', border: 'none', cursor: canEdit ? 'pointer' : 'default',
             }}
           >
             <span style={{
@@ -386,8 +394,8 @@ export default function ListDetail() {
 
           {/* Title area — tap to edit. 17px/600 title, one 13px metadata line (spec §5/§13) */}
           <div
-            onClick={() => { if (!item.completed) { cancelEdit(); startEdit(item) } }}
-            style={{ flex: 1, minWidth: 0, cursor: item.completed ? 'default' : 'pointer' }}
+            onClick={() => { if (canEdit && !item.completed) { cancelEdit(); startEdit(item) } }}
+            style={{ flex: 1, minWidth: 0, cursor: canEdit && !item.completed ? 'pointer' : 'default' }}
           >
             <div className="flex items-center gap-2">
               <span style={{
@@ -461,11 +469,12 @@ export default function ListDetail() {
               />
             ) : (
               <button
-                onClick={e => { e.stopPropagation(); setQtyDraft(item.quantity ?? ''); setQtyEditId(item.id) }}
+                onClick={e => { e.stopPropagation(); if (canEdit) { setQtyDraft(item.quantity ?? ''); setQtyEditId(item.id) } }}
+                disabled={!canEdit}
                 style={{
                   flexShrink: 0, padding: '3px 9px', borderRadius: 99,
                   background: 'var(--bg-input)', border: '1px solid var(--border)',
-                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600, cursor: canEdit ? 'pointer' : 'default',
                   color: 'var(--text-2)',
                 }}
               >{item.quantity}</button>
@@ -496,9 +505,21 @@ export default function ListDetail() {
       <div className="header">
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {list.name}
-          </p>
+          <div className="flex items-center" style={{ gap: 7, minWidth: 0 }}>
+            <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {list.name}
+            </p>
+            {isViewer && (
+              <span style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 11, fontWeight: 700, color: 'var(--text-2)',
+                background: 'var(--bg-input)', border: '1px solid var(--border)',
+                padding: '2px 8px', borderRadius: 99,
+              }}>
+                <Eye size={12} /> View only
+              </span>
+            )}
+          </div>
           {/* Live remaining-count under the title — the single source of the
               "items left" info (spec §1.3), shown for personal and shared alike */}
           {items.length > 0 && (
@@ -580,8 +601,9 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Smart banner (spec §4/§16) — one at a time, only when actionable */}
-        {dupeGroups.size > 0 ? (
+        {/* Smart banner (spec §4/§16) — one at a time, only when actionable.
+            Viewers can't act on duplicates/categories, so no banner for them. */}
+        {!canEdit ? null : dupeGroups.size > 0 ? (
           <div style={{ padding: '0 16px 8px' }}>
             <button
               onClick={() => setDupeReviewOpen(true)}
@@ -639,9 +661,10 @@ export default function ListDetail() {
           ) : items.length === 0 ? (
             <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 24px', textAlign: 'center' }}>
               <div style={{ fontSize: 36 }}>{list.emoji}</div>
-              <p style={{ fontWeight: 600, fontSize: 15 }}>Ready to start?</p>
+              <p style={{ fontWeight: 600, fontSize: 15 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
               <p className="text-muted text-sm">
-                {list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
+                {!canEdit ? 'Items added by the group will show up here.'
+                  : list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
               </p>
             </div>
           ) : (
@@ -662,12 +685,12 @@ export default function ListDetail() {
                     <Sparkles size={15} /> View Insights
                   </button>
                   <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                    <button onClick={() => setShowAdd(true)}
-                      className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>
-                    <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
+                    {canEdit && <button onClick={() => setShowAdd(true)}
+                      className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>}
+                    {canEdit && <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
                       <RefreshCw size={13} style={unchecking ? { animation: 'spin 1s linear infinite' } : {}} /> Reuse list
-                    </button>
+                    </button>}
                     {isOwner && <button onClick={() => setShareOpen(true)} className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
                       <Share2 size={13} /> Share
                     </button>}
@@ -736,20 +759,23 @@ export default function ListDetail() {
         </div>
       </div>
 
-      {/* FAB — morphs away while the add sheet is open (spec §7) */}
-      <button
-        className="fab"
-        aria-label="Add item"
-        onClick={() => setShowAdd(true)}
-        style={{
-          transform: showAdd ? 'scale(0.5)' : 'none',
-          opacity: showAdd ? 0 : 1,
-          pointerEvents: showAdd ? 'none' : 'auto',
-          transition: 'transform 220ms var(--ease), opacity 220ms var(--ease)',
-        }}
-      >
-        <Plus size={24} />
-      </button>
+      {/* FAB — morphs away while the add sheet is open (spec §7).
+          Hidden entirely for viewers, who can't add items. */}
+      {canEdit && (
+        <button
+          className="fab"
+          aria-label="Add item"
+          onClick={() => setShowAdd(true)}
+          style={{
+            transform: showAdd ? 'scale(0.5)' : 'none',
+            opacity: showAdd ? 0 : 1,
+            pointerEvents: showAdd ? 'none' : 'auto',
+            transition: 'transform 220ms var(--ease), opacity 220ms var(--ease)',
+          }}
+        >
+          <Plus size={24} />
+        </button>
+      )}
 
       {/* ── Add Item Sheet (extracted) ── */}
       <AddItemSheet

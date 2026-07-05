@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, MessageCircle, MoreHorizontal, Shuffle, X } from 'lucide-react'
+import { Check, Copy, Eye, MessageCircle, MoreHorizontal, Pencil, Shuffle, X } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
 import type { List, ListMember } from '../../types'
 
@@ -21,15 +21,23 @@ function WhatsAppIcon({ size = 24 }: { size?: number }) {
   )
 }
 
+const ROLE_LABEL: Record<ListMember['role'], string> = {
+  owner: 'Owner',
+  collaborator: 'Can edit',
+  viewer: 'View only',
+}
+
 function MemberRow({
-  member, listId, isCurrentUser, canRemove,
+  member, listId, isCurrentUser, canRemove, canManageRole,
 }: {
   member: ListMember
   listId: string
   isCurrentUser: boolean
   canRemove: boolean
+  canManageRole: boolean
 }) {
-  const removeMember = useListsStore(s => s.removeMember)
+  const removeMember   = useListsStore(s => s.removeMember)
+  const setMemberRole  = useListsStore(s => s.setMemberRole)
   const [offset, setOffset]     = useState(0)
   const startXRef = useRef<number | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -106,17 +114,31 @@ function MemberRow({
             {member.display_name}{isCurrentUser ? ' (you)' : ''}
           </p>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
-            {member.role === 'owner' ? 'Owner' : 'Member'}
+            {ROLE_LABEL[member.role]}
           </p>
         </div>
-        {member.role === 'owner' && (
+        {member.role === 'owner' ? (
           <span style={{
             fontSize: 11, fontWeight: 700, color: 'var(--accent)',
             background: 'var(--accent-dim)', padding: '3px 10px', borderRadius: 99,
           }}>
             Owner
           </span>
-        )}
+        ) : canManageRole ? (
+          <button
+            onClick={() => setMemberRole(listId, member.id, member.role === 'viewer' ? 'collaborator' : 'viewer')}
+            aria-label={member.role === 'viewer' ? 'Give edit access' : 'Make view only'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+              fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)',
+              background: 'var(--bg-input)', border: '1px solid var(--border)',
+              padding: '5px 10px', borderRadius: 99, cursor: 'pointer',
+            }}
+          >
+            {member.role === 'viewer' ? <Eye size={13} /> : <Pencil size={13} />}
+            {member.role === 'viewer' ? 'View only' : 'Can edit'}
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -130,23 +152,30 @@ interface Props {
 
 export default function ShareListSheet({ list, members, onClose }: Props) {
   const store = useListsStore()
+  const isOwner = list.owner_id === store.userId
   const [currentCode, setCurrentCode] = useState<string>(list.invite_code ?? '')
   const [generating, setGenerating]   = useState(true)
   const [copied, setCopied]           = useState(false)
   const [draftIdx, setDraftIdx]       = useState(() => Math.floor(Math.random() * MESSAGE_DRAFTS.length))
-  // StrictMode double-invoke guard: regenerate exactly once per open so the
-  // DB and currentCode always agree.
-  const didRegenerate = useRef(false)
+  // The access level this link grants. Owners can switch it; each switch mints
+  // a fresh link so the old level can't be reused.
+  const [access, setAccess] = useState<'collaborator' | 'viewer'>(list.invite_role ?? 'collaborator')
+  // StrictMode double-invoke guard: regenerate once per distinct access level so
+  // the DB, currentCode, and the visible level always agree.
+  const lastGenAccess = useRef<string | null>(null)
 
   useEffect(() => {
-    if (didRegenerate.current) return
-    didRegenerate.current = true
-    store.regenerateInvite(list.id).then(newCode => {
+    // Only owners can rotate the link / set its level; others just see it.
+    if (!isOwner) { setGenerating(false); return }
+    if (lastGenAccess.current === access) return
+    lastGenAccess.current = access
+    setGenerating(true)
+    store.regenerateInvite(list.id, access).then(newCode => {
       if (newCode) setCurrentCode(newCode)
       setGenerating(false)
     }).catch(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [access, isOwner])
 
   const joinUrl   = currentCode ? `${window.location.origin}/join/${currentCode}` : ''
   const shareUrl  = joinUrl
@@ -161,8 +190,6 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
-
-  const isOwner = list.owner_id === store.userId
 
   const btnBase: React.CSSProperties = {
     width: 64, height: 64, borderRadius: 18, border: 'none',
@@ -194,6 +221,41 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
         <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '6px 20px 14px' }}>
           {generating ? 'Generating a fresh link…' : 'A fresh link was generated — older links no longer work.'}
         </p>
+
+        {/* Access level — owners choose what the link grants. Switching mints a
+            fresh link at the new level. */}
+        {isOwner && (
+          <div style={{ margin: '0 20px 18px' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 8px' }}>
+              Anyone with the link
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {([
+                { key: 'collaborator' as const, icon: <Pencil size={15} />, label: 'Can edit', hint: 'Add & tick off items' },
+                { key: 'viewer' as const,       icon: <Eye size={15} />,    label: 'View only', hint: 'See the list, no changes' },
+              ]).map(opt => {
+                const on = access === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => { if (!generating) setAccess(opt.key) }}
+                    disabled={generating}
+                    style={{
+                      flex: 1, textAlign: 'left', padding: '11px 13px', borderRadius: 13, cursor: generating ? 'default' : 'pointer',
+                      background: on ? 'var(--accent-dim)' : 'var(--bg-input)',
+                      border: `1px solid ${on ? 'var(--accent-mid)' : 'var(--border)'}`,
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: on ? 'var(--accent)' : 'var(--text)', fontWeight: 700, fontSize: 13.5 }}>
+                      {opt.icon}{opt.label}
+                    </span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-3)', marginTop: 3 }}>{opt.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Message draft — shuffle cycles the wording; all share actions use it */}
         <div style={{
@@ -298,6 +360,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
                 listId={list.id}
                 isCurrentUser={m.user_id === store.userId}
                 canRemove={isOwner && m.role !== 'owner'}
+                canManageRole={isOwner && m.role !== 'owner'}
               />
             ))}
           </>

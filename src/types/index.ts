@@ -4,7 +4,7 @@ export interface ListMember {
   id: string
   list_id: string
   user_id: string | null
-  role: 'owner' | 'collaborator'
+  role: 'owner' | 'collaborator' | 'viewer'
   display_name: string
 }
 
@@ -29,6 +29,7 @@ export interface List {
   emoji: string
   owner_id: string
   invite_code: string
+  invite_role: 'collaborator' | 'viewer'
   invite_expires_at: string | null
   is_template: boolean
   archived_at: string | null
