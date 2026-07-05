@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useListsStore } from './useListsStore'
 import { useSyncStore } from './useSyncStore'
 import { useCategoriesStore } from './useCategoriesStore'
+import { useMemoryStore } from './useMemoryStore'
 
 interface AuthState {
   session: Session | null
@@ -111,8 +112,10 @@ export const useAuthStore = create<AuthState>(set => ({
     useListsStore.persist.clearStorage()
     useSyncStore.getState().clear()
     useSyncStore.persist.clearStorage()
-    // Custom categories are per-user — reset so the next account starts clean.
+    // Custom categories and list-memory are per-user — reset so the next
+    // account starts clean.
     useCategoriesStore.getState().reset()
+    useMemoryStore.getState().reset()
     await supabase.auth.signOut()
     set({ session: null, user: null, displayName: '', isGuest: false })
   },

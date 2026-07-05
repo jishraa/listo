@@ -5,9 +5,10 @@ import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutT
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
-import { parseItemInput } from '../lib/constants'
+import { parseItemInput, detectCategoryIn } from '../lib/constants'
 import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
+import { useMemoryStore, regularsOf } from '../store/useMemoryStore'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
 import { SwipeRow } from '../components/lists/SwipeRow'
@@ -173,6 +174,14 @@ export default function ListDetail() {
 
   const allCategories = useCategoriesStore(s2 => s2.categories)
   const cats = list ? allCategories[list.type] : []
+
+  // List Memory — "your regulars" to seed a fresh list in one tap.
+  const memHistory = useMemoryStore(s => s.history)
+  const regulars = useMemo(() => regularsOf(memHistory, new Set(), 8), [memHistory])
+  const addRegular = (m: { name: string; category: string | null; lastQuantity: string | null }) => {
+    if (!list) return
+    store.addItem(list.id, m.name, m.lastQuantity ?? '', m.category ?? detectCategoryIn(cats, m.name) ?? null)
+  }
 
   const catById = useMemo(() => new Map(cats.map(c => [c.id, c])), [cats])
 
@@ -659,14 +668,38 @@ export default function ListDetail() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 24px', textAlign: 'center' }}>
-              <div style={{ fontSize: 36 }}>{list.emoji}</div>
-              <p style={{ fontWeight: 600, fontSize: 15 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
-              <p className="text-muted text-sm">
-                {!canEdit ? 'Items added by the group will show up here.'
-                  : list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
-              </p>
-            </div>
+            <>
+              <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 36 }}>{list.emoji}</div>
+                <p style={{ fontWeight: 600, fontSize: 15 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
+                <p className="text-muted text-sm">
+                  {!canEdit ? 'Items added by the group will show up here.'
+                    : list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
+                </p>
+              </div>
+
+              {/* List Memory: one-tap add the user's regulars to a fresh list */}
+              {canEdit && regulars.length > 0 && (
+                <div style={{ marginTop: 4 }}>
+                  <p style={sectionLabel}>Your regulars</p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {regulars.map(m => (
+                      <button
+                        key={m.nameKey}
+                        onClick={() => addRegular(m)}
+                        style={{
+                          height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
+                          background: 'var(--bg-input)', border: '1px solid var(--border)',
+                          fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        + {m.name}{m.lastQuantity ? ` ${m.lastQuantity}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <>
               {/* Celebration card */}

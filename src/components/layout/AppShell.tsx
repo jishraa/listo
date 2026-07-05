@@ -4,6 +4,7 @@ import { ListChecks, Plus, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useListsStore } from '../../store/useListsStore'
 import { useCategoriesStore } from '../../store/useCategoriesStore'
+import { useMemoryStore } from '../../store/useMemoryStore'
 import CreateListSheet from '../lists/CreateListSheet'
 import type { ListType } from '../../types'
 
@@ -31,6 +32,7 @@ export default function AppShell() {
     const name = displayName || (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
     store.init(user.id, name)
     useCategoriesStore.getState().init(user.id)
+    useMemoryStore.getState().load(user.id)
   }, [user])
 
   // Items/members power every tab (Home stats, Insights, Lists progress),

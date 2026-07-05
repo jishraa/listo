@@ -5,6 +5,7 @@ import type { List, ListItem, ListMember, InvitePreview } from '../types'
 // Deferred circular import (sync store also imports this one) — both only
 // touch each other inside functions, never at module top level.
 import { useSyncStore, newOpId, newTempId, isTempId, isNetworkError } from './useSyncStore'
+import { useMemoryStore } from './useMemoryStore'
 
 interface ListsState {
   lists: List[]
@@ -300,6 +301,9 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
 
   addItem: async (listId, title, quantity, category) => {
     const { displayName } = get()
+    // List Memory: every add teaches the user's history (fire-and-forget, best
+    // effort — never blocks or fails the add).
+    useMemoryStore.getState().record(title, category, quantity || null)
     // Offline (or the request dies mid-air): apply a temp row locally and
     // queue the insert — the sync engine swaps in the server row later.
     const addOffline = () => {

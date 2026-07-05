@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
+import { useMemoryStore, memoryKey, regularsOf, suggestOf, type MemoryItem } from '../../store/useMemoryStore'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../../lib/constants'
 import { capitalize } from '../../lib/utils'
 import CategoryPickerSheet from './CategoryPickerSheet'
@@ -75,28 +76,53 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     return () => clearTimeout(t)
   }, [input, open, catSticky, cats])
 
-  const suggestions = useMemo(() => {
-    const q = parsedInput.item.toLowerCase()
-    if (q.length < 2) return []
-    const pool = list.type === 'shopping' ? GROCERY_VOCAB : []
-    return pool.filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q).slice(0, 5)
-  }, [parsedInput, list.type])
+  // List Memory drives both surfaces below. Subscribe to history so they stay
+  // reactive as the user adds items.
+  const memHistory = useMemoryStore(s => s.history)
+  const excludeKeys = useMemo(
+    () => new Set(items.filter(i => !i.completed).map(i => memoryKey(i.title))),
+    [items],
+  )
 
-  // Frequent items from the user's own history across lists — shown as
-  // one-tap add chips while the field is empty (recommended additions §2).
-  const frequentItems = useMemo(() => {
-    const counts = new Map<string, number>()
+  // Type-ahead: the user's own history first (with usual quantity), then the
+  // generic grocery vocab for anything they haven't bought before.
+  const suggestions = useMemo(() => {
+    const q = parsedInput.item
+    if (q.trim().length < 2) return []
+    const mem = suggestOf(memHistory, q, excludeKeys, 5)
+    const memKeys = new Set(mem.map(m => m.nameKey))
+    const toEntry = (m: MemoryItem) => {
+      const fill = m.lastQuantity ? `${m.name} ${m.lastQuantity}` : m.name
+      return { key: `m:${m.nameKey}`, label: fill, fill }
+    }
+    const ql = q.toLowerCase()
+    const pool = list.type === 'shopping' ? GROCERY_VOCAB : []
+    const vocab = pool
+      .filter(t => t.toLowerCase().startsWith(ql) && t.toLowerCase() !== ql && !memKeys.has(memoryKey(t)))
+      .slice(0, Math.max(0, 5 - mem.length))
+      .map(t => ({ key: `v:${t}`, label: t, fill: t }))
+    return [...mem.map(toEntry), ...vocab]
+  }, [parsedInput, list.type, excludeKeys, memHistory])
+
+  // "Your regulars" — one-tap add chips (with usual quantity) from history,
+  // shown while the field is empty. Falls back to current-list frequency for
+  // users who have no server history yet.
+  const regulars = useMemo<MemoryItem[]>(() => {
+    const mem = regularsOf(memHistory, excludeKeys, 6)
+    if (mem.length > 0) return mem
+    const counts = new Map<string, { name: string; n: number }>()
     Object.values(store.items).flat().forEach(i => {
-      const k = i.title.trim().toLowerCase()
-      if (k) counts.set(k, (counts.get(k) ?? 0) + 1)
+      const k = memoryKey(i.title)
+      if (!k) return
+      const e = counts.get(k) ?? { name: capitalize(i.title.trim()), n: 0 }
+      e.n++; counts.set(k, e)
     })
-    const pendingHere = new Set(items.filter(i => !i.completed).map(i => i.title.toLowerCase()))
     return [...counts.entries()]
-      .filter(([t, n]) => n >= 2 && !pendingHere.has(t))
-      .sort((a, b) => b[1] - a[1])
+      .filter(([k, v]) => v.n >= 2 && !excludeKeys.has(k))
+      .sort((a, b) => b[1].n - a[1].n)
       .slice(0, 6)
-      .map(([t]) => capitalize(t))
-  }, [store.items, items])
+      .map(([k, v]) => ({ nameKey: k, name: v.name, category: null, lastQuantity: null, count: v.n }))
+  }, [memHistory, store.items, excludeKeys])
 
   function resetAdd() {
     setInput(''); setCategory(null); setCatSticky(false)
@@ -131,9 +157,10 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     setPendingAdd(null)
   }
 
-  async function addFrequent(title: string) {
-    await store.addItem(list.id, title, '', detectCategoryIn(cats, title) ?? null)
-    flashAddedToast(title)
+  async function addRegular(m: MemoryItem) {
+    const cat = m.category ?? detectCategoryIn(cats, m.name) ?? null
+    await store.addItem(list.id, m.name, m.lastQuantity ?? '', cat)
+    flashAddedToast(m.lastQuantity ? `${m.name} ${m.lastQuantity}` : m.name)
     inputRef.current?.focus()
   }
 
@@ -191,9 +218,9 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                     border: '1px solid var(--border)', marginTop: 4,
                   }}>
                     {suggestions.map(s => (
-                      <button key={s} onClick={() => { setInput(s); inputRef.current?.focus() }}
+                      <button key={s.key} onClick={() => { setInput(s.fill); inputRef.current?.focus() }}
                         style={{ display: 'block', width: '100%', padding: '11px 14px', textAlign: 'left', fontSize: 14, color: 'var(--text)', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'none' }}>
-                        {s}
+                        {s.label}
                       </button>
                     ))}
                   </div>
@@ -212,24 +239,24 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                 </span>
               )}
 
-              {/* Frequent items — one-tap add while the field is empty */}
-              {!input && frequentItems.length > 0 && (
+              {/* Your regulars — one-tap add (with usual quantity) while empty */}
+              {!input && regulars.length > 0 && (
                 <div>
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
-                    Frequent
+                    Your regulars
                   </p>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {frequentItems.map(t => (
+                    {regulars.map(m => (
                       <button
-                        key={t}
-                        onClick={() => addFrequent(t)}
+                        key={m.nameKey}
+                        onClick={() => addRegular(m)}
                         style={{
                           height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
                           background: 'var(--bg-input)', border: '1px solid var(--border)',
                           fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
                         }}
                       >
-                        + {t}
+                        + {m.name}{m.lastQuantity ? ` ${m.lastQuantity}` : ''}
                       </button>
                     ))}
                   </div>
