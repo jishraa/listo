@@ -3,6 +3,7 @@ import { Check, Plus } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
 import { useMemoryStore, memoryKey, regularsOf, suggestOf, type MemoryItem } from '../../store/useMemoryStore'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../../lib/constants'
+import { findPendingMergeTarget, hasCompletedMatch } from '../../lib/duplicates'
 import { capitalize } from '../../lib/utils'
 import CategoryPickerSheet from './CategoryPickerSheet'
 import type { List, ListItem } from '../../types'
@@ -46,13 +47,15 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
   const [pickerOpen, setPickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Transient "✓ added" confirmation
+  // Transient "✓ added" confirmation ("repeat" adds a "previously purchased" note)
   const [addedToast, setAddedToast] = useState<string | null>(null)
+  const [addedRepeat, setAddedRepeat] = useState(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  function flashAddedToast(title: string) {
+  function flashAddedToast(title: string, repeat = false) {
     setAddedToast(title)
+    setAddedRepeat(repeat)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setAddedToast(null), 2200)
+    toastTimer.current = setTimeout(() => setAddedToast(null), repeat ? 3500 : 2200)
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
@@ -135,17 +138,22 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     const qty = parsed.qty
     if (!t) return
     const finalCat = catSticky ? category : (category ?? detectCategoryIn(cats, t))
+    // Blocking merge only against a PENDING item that already has a quantity
+    // (scenario 2). Completed items never trigger this (repeat purchase).
     if (qty) {
-      const existing = items.find(i => !i.completed && i.title.toLowerCase() === t.toLowerCase() && i.quantity)
+      const existing = findPendingMergeTarget(items, t)
       if (existing) {
         setPendingAdd({ title: t, qty, category: finalCat ?? null })
         setMergeTarget(existing); setShowMerge(true); return
       }
     }
+    // A completed item with this name = repeat purchase → add as new pending,
+    // no review, and note it in the confirmation.
+    const repeat = hasCompletedMatch(items, t)
     resetAdd(); setFlashing(true)
     await store.addItem(list.id, t, qty, finalCat ?? null)
     setFlashing(false)
-    flashAddedToast(qty ? `${t} ${qty}` : t)
+    flashAddedToast(qty ? `${t} ${qty}` : t, repeat)
     setTimeout(() => inputRef.current?.focus(), 60)
   }
 
@@ -235,7 +243,9 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                   padding: '4px 2px', color: 'var(--accent)', fontSize: 13, fontWeight: 600,
                 }}>
                   <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {addedToast} added{addedRepeat && <span style={{ color: 'var(--text-3)', fontWeight: 500 }}> · previously purchased</span>}
+                  </span>
                 </span>
               )}
 

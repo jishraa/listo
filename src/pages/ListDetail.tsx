@@ -9,6 +9,7 @@ import { parseItemInput, detectCategoryIn } from '../lib/constants'
 import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../store/useMemoryStore'
+import { pendingDuplicateGroups } from '../lib/duplicates'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
 import { SwipeRow } from '../components/lists/SwipeRow'
@@ -236,17 +237,9 @@ export default function ListDetail() {
   }, [items])
 
   // Duplicate detection
-  const dupeGroups = useMemo(() => {
-    const groups = new Map<string, ListItem[]>()
-    items.forEach(i => {
-      const key = i.title.trim().toLowerCase()
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(i)
-    })
-    const result = new Map<string, ListItem[]>()
-    groups.forEach((g, k) => { if (g.length > 1) result.set(k, g) })
-    return result
-  }, [items])
+  // Blocking duplicate detection runs ONLY against pending items — completed
+  // items are past purchases and must never trigger review (see lib/duplicates).
+  const dupeGroups = useMemo(() => pendingDuplicateGroups(items), [items])
   const dupeIds = useMemo(() => {
     const s = new Set<string>(); dupeGroups.forEach(g => g.forEach(i => s.add(i.id))); return s
   }, [dupeGroups])

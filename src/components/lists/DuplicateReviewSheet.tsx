@@ -1,52 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
+import { analyzeGroup } from '../../lib/duplicates'
 import type { List, ListItem } from '../../types'
 
 // Quantity-aware duplicate review (spec §4). Contextual, staged actions:
 // exact duplicates offer removal, count/same-unit groups offer a merge with
 // preview, ambiguous groups only ever merge on explicit confirmation.
-// Nothing applies until the user taps Apply.
-
-const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
-
-// Parse a stored quantity string. "×2" → a count; "2kg" → a unit quantity;
-// null/empty → no quantity. We never invent a unit that isn't there.
-function parseQty(q: string | null | undefined): { count: boolean; num: number; unit: string } | null {
-  if (!q) return null
-  const m = q.trim().replace(/\s+/g, '').match(/^([×x])?(\d+(?:\.\d+)?)([a-zA-Z]*)$/)
-  if (!m) return null
-  const unit = m[3].toLowerCase()
-  return { count: !!m[1] || !unit, num: parseFloat(m[2]), unit }
-}
-
-type DupeKind = 'exact' | 'mergeable' | 'ambiguous'
-interface DupePlan { kind: DupeKind; merged: string | null; mergeLabel: string; suggestMerge: boolean }
-
-// Decide what to suggest for a group of same-named items (spec duplicate logic).
-export function analyzeGroup(group: ListItem[]): DupePlan {
-  const parsed = group.map(i => parseQty(i.quantity))
-  if (parsed.every(p => p === null)) {
-    // Milk + Milk → plain duplicate, remove the extras.
-    return { kind: 'exact', merged: null, mergeLabel: 'Remove Duplicate', suggestMerge: true }
-  }
-  if (parsed.every(p => p !== null)) {
-    const ps = parsed as { count: boolean; num: number; unit: string }[]
-    const allCount = ps.every(p => p.count && !p.unit)
-    const unit0 = ps[0].unit
-    const allSameUnit = !!unit0 && ps.every(p => !p.count && p.unit === unit0)
-    if (allCount || allSameUnit) {
-      // ×2 + ×3 → ×5, or 2kg + 5kg → 7kg
-      const sum = ps.reduce((a, p) => a + p.num, 0)
-      const merged = allCount ? `×${fmtNum(sum)}` : `${fmtNum(sum)}${unit0}`
-      return { kind: 'mergeable', merged, mergeLabel: `Merge to ${merged}`, suggestMerge: true }
-    }
-  }
-  // Rice + Rice 5kg, or incompatible units → let the user decide; keep the one
-  // present quantity rather than inventing anything.
-  const firstQty = group.find(i => i.quantity)?.quantity ?? null
-  return { kind: 'ambiguous', merged: firstQty, mergeLabel: 'Merge Items', suggestMerge: false }
-}
+// Nothing applies until the user taps Apply. Detection logic lives in
+// lib/duplicates (pending-only) and is unit-tested.
 
 interface Props {
   open: boolean
