@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -13,6 +13,7 @@ import { openYft } from '../lib/yft'
 import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
+import ShoppingInsights from '../components/lists/ShoppingInsights'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -665,26 +666,6 @@ export default function ListDetail() {
     color: 'var(--text-3)', textTransform: 'uppercase',
   }
 
-  // ── Insights precomputed vars ────────────────────────────────
-  const insTotal = items.length
-  const insDone = items.filter(i => i.completed).length
-  const insPctDone = insTotal > 0 ? Math.round((insDone / insTotal) * 100) : 0
-  const insCatStats = cats.map(c => {
-    const catItems = items.filter(i => i.category === c.id)
-    const catDone = catItems.filter(i => i.completed).length
-    return { ...c, total: catItems.length, done: catDone }
-  }).filter(c => c.total > 0)
-  const insUncategorised = items.filter(i => !i.category)
-  const insUncatDone = insUncategorised.filter(i => i.completed).length
-  const insMemberAdded: Record<string, number> = {}
-  const insMemberCompleted: Record<string, number> = {}
-  items.forEach(i => {
-    if (i.added_by_name)     insMemberAdded[i.added_by_name]     = (insMemberAdded[i.added_by_name] || 0) + 1
-    if (i.completed_by_name) insMemberCompleted[i.completed_by_name] = (insMemberCompleted[i.completed_by_name] || 0) + 1
-  })
-  const insTopAdder    = Object.entries(insMemberAdded).sort((a, b) => b[1] - a[1])[0]
-  const insTopCompleter = Object.entries(insMemberCompleted).sort((a, b) => b[1] - a[1])[0]
-
   // Staged duplicate changes (ignores any stale keys not in the current groups)
   const dupeChanges = [...dupeGroups.keys()].filter(k => dupeSelected.has(k)).length
 
@@ -1272,167 +1253,20 @@ export default function ListDetail() {
         </>
       )}
 
-      {/* ── Insights (full screen) ── */}
+      {/* ── Insights (full screen, redesign spec) ── */}
       {insightsOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: 'var(--bg)', display: 'flex', flexDirection: 'column',
-          animation: 'slide-up 0.3s var(--ease)',
-        }}>
-          {/* Nav */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 16px', borderBottom: '1px solid var(--border)',
-            paddingTop: 'calc(14px + env(safe-area-inset-top, 0px))',
-          }}>
-            <button onClick={() => setInsightsOpen(false)}
-              style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'var(--bg-input)', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-              <ChevronLeft size={18} />
-            </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: 0, lineHeight: 1.2 }}>Insights</p>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{list.emoji} {list.name}</p>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-              {/* Summary stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                {[
-                  { label: 'Total', value: insTotal, color: 'var(--text)' },
-                  { label: 'Done',  value: insDone,  color: '#16a34a' },
-                  { label: 'Left',  value: insTotal - insDone, color: insTotal - insDone > 0 ? '#d97706' : 'var(--text-3)' },
-                ].map(s => (
-                  <div key={s.label} style={{
-                    background: 'var(--bg-input)', borderRadius: 12,
-                    padding: '12px 10px', textAlign: 'center',
-                  }}>
-                    <p style={{ fontSize: 22, fontWeight: 800, color: s.color, margin: 0 }}>{s.value}</p>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Overall progress */}
-              {insTotal > 0 && (
-                <div>
-                  <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Progress</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: insPctDone === 100 ? '#16a34a' : 'var(--accent)' }}>{insPctDone}%</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 99, width: `${insPctDone}%`, background: insPctDone === 100 ? '#16a34a' : 'var(--accent)', transition: 'width 0.5s ease' }} />
-                  </div>
-                </div>
-              )}
-
-              {/* Category breakdown */}
-              {(insCatStats.length > 0 || insUncategorised.length > 0) && (
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>By Category</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {insCatStats.map(c => {
-                      const p = c.total > 0 ? Math.round((c.done / c.total) * 100) : 0
-                      return (
-                        <div key={c.id}>
-                          <div className="flex items-center justify-between" style={{ marginBottom: 5 }}>
-                            <div className="flex items-center gap-2">
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block', flexShrink: 0 }} />
-                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.name}</span>
-                            </div>
-                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.done}/{c.total} · {p}%</span>
-                          </div>
-                          <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 99, width: `${p}%`, background: c.color, opacity: 0.85, transition: 'width 0.5s ease' }} />
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {insUncategorised.length > 0 && (
-                      <div>
-                        <div className="flex items-center justify-between" style={{ marginBottom: 5 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Uncategorised</span>
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{insUncatDone}/{insUncategorised.length} · {insUncategorised.length > 0 ? Math.round((insUncatDone / insUncategorised.length) * 100) : 0}%</span>
-                        </div>
-                        <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-input)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 99, width: `${insUncategorised.length > 0 ? Math.round((insUncatDone / insUncategorised.length) * 100) : 0}%`, background: 'var(--text-3)', transition: 'width 0.5s ease' }} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Member activity — collaboration-only (spec §3.3) */}
-              {members.length > 1 && (insTopAdder || insTopCompleter) && (
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Member Activity</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {insTopAdder && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
-                        <div style={{
-                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                          background: `hsl(${(insTopAdder[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{insTopAdder[0][0]?.toUpperCase()}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{insTopAdder[0]}</p>
-                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Added {insTopAdder[1]} item{insTopAdder[1] !== 1 ? 's' : ''}</p>
-                        </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(22,163,74,0.12)', color: '#16a34a' }}>Top Adder</span>
-                      </div>
-                    )}
-                    {insTopCompleter && insTopCompleter[0] !== insTopAdder?.[0] && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 10 }}>
-                        <div style={{
-                          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                          background: `hsl(${(insTopCompleter[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{insTopCompleter[0][0]?.toUpperCase()}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{insTopCompleter[0]}</p>
-                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Checked off {insTopCompleter[1]} item{insTopCompleter[1] !== 1 ? 's' : ''}</p>
-                        </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>Top Completer</span>
-                      </div>
-                    )}
-                    {insTopCompleter && insTopCompleter[0] === insTopAdder?.[0] && (
-                      <div style={{ fontSize: 13, color: 'var(--text-3)', textAlign: 'center', padding: '4px 0' }}>
-                        {insTopAdder[0]} is leading on both adding and completing! 🏆
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {insTotal === 0 && (
-                <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 14, padding: '16px 0' }}>Add some items to see insights.</p>
-              )}
-
-              {/* Companion card (YFT integration spec §1/§5) — shopping only */}
-              {list.type === 'shopping' && (
-                <button
-                  onClick={() => openYft('/tracker/monthly')}
-                  className="card card-press"
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}
-                >
-                  <img src="/yft.png" alt="YFT" style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0 }} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Track Your Shopping Spend</span>
-                    <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                      Record this shopping expense in YFT and keep an eye on your monthly budget.
-                    </span>
-                  </span>
-                  <ChevronRight size={18} color="var(--text-3)" style={{ flexShrink: 0 }} />
-                </button>
-              )}
-            </div>
-          </div>
+        <ShoppingInsights
+          list={list}
+          items={items}
+          members={members}
+          displayName={displayName}
+          onClose={() => setInsightsOpen(false)}
+          onCategorize={() => {
+            setInsightsOpen(false)
+            if (uncategorizedPending[0]) { cancelEdit(); startEdit(uncategorizedPending[0]) }
+          }}
+          onReviewDuplicates={() => { setInsightsOpen(false); setDupeSelected(new Set()); setDupeReviewOpen(true) }}
+        />
       )}
 
       {/* ── Share sheet ── */}

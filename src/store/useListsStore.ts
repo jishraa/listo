@@ -22,6 +22,7 @@ interface ListsState {
   deleteList: (listId: string) => Promise<void>
   duplicateList: (listId: string) => Promise<void>
   saveAsTemplate: (listId: string) => Promise<void>
+  createTemplate: (name: string, emoji: string, items: { title: string; category: string | null }[]) => Promise<void>
   createFromTemplate: (templateId: string) => Promise<List | null>
   setArchived: (listId: string, archived: boolean) => Promise<void>
   leaveList: (listId: string) => Promise<void>
@@ -201,6 +202,21 @@ export const useListsStore = create<ListsState>((set, get) => ({
     const tpl = data as List
     await supabase.from('list_members').insert({ list_id: tpl.id, user_id: userId, role: 'owner', display_name: displayName })
     await copyItems(get().items[listId] ?? [], tpl.id, displayName)
+    set({ lists: [tpl, ...get().lists] })
+  },
+
+  // Template from arbitrary items (e.g. Insights "Suggested for You").
+  createTemplate: async (name, emoji, tplItems) => {
+    const { userId, displayName } = get()
+    const { data, error } = await supabase
+      .from('lists')
+      .insert({ name, type: 'shopping', emoji, owner_id: userId, invite_code: generateInviteCode(), is_template: true })
+      .select()
+      .single()
+    if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
+    const tpl = data as List
+    await supabase.from('list_members').insert({ list_id: tpl.id, user_id: userId, role: 'owner', display_name: displayName })
+    await copyItems(tplItems.map((t, i) => ({ title: t.title, quantity: null, category: t.category, sort_order: i })), tpl.id, displayName)
     set({ lists: [tpl, ...get().lists] })
   },
 

@@ -4,6 +4,54 @@ import { LIST_TYPE_LABELS } from './utils'
 
 const GREEN: [number, number, number] = [22, 163, 74]
 
+function slugify(name: string): string {
+  return name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'list'
+}
+
+async function deliverFile(blob: Blob, filename: string, mime: string, title: string) {
+  const file = new File([blob], filename, { type: mime })
+  if (navigator.canShare?.({ files: [file] })) {
+    await navigator.share({ files: [file], title }).catch(() => {})
+  } else {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+}
+
+// CSV export — the "Excel" option. Same columns as the PDF table; opens
+// directly in Excel / Sheets for detailed analysis.
+export async function exportListCsv(list: List, items: ListItem[], members: ListMember[]) {
+  const categoryNames = new Map(
+    Object.values(useCategoriesStore.getState().categories).flat().map(c => [c.id, c.name])
+  )
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const rows: string[] = [
+    ['#', 'Item', 'Qty', 'Category', 'Status', 'Added by', 'Completed by'].join(','),
+    ...items.map((i, idx) => [
+      String(idx + 1),
+      esc(i.title),
+      esc(i.quantity ?? ''),
+      esc(i.category ? (categoryNames.get(i.category) ?? '') : ''),
+      i.completed ? 'Done' : 'Pending',
+      esc(i.added_by_name ?? ''),
+      esc(i.completed_by_name ?? ''),
+    ].join(',')),
+  ]
+  const done = items.filter(i => i.completed).length
+  rows.push('')
+  rows.push(['', esc(`${list.name} — ${done} of ${items.length} completed`), '', '', '', '', ''].join(','))
+  if (members.length > 1) {
+    rows.push(['', esc(`Members: ${members.map(m => m.display_name).join(', ')}`), '', '', '', '', ''].join(','))
+  }
+  // BOM so Excel detects UTF-8 (quantities use ×)
+  const blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  await deliverFile(blob, `${slugify(list.name)}-report.csv`, 'text/csv', `${list.name} — Listo report`)
+}
+
 // Generates a PDF report for one list and hands it to the share sheet
 // (falls back to a download where Web Share can't send files).
 // jspdf is dynamically imported so it stays out of the main bundle.
@@ -69,18 +117,6 @@ export async function exportListReport(list: List, items: ListItem[], members: L
     doc.text('Next step: track this month\'s grocery budget in YFT — yft.grk766.workers.dev', 14, Math.min(y + 12, 285))
   }
 
-  const filename = `${list.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'list'}-report.pdf`
   const blob = doc.output('blob')
-  const file = new File([blob], filename, { type: 'application/pdf' })
-
-  if (navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file], title: `${list.name} — Listo report` }).catch(() => {})
-  } else {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  await deliverFile(blob, `${slugify(list.name)}-report.pdf`, 'application/pdf', `${list.name} — Listo report`)
 }
