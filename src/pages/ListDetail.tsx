@@ -5,8 +5,8 @@ import { ChevronLeft, ArrowUpDown, Sparkles, Check, Copy, FileText, LayoutTempla
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
-import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../lib/constants'
-import { friendlyName, formatRelativeTime } from '../lib/utils'
+import { parseItemInput } from '../lib/constants'
+import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
@@ -14,7 +14,9 @@ import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 import ShoppingInsights from '../components/lists/ShoppingInsights'
-import { useEnsureData } from './profile/common'
+import DuplicateReviewSheet from '../components/lists/DuplicateReviewSheet'
+import AddItemSheet from '../components/lists/AddItemSheet'
+import { useEnsureData } from '../hooks/useEnsureData'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -55,63 +57,6 @@ function formatCompletedAt(iso: string): string {
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${time}`
 }
 
-function mergeQuantities(a: string | null | undefined, b: string): string {
-  if (!a) return b
-  const parse = (s: string) => {
-    const m = s.trim().replace(/\s+/g, '').match(/^([×x])?(\d+(?:\.\d+)?)([a-zA-Z]*)$/)
-    if (!m) return null
-    return { cross: !!m[1], num: parseFloat(m[2]), unit: m[3].toLowerCase() }
-  }
-  const pa = parse(a), pb = parse(b)
-  if (!pa || !pb) return `${a}+${b}`
-  const sum = pa.num + pb.num
-  return `${(pa.cross || pb.cross) ? '×' : ''}${Number.isInteger(sum) ? sum : sum.toFixed(1)}${pa.unit || pb.unit}`
-}
-
-// Normalise item titles for display: "rice" → "Rice" (spec: capitalisation).
-const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
-
-// ── Duplicate analysis (quantity-aware) ──────────────────────
-const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
-
-// Parse a stored quantity string. "×2" → a count; "2kg" → a unit quantity;
-// null/empty → no quantity. We never invent a unit that isn't there.
-function parseQty(q: string | null | undefined): { count: boolean; num: number; unit: string } | null {
-  if (!q) return null
-  const m = q.trim().replace(/\s+/g, '').match(/^([×x])?(\d+(?:\.\d+)?)([a-zA-Z]*)$/)
-  if (!m) return null
-  const unit = m[3].toLowerCase()
-  return { count: !!m[1] || !unit, num: parseFloat(m[2]), unit }
-}
-
-type DupeKind = 'exact' | 'mergeable' | 'ambiguous'
-interface DupePlan { kind: DupeKind; merged: string | null; mergeLabel: string; suggestMerge: boolean }
-
-// Decide what to suggest for a group of same-named items (spec duplicate logic).
-function analyzeGroup(group: ListItem[]): DupePlan {
-  const parsed = group.map(i => parseQty(i.quantity))
-  if (parsed.every(p => p === null)) {
-    // Milk + Milk → plain duplicate, remove the extras.
-    return { kind: 'exact', merged: null, mergeLabel: 'Remove Duplicate', suggestMerge: true }
-  }
-  if (parsed.every(p => p !== null)) {
-    const ps = parsed as { count: boolean; num: number; unit: string }[]
-    const allCount = ps.every(p => p.count && !p.unit)
-    const unit0 = ps[0].unit
-    const allSameUnit = !!unit0 && ps.every(p => !p.count && p.unit === unit0)
-    if (allCount || allSameUnit) {
-      // ×2 + ×3 → ×5, or 2kg + 5kg → 7kg
-      const sum = ps.reduce((a, p) => a + p.num, 0)
-      const merged = allCount ? `×${fmtNum(sum)}` : `${fmtNum(sum)}${unit0}`
-      return { kind: 'mergeable', merged, mergeLabel: `Merge to ${merged}`, suggestMerge: true }
-    }
-  }
-  // Rice + Rice 5kg, or incompatible units → let the user decide; keep the one
-  // present quantity rather than inventing anything.
-  const firstQty = group.find(i => i.quantity)?.quantity ?? null
-  return { kind: 'ambiguous', merged: firstQty, mergeLabel: 'Merge Items', suggestMerge: false }
-}
-
 function Overlay({ onClick }: { onClick?: () => void }) {
   return <div className="sheet-overlay" onClick={onClick} />
 }
@@ -131,16 +76,8 @@ export default function ListDetail() {
   const members = list ? (store.members[list.id] ?? []) : []
   const isOwner = !!list && list.owner_id === user?.id
 
-  // ── Add sheet state ─────────────────────────────────────────
-  const [showAdd,         setShowAdd]         = useState(false)
-  const [addInput,        setAddInput]        = useState('')
-  const [addCategory,     setAddCategory]     = useState<string | null>(null)
-  const [addCatSticky,    setAddCatSticky]    = useState(false)
-  const [addFlashing,     setAddFlashing]     = useState(false)
-  const [showMerge,       setShowMerge]       = useState(false)
-  const [mergeTarget,     setMergeTarget]     = useState<ListItem | null>(null)
-  const [pendingAdd,      setPendingAdd]      = useState<{ title: string; qty: string; category: string | null } | null>(null)
-  const addInputRef = useRef<HTMLInputElement>(null)
+  // ── Add sheet (extracted to AddItemSheet) ───────────────────
+  const [showAdd, setShowAdd] = useState(false)
 
   // ── Edit state ───────────────────────────────────────────────
   const [editingId,    setEditingId]    = useState<string | null>(null)
@@ -175,12 +112,9 @@ export default function ListDetail() {
       return next
     })
   }
-  // Which flow the category picker sheet is serving (add sheet vs row edit)
-  const [catPickerFor,     setCatPickerFor]     = useState<'add' | 'edit' | null>(null)
+  // Category picker for the inline row-edit flow (the add flow has its own)
+  const [editPickerOpen,   setEditPickerOpen]   = useState(false)
   const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
-  // Group keys staged for their suggested action; absence = keep both.
-  const [dupeSelected,     setDupeSelected]     = useState<Set<string>>(new Set())
-  const [dupeResolved,     setDupeResolved]     = useState(false)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [unchecking,       setUnchecking]       = useState(false)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
@@ -191,18 +125,8 @@ export default function ListDetail() {
     const s = localStorage.getItem(`listo-sort-${id}`)
     return (s === 'alpha' || s === 'category') ? s : 'date'
   })
-  // Transient "✓ added" confirmation in the add sheet
-  const [addedToast, setAddedToast] = useState<string | null>(null)
-  const addedToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function flashAddedToast(title: string) {
-    setAddedToast(title)
-    if (addedToastTimer.current) clearTimeout(addedToastTimer.current)
-    addedToastTimer.current = setTimeout(() => setAddedToast(null), 2200)
-  }
-  useEffect(() => () => { if (addedToastTimer.current) clearTimeout(addedToastTimer.current) }, [])
 
   useEffect(() => {
     if (!id) return
@@ -243,18 +167,6 @@ export default function ListDetail() {
   const allCategories = useCategoriesStore(s2 => s2.categories)
   const cats = list ? allCategories[list.type] : []
 
-  // Auto-detect category
-  useEffect(() => {
-    if (!list || addCatSticky) return
-    const { item } = parseItemInput(addInput)
-    if (!item) { setAddCategory(null); return }
-    const t = setTimeout(() => {
-      const detected = detectCategoryIn(allCategories[list.type], item)
-      if (detected) setAddCategory(detected)
-    }, 250)
-    return () => clearTimeout(t)
-  }, [addInput, list, addCatSticky, allCategories])
-
   const catById = useMemo(() => new Map(cats.map(c => [c.id, c])), [cats])
 
   const usedCatIds = useMemo(() => {
@@ -281,39 +193,6 @@ export default function ListDetail() {
   const uncategorizedPending = useMemo(
     () => items.filter(i => !i.completed && !i.category), [items]
   )
-
-  // Suggestions
-  const parsedInput = useMemo(() => parseItemInput(addInput), [addInput])
-  const suggestions = useMemo(() => {
-    if (!list) return []
-    const q = parsedInput.item.toLowerCase()
-    if (q.length < 2) return []
-    const pool = list.type === 'shopping' ? GROCERY_VOCAB : []
-    return pool.filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q).slice(0, 5)
-  }, [parsedInput, list])
-
-  // Frequent items from the user's own history across lists — shown as
-  // one-tap add chips while the field is empty (recommended additions §2).
-  const frequentItems = useMemo(() => {
-    const counts = new Map<string, number>()
-    Object.values(store.items).flat().forEach(i => {
-      const k = i.title.trim().toLowerCase()
-      if (k) counts.set(k, (counts.get(k) ?? 0) + 1)
-    })
-    const pendingHere = new Set(items.filter(i => !i.completed).map(i => i.title.toLowerCase()))
-    return [...counts.entries()]
-      .filter(([t, n]) => n >= 2 && !pendingHere.has(t))
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([t]) => capitalize(t))
-  }, [store.items, items])
-
-  async function addFrequent(title: string) {
-    if (!list) return
-    await store.addItem(list.id, title, '', detectCategoryIn(cats, title) ?? null)
-    flashAddedToast(title)
-    addInputRef.current?.focus()
-  }
 
   // Latest change by another member — a subtle shared-list activity hint
   // ("Anjana added Milk · 2m ago"), not a full activity feed (additions §6).
@@ -393,66 +272,6 @@ export default function ListDetail() {
     await store.addItem(list.id, item.title, item.quantity ?? '', item.category)
   }
 
-  function resetAdd() {
-    setAddInput(''); setAddCategory(null); setAddCatSticky(false)
-    setShowMerge(false); setMergeTarget(null); setPendingAdd(null)
-  }
-
-  async function handleSheetAdd() {
-    const parsed = parseItemInput(addInput)
-    const t = capitalize(parsed.item)
-    const qty = parsed.qty
-    if (!t || !list) return
-    const finalCat = addCatSticky ? addCategory : (addCategory ?? detectCategoryIn(cats, t))
-    if (qty) {
-      const existing = items.find(i => !i.completed && i.title.toLowerCase() === t.toLowerCase() && i.quantity)
-      if (existing) {
-        setPendingAdd({ title: t, qty, category: finalCat ?? null })
-        setMergeTarget(existing); setShowMerge(true); return
-      }
-    }
-    resetAdd(); setAddFlashing(true)
-    await store.addItem(list.id, t, qty, finalCat ?? null)
-    setAddFlashing(false)
-    flashAddedToast(qty ? `${t} ${qty}` : t)
-    setTimeout(() => addInputRef.current?.focus(), 60)
-  }
-
-  async function handleMerge() {
-    if (!mergeTarget || !pendingAdd || !list) return
-    const combined = mergeQuantities(mergeTarget.quantity, pendingAdd.qty)
-    setShowMerge(false); setMergeTarget(null); resetAdd()
-    await store.updateItem(list.id, mergeTarget.id, { title: mergeTarget.title, quantity: combined, category: mergeTarget.category })
-    setPendingAdd(null)
-  }
-
-  function toggleDupe(key: string) {
-    setDupeSelected(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }
-
-  // Apply every staged group: keep the first item (with merged quantity where
-  // applicable) and remove the rest. Keep-both groups are untouched.
-  async function applyDupePlan() {
-    if (!list) return
-    for (const [key, group] of dupeGroups.entries()) {
-      if (!dupeSelected.has(key)) continue
-      const plan = analyzeGroup(group)
-      const [first, ...rest] = group
-      if (plan.merged && plan.merged !== first.quantity) {
-        await store.updateItem(list.id, first.id, { title: first.title, quantity: plan.merged, category: first.category })
-      }
-      for (const r of rest) await store.deleteItem(list.id, r.id)
-    }
-    setDupeSelected(new Set())
-    setDupeReviewOpen(false)
-    setDupeResolved(true)
-    setTimeout(() => setDupeResolved(false), 2200)
-  }
-
   if (!list) return (
     <div className="app-container">
       <div className="header">
@@ -505,7 +324,7 @@ export default function ListDetail() {
         <div className="flex items-center justify-between">
           {cats.length > 0 ? (
             <button
-              onClick={() => setCatPickerFor('edit')}
+              onClick={() => setEditPickerOpen(true)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer',
@@ -670,8 +489,6 @@ export default function ListDetail() {
     color: 'var(--text-3)', textTransform: 'uppercase',
   }
 
-  // Staged duplicate changes (ignores any stale keys not in the current groups)
-  const dupeChanges = [...dupeGroups.keys()].filter(k => dupeSelected.has(k)).length
 
   return (
     <div className="app-container">
@@ -767,7 +584,7 @@ export default function ListDetail() {
         {dupeGroups.size > 0 ? (
           <div style={{ padding: '0 16px 8px' }}>
             <button
-              onClick={() => { setDupeSelected(new Set()); setDupeReviewOpen(true) }}
+              onClick={() => setDupeReviewOpen(true)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
                 borderRadius: 10, background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.28)',
@@ -845,7 +662,7 @@ export default function ListDetail() {
                     <Sparkles size={15} /> View Insights
                   </button>
                   <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                    <button onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}
+                    <button onClick={() => setShowAdd(true)}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>
                     <button disabled={unchecking} onClick={async () => { setUnchecking(true); await store.uncheckAll(list.id); setUnchecking(false) }}
                       className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
@@ -923,7 +740,7 @@ export default function ListDetail() {
       <button
         className="fab"
         aria-label="Add item"
-        onClick={() => { setShowAdd(true); setTimeout(() => addInputRef.current?.focus(), 80) }}
+        onClick={() => setShowAdd(true)}
         style={{
           transform: showAdd ? 'scale(0.5)' : 'none',
           opacity: showAdd ? 0 : 1,
@@ -934,158 +751,14 @@ export default function ListDetail() {
         <Plus size={24} />
       </button>
 
-      {/* ── Add Item Sheet ── */}
-      {showAdd && (
-        <>
-          <Overlay onClick={() => { resetAdd(); setShowAdd(false) }} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <p style={{ fontSize: 17, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Add to {list.name}</p>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <div className="flex gap-2">
-                  <input
-                    ref={addInputRef}
-                    value={addInput}
-                    onChange={e => setAddInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSheetAdd()}
-                    placeholder={list.type === 'shopping' ? 'Add item… e.g. Milk ×2 or Rice 2kg' : 'Add an item…'}
-                    maxLength={200}
-                    style={{
-                      flex: 1, height: 48, borderRadius: 10, padding: '0 14px',
-                      background: 'var(--bg-input)', border: '1.5px solid transparent',
-                      color: 'var(--text)', fontSize: 15, outline: 'none',
-                      transition: 'border-color 0.15s',
-                    }}
-                    onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-                    onBlur={e => e.currentTarget.style.borderColor = 'transparent'}
-                  />
-                  <button
-                    onClick={handleSheetAdd}
-                    disabled={!parsedInput.item || addFlashing}
-                    style={{
-                      flexShrink: 0, width: 48, height: 48, borderRadius: 10, border: 'none',
-                      background: parsedInput.item ? 'var(--accent)' : 'var(--bg-input)',
-                      color: parsedInput.item ? '#fff' : 'var(--text-3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                  ><Plus size={22} /></button>
-                </div>
-
-                {/* Suggestions */}
-                {suggestions.length > 0 && (
-                  <div style={{
-                    position: 'absolute', top: '100%', left: 0, right: 52, zIndex: 10,
-                    background: 'var(--bg-card)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                    borderRadius: 10, boxShadow: 'var(--shadow)',
-                    border: '1px solid var(--border)', marginTop: 4,
-                  }}>
-                    {suggestions.map(s => (
-                      <button key={s} onClick={() => { setAddInput(s); addInputRef.current?.focus() }}
-                        style={{ display: 'block', width: '100%', padding: '11px 14px', textAlign: 'left', fontSize: 14, color: 'var(--text)', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'none' }}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* "✓ added" confirmation — directly below the input, close to the
-                  action that triggered it; auto-hides after ~2s (spec §2.1) */}
-              {addedToast && (
-                <span className="list-fade-in" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-                  padding: '4px 2px', color: 'var(--accent)', fontSize: 13, fontWeight: 600,
-                }}>
-                  <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{addedToast} added</span>
-                </span>
-              )}
-
-              {/* Frequent items — one-tap add while the field is empty */}
-              {!addInput && frequentItems.length > 0 && (
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
-                    Frequent
-                  </p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {frequentItems.map(t => (
-                      <button
-                        key={t}
-                        onClick={() => addFrequent(t)}
-                        style={{
-                          height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
-                          background: 'var(--bg-input)', border: '1px solid var(--border)',
-                          fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        + {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Parsed qty badge */}
-              {parsedInput.qty && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qty</span>
-                  <span style={{ padding: '2px 10px', borderRadius: 100, fontSize: 12, fontWeight: 700, background: 'var(--accent)', color: '#04080f' }}>{parsedInput.qty}</span>
-                </div>
-              )}
-
-              {/* Category — hidden until auto-detect picks one from the typed
-                  item; Change opens the dedicated picker sheet */}
-              {cats.length > 0 && addCategory && (() => {
-                const c = catById.get(addCategory)
-                if (!c) return null
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '4px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600,
-                      background: `${c.color}1f`, color: 'var(--text)',
-                    }}>{c.emoji} {c.name}</span>
-                    <button onClick={() => setCatPickerFor('add')}
-                      style={{ padding: '6px 10px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-2)', border: 'none' }}>
-                      Change
-                    </button>
-                  </div>
-                )
-              })()}
-              {cats.length > 0 && !addCategory && parsedInput.item && (
-                <button onClick={() => setCatPickerFor('add')}
-                  style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: 'none' }}>
-                  ＋ Category
-                </button>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Merge confirm ── */}
-      {showMerge && mergeTarget && pendingAdd && (
-        <>
-          <Overlay />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontWeight: 700, fontSize: 16 }}>"{mergeTarget.title}" already exists</p>
-              <p className="text-muted text-sm">
-                Existing: <strong>{mergeTarget.quantity || '—'}</strong> · Adding: <strong>{pendingAdd.qty}</strong> → Combined: <strong>{mergeQuantities(mergeTarget.quantity, pendingAdd.qty)}</strong>
-              </p>
-              <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(pendingAdd.title) }}>Add Separate</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleMerge}>Merge Qty</button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* ── Add Item Sheet (extracted) ── */}
+      <AddItemSheet
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        list={list}
+        items={items}
+        cats={cats}
+      />
 
       {/* ── Menu ── */}
       {menuOpen && (
@@ -1269,7 +942,7 @@ export default function ListDetail() {
             setInsightsOpen(false)
             if (uncategorizedPending[0]) { cancelEdit(); startEdit(uncategorizedPending[0]) }
           }}
-          onReviewDuplicates={() => { setInsightsOpen(false); setDupeSelected(new Set()); setDupeReviewOpen(true) }}
+          onReviewDuplicates={() => { setInsightsOpen(false); setDupeReviewOpen(true) }}
         />
       )}
 
@@ -1278,133 +951,23 @@ export default function ListDetail() {
         <ShareListSheet list={list} members={members} onClose={() => setShareOpen(false)} />
       )}
 
-      {/* ── Category picker ── */}
+      {/* ── Category picker (row-edit flow) ── */}
       <CategoryPickerSheet
-        open={catPickerFor !== null}
+        open={editPickerOpen}
         categories={cats}
-        selected={catPickerFor === 'edit' ? editCategory : addCategory}
-        onSelect={id => {
-          if (catPickerFor === 'edit') setEditCategory(id)
-          else { setAddCategory(id); setAddCatSticky(true) }
-        }}
-        onClose={() => setCatPickerFor(null)}
+        selected={editCategory}
+        onSelect={id => setEditCategory(id)}
+        onClose={() => setEditPickerOpen(false)}
       />
 
-      {/* ── Duplicate review (spec §4) ── */}
-      {dupeReviewOpen && (
-        <>
-          <Overlay onClick={() => setDupeReviewOpen(false)} />
-          <div className="sheet" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-            <div className="sheet-handle" />
-            <div style={{ padding: '10px 20px 24px' }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Review duplicates</p>
-              <p className="text-sm text-muted" style={{ margin: '0 0 16px' }}>
-                Merge, remove, or keep similar items.
-              </p>
-              {dupeGroups.size === 0 ? (
-                <p className="text-sm text-muted" style={{ textAlign: 'center', padding: '16px 0' }}>
-                  No duplicates left 🎉
-                </p>
-              ) : [...dupeGroups.entries()].map(([key, group]) => {
-                const plan = analyzeGroup(group)
-                const selected = dupeSelected.has(key)
-                const shared = members.length > 1
-                const keepLabel = group.length > 2 ? 'Keep All' : 'Keep Both'
-                // The destructive removal action is styled red only for exact
-                // duplicates; merges are the neutral accent (spec).
-                const isRemoval = plan.kind === 'exact'
-                return (
-                  <div key={key} style={{ marginBottom: 18 }}>
-                    <div className="flex items-baseline justify-between" style={{ margin: '0 2px 8px' }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{group[0].title}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{group.length} similar items</span>
-                    </div>
-                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                      {group.map((it, i) => (
-                        <div key={it.id} style={{
-                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                          background: 'var(--bg-card)', borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                        }}>
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
-                              {it.title}{it.quantity ? ` ${it.quantity}` : ''}
-                              {it.completed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
-                            </span>
-                            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-3)', marginTop: 1 }}>
-                              {i === 0 ? 'Original' : 'Added later'}
-                              {shared && it.added_by_name ? ` · by ${it.added_by_name}` : ''}
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Merge preview */}
-                    {selected && plan.merged && (
-                      <p style={{ fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, margin: '8px 2px 0' }}>
-                        {group.map(i => `${group[0].title}${i.quantity ? ` ${i.quantity}` : ''}`).join(' + ')} → {group[0].title} {plan.merged}
-                      </p>
-                    )}
-
-                    {/* Contextual actions */}
-                    <div className="flex" style={{ gap: 8, marginTop: 10 }}>
-                      <button
-                        onClick={() => toggleDupe(key)}
-                        style={{
-                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                          height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                          border: selected
-                            ? 'none'
-                            : `1px solid ${isRemoval ? 'rgba(239,68,68,0.35)' : 'var(--border-2)'}`,
-                          background: selected ? (isRemoval ? '#ef4444' : 'var(--accent)') : 'transparent',
-                          color: selected ? '#fff' : (isRemoval ? '#ef4444' : 'var(--accent)'),
-                        }}>
-                        {isRemoval && <Trash2 size={14} />}{plan.mergeLabel}
-                      </button>
-                      <button
-                        onClick={() => { if (selected) toggleDupe(key) }}
-                        style={{
-                          flex: 1, height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                          border: !selected ? '1px solid var(--border-2)' : 'none',
-                          background: !selected ? 'var(--bg-input)' : 'transparent',
-                          color: 'var(--text-2)',
-                        }}>
-                        {keepLabel}
-                      </button>
-                    </div>
-
-                    {/* Suggested hint */}
-                    {plan.suggestMerge && !selected && (
-                      <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '6px 2px 0' }}>
-                        <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Suggested:</span> {plan.mergeLabel}
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-              <button
-                className="btn btn-primary btn-full"
-                onClick={() => dupeChanges > 0 ? applyDupePlan() : setDupeReviewOpen(false)}
-                style={{ marginTop: 4 }}>
-                {dupeChanges === 0 ? 'Done' : dupeChanges === 1 ? 'Apply Changes' : `Apply ${dupeChanges} Changes`}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ── Duplicates resolved toast ── */}
-      {dupeResolved && (
-        <div className="list-fade-in" style={{
-          position: 'fixed', bottom: 84, left: 16, right: 16, zIndex: 200,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          background: 'var(--bg-card)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid var(--border)', borderRadius: 16, padding: '13px 16px', boxShadow: 'var(--shadow)',
-        }}>
-          <Check size={16} color="var(--accent)" strokeWidth={2.5} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Duplicates resolved</span>
-        </div>
-      )}
+      {/* ── Duplicate review (extracted; spec §4) ── */}
+      <DuplicateReviewSheet
+        open={dupeReviewOpen}
+        onClose={() => setDupeReviewOpen(false)}
+        list={list}
+        groups={dupeGroups}
+        shared={members.length > 1}
+      />
 
       {/* ── Undo delete toast ── */}
       {undoItem && (

@@ -1,9 +1,5 @@
-import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useAuthStore } from '../../store/useAuthStore'
-import { useListsStore } from '../../store/useListsStore'
-import { useCategoriesStore } from '../../store/useCategoriesStore'
 
 // Drill-in page scaffold: back header + scrolling padded content.
 export function SubPage({ title, children }: { title: string; children: React.ReactNode }) {
@@ -65,25 +61,6 @@ export function Row({ icon, label, value, valueColor, onPress, last = false }: {
   )
 }
 
-// Drill-in pages render outside AppShell, so a direct load / refresh needs
-// the same store bootstrap the shell does.
-export function useEnsureData() {
-  const { user, displayName } = useAuthStore()
-  const store = useListsStore()
-
-  useEffect(() => {
-    if (!user) return
-    const name = (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
-    store.init(user.id, name || displayName)
-    useCategoriesStore.getState().init(user.id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
-
-  useEffect(() => {
-    for (const list of store.lists) {
-      if (!store.items[list.id]) store.loadItems(list.id)
-      if (!store.members[list.id]) store.loadMembers(list.id)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.lists.length])
-}
+// Moved to src/hooks/useEnsureData.ts — re-exported so existing profile
+// imports keep working.
+export { useEnsureData } from '../../hooks/useEnsureData'

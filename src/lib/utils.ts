@@ -22,6 +22,9 @@ export function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// Normalise item titles for display: "rice" → "Rice".
+export const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
+
 // Humanise technical usernames for display: "anjana1995ks" / "anjana@x.com"
 // → "Anjana". Real display names (with spaces / no digits) pass through.
 export function friendlyName(name: string): string {
