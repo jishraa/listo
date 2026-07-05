@@ -70,6 +70,13 @@ function Overlay({ onClick }: { onClick?: () => void }) {
 // so completing a list prompts once, never repeatedly.
 const beforeYouGoAutoShown = new Set<string>()
 
+// Duplicate groups the user chose to keep (by normalized name), persisted per
+// list so "Keep both" permanently dismisses that warning.
+function readKeptDupes(id: string | undefined): string[] {
+  if (!id) return []
+  try { return JSON.parse(localStorage.getItem(`listo-kept-dupes-${id}`) || '[]') as string[] } catch { return [] }
+}
+
 export default function ListDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -239,7 +246,22 @@ export default function ListDetail() {
   // Duplicate detection
   // Blocking duplicate detection runs ONLY against pending items — completed
   // items are past purchases and must never trigger review (see lib/duplicates).
-  const dupeGroups = useMemo(() => pendingDuplicateGroups(items), [items])
+  // Groups the user has chosen to "Keep both" are remembered per list so the
+  // banner stops nagging about intentional repeats.
+  const [keptDupes, setKeptDupes] = useState<Set<string>>(new Set())
+  useEffect(() => { setKeptDupes(new Set(readKeptDupes(id))) }, [id])
+  const keepDupe = useCallback((key: string) => {
+    setKeptDupes(prev => {
+      const next = new Set(prev).add(key)
+      if (id) localStorage.setItem(`listo-kept-dupes-${id}`, JSON.stringify([...next]))
+      return next
+    })
+  }, [id])
+  const dupeGroups = useMemo(() => {
+    const g = pendingDuplicateGroups(items)
+    keptDupes.forEach(k => g.delete(k))
+    return g
+  }, [items, keptDupes])
   const dupeIds = useMemo(() => {
     const s = new Set<string>(); dupeGroups.forEach(g => g.forEach(i => s.add(i.id))); return s
   }, [dupeGroups])
@@ -1115,6 +1137,7 @@ export default function ListDetail() {
         list={list}
         groups={dupeGroups}
         shared={members.length > 1}
+        onKeep={keepDupe}
       />
 
       {/* ── Undo delete toast ── */}

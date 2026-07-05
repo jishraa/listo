@@ -17,9 +17,11 @@ interface Props {
   groups: Map<string, ListItem[]>
   /** Shared list → show "by member" on each row */
   shared: boolean
+  /** Keep both/all: permanently dismiss this group's warning (by group key). */
+  onKeep: (key: string) => void
 }
 
-export default function DuplicateReviewSheet({ open, onClose, list, groups, shared }: Props) {
+export default function DuplicateReviewSheet({ open, onClose, list, groups, shared, onKeep }: Props) {
   const store = useListsStore()
   // Group keys staged for their suggested action; absence = keep both.
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -128,11 +130,11 @@ export default function DuplicateReviewSheet({ open, onClose, list, groups, shar
                         {isRemoval && <Trash2 size={14} />}{plan.mergeLabel}
                       </button>
                       <button
-                        onClick={() => { if (isSelected) toggle(key) }}
+                        onClick={() => { setSelected(prev => { const n = new Set(prev); n.delete(key); return n }); onKeep(key) }}
                         style={{
                           flex: 1, height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                          border: !isSelected ? '1px solid var(--border-2)' : 'none',
-                          background: !isSelected ? 'var(--bg-input)' : 'transparent',
+                          border: '1px solid var(--border-2)',
+                          background: 'var(--bg-input)',
                           color: 'var(--text-2)',
                         }}>
                         {keepLabel}
