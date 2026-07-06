@@ -52,6 +52,12 @@ export default function Login() {
   const rawNext = searchParams.get('next') ?? ''
   const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
+  // Deep link into Create Account from the marketing "Get Started Free" CTA.
+  useEffect(() => {
+    if (searchParams.get('mode') === 'register') setMode('register')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (resendIn <= 0) return
     const t = setTimeout(() => setResendIn(s => s - 1), 1000)
