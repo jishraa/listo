@@ -96,7 +96,6 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: rgba(4, 8, 20, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -442,6 +441,17 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   -webkit-overflow-scrolling: touch;
 }
 .hscroll::-webkit-scrollbar { display: none; }
+
+/* Lists (home) header — pinned to the top while the list scrolls beneath it */
+.lists-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(4, 8, 20, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+[data-theme="light"] .lists-header { background: rgba(240, 245, 250, 0.94); }
 
 /* Completed-section toggle — the whole header row is tappable, no button chrome */
 .completed-toggle {
@@ -992,7 +1002,6 @@ html[data-theme="light"] body {
 /* Header / Nav */
 [data-theme="light"] .header {
   background: rgba(240, 245, 250, 0.94);
-  border-bottom-color: rgba(21,128,61,0.10);
 }
 
 [data-theme="light"] .bottom-nav {

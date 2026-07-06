@@ -394,8 +394,8 @@ export default function Lists() {
           </div>
         )}
 
-        {/* Header — counts give context (spec §1) */}
-        <div style={{ padding: '20px 16px 12px' }} className="flex items-center justify-between">
+        {/* Header — counts give context (spec §1); sticks to the top on scroll */}
+        <div style={{ padding: '20px 16px 12px' }} className="lists-header flex items-center justify-between">
           <div>
             <img src="/wordmark.png" alt="Listo" style={{ height: 26, width: 'auto', display: 'block' }} />
             {hasLists && (
