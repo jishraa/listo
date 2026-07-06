@@ -13,6 +13,7 @@ import Login from './pages/Login'
 import Lists from './pages/Lists'
 import JoinList from './pages/JoinList'
 
+const Landing           = lazy(() => import('./pages/Landing'))
 const ListDetail        = lazy(() => import('./pages/ListDetail'))
 const ResetPassword     = lazy(() => import('./pages/ResetPassword'))
 const Profile           = lazy(() => import('./pages/Profile'))
@@ -69,6 +70,25 @@ function AuthGuard({ children, allowGuest = true }: { children: React.ReactNode;
   if (isGuest && !allowGuest) return <Navigate to="/" replace />
 
   return <>{children}</>
+}
+
+// Root gate: the marketing landing page is public at "/" for signed-out
+// visitors, while authenticated users get their Lists workspace in place (so
+// the installed PWA still opens straight to their lists). AppShell renders the
+// <Outlet/> → the index route's <Lists/>.
+function RootGate() {
+  const { user, loading } = useAuthStore()
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="spinner" style={{ width: 32, height: 32, borderWidth: 3 }} />
+      </div>
+    )
+  }
+
+  if (!user) return <Landing />
+  return <AppShell />
 }
 
 // Connectivity + queue flushing (offline-first part C): tracks online state,
@@ -155,19 +175,17 @@ function AppRoutes() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/join/:code" element={<JoinList />} />
-      {/* Tab pages render inside the AppShell (bottom nav + create FAB) */}
-      <Route
-        element={
-          <AuthGuard>
-            <AppShell />
-          </AuthGuard>
-        }
-      >
-        <Route path="/" element={<Lists />} />
-        {/* Old dashboard/insights URLs — Lists is the root screen now */}
-        <Route path="/lists" element={<Navigate to="/" replace />} />
-        <Route path="/insights" element={<Navigate to="/" replace />} />
+      {/* Public marketing landing — always reachable, even when signed in
+          (so authenticated visitors see it with the "Open Listo" CTA). */}
+      <Route path="/about" element={<Landing />} />
+      {/* "/" is public: RootGate shows the landing to signed-out visitors and
+          the Lists workspace (AppShell → index route) to authenticated ones. */}
+      <Route path="/" element={<RootGate />}>
+        <Route index element={<Lists />} />
       </Route>
+      {/* Old dashboard/insights URLs — Lists is the root screen now */}
+      <Route path="/lists" element={<Navigate to="/" replace />} />
+      <Route path="/insights" element={<Navigate to="/" replace />} />
       {/* Drill-in pages — full-screen, own header, no bottom nav */}
       <Route
         path="/list/:id"
