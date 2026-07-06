@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X, ListChecks, ClipboardList } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -566,6 +566,38 @@ export default function ListDetail() {
     color: 'var(--text-3)', textTransform: 'uppercase',
   }
 
+  // ── List Options menu, grouped + context-aware (spec §6–§20) ──
+  // Actions only appear when relevant to the list's type and state, so the
+  // sheet stays short. Empty groups are dropped when rendering.
+  type MenuRow = { icon: ReactNode; label: string; onClick: () => void; right?: string; badge?: string; danger?: boolean }
+  const sortHint = sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added'
+  const closeMenu = () => setMenuOpen(false)
+  const menuGroups: { label: string; rows: MenuRow[] }[] = [
+    { label: 'View & Tools', rows: [
+      { icon: <ArrowUpDown size={16} />, label: 'Sort', right: sortHint, onClick: () => { closeMenu(); setSortMenuOpen(true) } },
+      ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', badge: 'PRO', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
+      ...(list.type === 'shopping' && canEdit && items.length > 0 ? [{ icon: <ShoppingCart size={16} />, label: 'Shop Mode', onClick: () => { closeMenu(); setShopModeOpen(true) } }] : []),
+      // Shopping-only, and only once there are forgotten regulars to suggest (§11)
+      ...(list.type === 'shopping' && canEdit && forgotten.length > 0 ? [{ icon: <ShoppingBag size={16} />, label: 'Before you go', onClick: () => { closeMenu(); setBeforeYouGoOpen(true) } }] : []),
+      { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', onClick: () => { closeMenu(); setCustomizeOpen(true) } },
+    ]},
+    { label: 'Manage List', rows: [
+      { icon: <Pencil size={16} />, label: 'Rename', onClick: () => { setRenameValue(list.name); closeMenu(); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
+      ...(isOwner ? [{ icon: <Copy size={16} />, label: 'Duplicate', onClick: async () => { closeMenu(); await store.duplicateList(list.id) } }] : []),
+      ...(isOwner ? [{ icon: <LayoutTemplate size={16} />, label: 'Save as Template', onClick: async () => { closeMenu(); await store.saveAsTemplate(list.id) } }] : []),
+      ...(isOwner ? [{ icon: <Share2 size={16} />, label: 'Share', onClick: () => { closeMenu(); setShareOpen(true) } }] : []),
+    ]},
+    // Reports only when there's reportable data (§14); Cleanup only with completed items (§15)
+    { label: 'Reports', rows: items.length > 0 ? [
+      { icon: <FileText size={16} />, label: 'Export Report', onClick: async () => { closeMenu(); await exportListReport(list, items, members) } },
+    ] : [] },
+    { label: 'Cleanup', rows: completed.length > 0 ? [
+      { icon: <Check size={16} />, label: 'Clear Completed', right: String(completed.length), onClick: async () => { closeMenu(); await store.uncheckAll(list.id) } },
+    ] : [] },
+    { label: 'Danger Zone', rows: isOwner ? [
+      { icon: <Trash2 size={16} />, label: 'Delete List', danger: true, onClick: () => { closeMenu(); setConfirmDelete(true) } },
+    ] : [] },
+  ]
 
   return (
     <div className="app-container">
@@ -733,13 +765,28 @@ export default function ListDetail() {
             </div>
           ) : items.length === 0 ? (
             <>
-              <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 24px', textAlign: 'center' }}>
-                <div style={{ fontSize: 36 }}>{list.emoji}</div>
-                <p style={{ fontWeight: 600, fontSize: 15 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
-                <p className="text-muted text-sm">
+              {/* Compact, focused empty state — no large bordered card (spec §1) */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10, padding: '48px 24px 8px' }}>
+                <div aria-hidden style={{
+                  width: 64, height: 64, borderRadius: 18, background: 'var(--accent-dim)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)',
+                }}>
+                  {list.type === 'shopping'
+                    ? <ShoppingCart size={30} strokeWidth={1.8} />
+                    : list.type === 'tasks'
+                      ? <ListChecks size={30} strokeWidth={1.8} />
+                      : <ClipboardList size={30} strokeWidth={1.8} />}
+                </div>
+                <p style={{ fontWeight: 700, fontSize: 17 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
+                <p className="text-muted text-sm" style={{ maxWidth: 264 }}>
                   {!canEdit ? 'Items added by the group will show up here.'
                     : list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
                 </p>
+                {canEdit && (
+                  <button className="btn btn-primary" style={{ marginTop: 6, minHeight: 46 }} onClick={() => setShowAdd(true)}>
+                    <Plus size={18} /> Add Item
+                  </button>
+                )}
               </div>
 
               {/* List Memory: one-tap add the user's regulars to a fresh list */}
@@ -928,47 +975,35 @@ export default function ListDetail() {
         regulars={regulars}
       />
 
-      {/* ── Menu ── */}
+      {/* ── List Options menu (titled, grouped, context-aware) ── */}
       {menuOpen && (
         <>
           <Overlay onClick={() => setMenuOpen(false)} />
           <div className="sheet">
             <div className="sheet-handle" />
-            <div style={{ padding: '8px 0 8px' }}>
-              {[
-                { icon: <ArrowUpDown size={16} />, label: 'Sort', hint: sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added', action: () => { setMenuOpen(false); setSortMenuOpen(true) } },
-                list.type === 'shopping' ? { icon: <Sparkles size={16} />, label: 'Insights', hint: '✦', action: () => { setMenuOpen(false); setInsightsOpen(true) } } : null,
-                list.type === 'shopping' && canEdit && items.length > 0 ? { icon: <ShoppingCart size={16} />, label: 'Shop Mode', hint: '', action: () => { setMenuOpen(false); setShopModeOpen(true) } } : null,
-                list.type === 'shopping' && canEdit ? { icon: <ShoppingBag size={16} />, label: 'Before you go', hint: '', action: () => { setMenuOpen(false); setBeforeYouGoOpen(true) } } : null,
-                { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', hint: '', action: () => { setMenuOpen(false); setCustomizeOpen(true) } },
-                { icon: <FileText size={16} />, label: 'Export Report', hint: 'PDF', action: async () => { setMenuOpen(false); await exportListReport(list, items, members) }, disabled: items.length === 0 },
-                { icon: <Pencil size={16} />, label: 'Rename', hint: '', action: () => { setRenameValue(list.name); setMenuOpen(false); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
-                isOwner ? { icon: <Copy size={16} />, label: 'Duplicate', hint: '', action: async () => { setMenuOpen(false); await store.duplicateList(list.id) } } : null,
-                isOwner ? { icon: <LayoutTemplate size={16} />, label: 'Save as Template', hint: '', action: async () => { setMenuOpen(false); await store.saveAsTemplate(list.id) } } : null,
-                isOwner ? { icon: <Share2 size={16} />, label: 'Share', hint: '', action: () => { setMenuOpen(false); setShareOpen(true) } } : null,
-                { icon: <Check size={16} />, label: `Clear Completed${completed.length > 0 ? ` (${completed.length})` : ''}`, hint: '', action: async () => { setMenuOpen(false); await store.uncheckAll(list.id) }, disabled: completed.length === 0 },
-                isOwner ? { icon: <Trash2 size={16} color="#ef4444" />, label: 'Delete List', hint: '', action: () => { setMenuOpen(false); setConfirmDelete(true) }, danger: true } : null,
-              ].filter(Boolean).map((item, i) => {
-                const it = item as { icon: ReactNode; label: string; hint: string; action: () => void; disabled?: boolean; danger?: boolean }
-                return (
-                  <button key={i} onClick={it.action} disabled={it.disabled}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 14,
-                      padding: '14px 20px', background: 'none', border: 'none',
-                      cursor: it.disabled ? 'not-allowed' : 'pointer', textAlign: 'left',
-                      opacity: it.disabled ? 0.4 : 1,
-                    }}>
-                    <span style={{ color: it.danger ? '#ef4444' : 'var(--text-2)' }}>{it.icon}</span>
-                    <span style={{ fontSize: 15, fontWeight: 500, color: it.danger ? '#ef4444' : 'var(--text)', flex: 1 }}>{it.label}</span>
-                    {/* ✦ = the single subtle premium indicator (spec §4.3) */}
-                    {it.hint && (
-                      <span style={{ fontSize: it.hint === '✦' ? 14 : 12, color: it.hint === '✦' ? 'var(--accent)' : 'var(--text-3)' }}>
-                        {it.hint}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+            <div className="sheet-header">
+              <div className="sheet-heading"><span className="sheet-title">List Options</span></div>
+              <button className="btn btn-ghost btn-sm" aria-label="Close" onClick={() => setMenuOpen(false)}><X size={18} /></button>
+            </div>
+            <div className="ld-menu" role="menu">
+              {menuGroups.filter(g => g.rows.length > 0).map(g => (
+                <div key={g.label} className="ld-menu-group">
+                  <p className="ld-menu-label">{g.label}</p>
+                  {g.rows.map((r, i) => (
+                    <button
+                      key={i}
+                      role="menuitem"
+                      className={`ld-menu-row${r.danger ? ' danger' : ''}`}
+                      onClick={r.onClick}
+                    >
+                      <span className="ld-row-icon">{r.icon}</span>
+                      <span className="ld-row-label">{r.label}</span>
+                      {r.badge && <span className="ld-pro-badge">{r.badge}</span>}
+                      {r.right && <span className="ld-row-right">{r.right}</span>}
+                    </button>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
         </>
@@ -1092,7 +1127,7 @@ export default function ListDetail() {
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Cancel</button>
                 <button className="btn btn-danger" style={{ flex: 1 }}
                   onClick={async () => { setConfirmDelete(false); await store.deleteList(list.id); navigate('/') }}>
-                  Delete
+                  Delete List
                 </button>
               </div>
             </div>

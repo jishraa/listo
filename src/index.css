@@ -415,6 +415,34 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: var(--bg-input); color: var(--text-2);
 }
 
+/* ── List Options menu (grouped, context-aware) ──────────────── */
+.ld-menu { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0 8px; }
+.ld-menu-group { padding: 2px 0 4px; }
+.ld-menu-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  color: var(--text-3); text-transform: uppercase;
+  padding: 8px 20px 3px; margin: 0;
+}
+.ld-menu-row {
+  width: 100%; display: flex; align-items: center; gap: 14px;
+  /* Compact rows, still a 46px touch target (spec §17) */
+  padding: 11px 20px; min-height: 46px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  transition: background 140ms var(--ease);
+}
+.ld-menu-row:active { background: var(--bg-input); }
+.ld-row-icon { display: flex; color: var(--text-2); flex-shrink: 0; }
+.ld-row-label { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; min-width: 0; }
+.ld-row-right { font-size: 12.5px; color: var(--text-3); flex-shrink: 0; }
+.ld-menu-row.danger .ld-row-icon,
+.ld-menu-row.danger .ld-row-label { color: #ef4444; }
+/* Small, subtle premium badge sitting next to the Insights label (spec §12) */
+.ld-pro-badge {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.04em;
+  color: var(--accent-text); background: var(--accent-soft);
+  padding: 2px 6px; border-radius: 5px; flex-shrink: 0;
+}
+
 /* ── Progress bar ────────────────────────────────────────────── */
 .progress-bar {
   height: 4px;
