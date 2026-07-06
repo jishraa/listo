@@ -153,8 +153,14 @@ export default function Login() {
           <Link to="/about" aria-label="About Listo" style={{ display: 'block' }}>
             <img
               src="/brand.png"
+              alt=""
+              aria-hidden
+              style={{ width: 62, height: 62, display: 'block', margin: '0 auto 12px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', borderRadius: 16 }}
+            />
+            <img
+              src="/wordmark.png"
               alt="Listo"
-              style={{ width: 62, height: 62, display: 'block', margin: '0 auto 20px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', borderRadius: 16 }}
+              style={{ height: 26, width: 'auto', display: 'block', margin: '0 auto 20px' }}
             />
           </Link>
           {mode === 'register' ? (

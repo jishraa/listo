@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, ChevronRight, Plus } from 'lucide-react'
 import Sheet from '../ui/Sheet'
 import type { List, ListType } from '../../types'
 import { TEMPLATES, LIST_TYPE_ICONS, suggestListMeta } from '../../lib/constants'
@@ -32,9 +32,12 @@ interface Props {
   onCreate: (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => Promise<void>
   // Opening screen: template gallery (default) or the blank-list form
   initialStep?: 'templates' | 'custom'
+  // Preselection for the empty-state starter shortcuts — opens straight into
+  // the custom form with the name/type/icon filled in, all still editable.
+  initial?: { name: string; type: ListType; emoji: string }
 }
 
-export default function CreateListSheet({ open, onClose, onCreate, initialStep = 'templates' }: Props) {
+export default function CreateListSheet({ open, onClose, onCreate, initialStep = 'templates', initial }: Props) {
   const [step, setStep] = useState<'templates' | 'custom'>(initialStep)
   const [name, setName] = useState('')
   const [type, setType] = useState<ListType>(getDefaultListType)
@@ -43,6 +46,9 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   const [typeManual, setTypeManual] = useState(false)
   // 'auto' = let the name/type decide; otherwise an explicit emoji.
   const [iconChoice, setIconChoice] = useState<'auto' | string>('auto')
+  // Starter items carried from a chosen template into the review form; they're
+  // created with the list once the user confirms (spec §8/§9).
+  const [pendingItems, setPendingItems] = useState<{ title: string; category?: string }[] | undefined>(undefined)
   const [loading, setLoading] = useState(false)
 
   const lists = useListsStore(s => s.lists)
@@ -63,13 +69,39 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   const autoEmoji = (!typeManual && suggestion) ? suggestion.emoji : LIST_TYPE_ICONS[type][0]
   const resolvedEmoji = iconChoice === 'auto' ? autoEmoji : iconChoice
 
-  // Re-sync when reopened — the same instance can be opened with a
-  // different initialStep (e.g. Lists' "New List" vs "Templates" actions).
-  useEffect(() => { if (open) setStep(initialStep) }, [open, initialStep])
+  // Re-sync when reopened — the same instance can be opened with a different
+  // initialStep (e.g. Lists' "New List" vs "Templates" actions) or with a
+  // starter preselection that jumps straight into the prefilled custom form.
+  useEffect(() => {
+    if (!open) return
+    if (initial) {
+      setStep('custom')
+      setName(initial.name)
+      setType(initial.type)
+      setTypeManual(true)      // honor the starter's type; still user-editable
+      setIconChoice(initial.emoji)
+      setPendingItems(undefined)
+    } else {
+      setStep(initialStep)
+    }
+  }, [open, initialStep, initial])
 
   const reset = () => {
     setStep(initialStep); setName(''); setType(getDefaultListType())
-    setTypeManual(false); setIconChoice('auto')
+    setTypeManual(false); setIconChoice('auto'); setPendingItems(undefined)
+  }
+
+  // Tapping a suggested template doesn't create it — it prefills the review
+  // form (name/type/icon + starter items), all still editable (spec §8/§9).
+  const configureTemplate = (t: typeof TEMPLATES[0]) => {
+    setName(t.label); setType(t.type); setTypeManual(true)
+    setIconChoice(t.emoji); setPendingItems(t.items); setStep('custom')
+  }
+
+  // "Create Blank List" — a clean form with no template prefill (spec §10/§12).
+  const startBlank = () => {
+    setName(''); setType(getDefaultListType()); setTypeManual(false)
+    setIconChoice('auto'); setPendingItems(undefined); setStep('custom')
   }
 
   const handleCreate = async (templateItems?: { title: string; category?: string }[]) => {
@@ -78,14 +110,6 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
     setLoading(true)
     await onCreate(name.trim(), type, resolvedEmoji, templateItems)
     reset()
-    setLoading(false)
-    onClose()
-  }
-
-  const handleTemplate = async (t: typeof TEMPLATES[0]) => {
-    if (loading) return
-    setLoading(true)
-    await onCreate(t.label, t.type, t.emoji, t.items)
     setLoading(false)
     onClose()
   }
@@ -106,8 +130,10 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
     <Sheet
       open={open}
       onClose={handleClose}
-      title={isCustom ? 'Create List' : 'New List'}
-      subtitle={isCustom ? 'Choose a name and type to get started.' : undefined}
+      title={isCustom ? 'Create List' : 'Create a List'}
+      subtitle={isCustom
+        ? (pendingItems ? 'Review your list — tweak anything, then create.' : 'Choose a name and type to get started.')
+        : 'Start quickly with a template or create your own.'}
       // Step navigation back to the gallery (only when we came from it) — not a
       // dismissal, so it doesn't compete with X / swipe / backdrop (spec §7).
       onBack={isCustom && initialStep === 'templates' ? () => setStep('templates') : undefined}
@@ -116,9 +142,7 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
         <div className="sheet-body">
           {myTemplates.length > 0 && (
             <>
-              <p className="text-xs" style={{ fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                My templates
-              </p>
+              <p className="tmpl-section-label">My templates</p>
               <div className="flex-col gap-2">
                 {myTemplates.map(t => {
                   const count = (items[t.id] ?? []).length
@@ -127,63 +151,49 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
                       key={t.id}
                       onClick={() => handleUserTemplate(t)}
                       disabled={loading}
-                      className="card"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '12px 14px', textAlign: 'left', width: '100%',
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        opacity: loading ? 0.6 : 1,
-                      }}
+                      className="card card-press tmpl-card"
+                      aria-label={`${t.name} template, ${TYPE_LABELS[t.type]} list, ${count} ${count === 1 ? 'item' : 'items'}`}
                     >
-                      <span style={{ fontSize: 26 }}>{t.emoji}</span>
-                      <div>
-                        <p style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</p>
-                        <p className="text-xs text-hint" style={{ marginTop: 2 }}>
-                          {count} {count === 1 ? 'item' : 'items'} · {TYPE_LABELS[t.type]}
-                        </p>
+                      <span className="tmpl-emoji">{t.emoji}</span>
+                      <div className="tmpl-text">
+                        <p className="tmpl-name truncate">{t.name}</p>
+                        <p className="tmpl-meta">{TYPE_LABELS[t.type]} · {count} {count === 1 ? 'item' : 'items'}</p>
                       </div>
+                      <ChevronRight size={17} className="tmpl-chevron" />
                     </button>
                   )
                 })}
               </div>
-              <p className="text-xs" style={{ fontWeight: 700, letterSpacing: '0.07em', color: 'var(--text-3)', textTransform: 'uppercase' }}>
-                Suggested
-              </p>
             </>
           )}
+
+          <p className="tmpl-section-label">Suggested</p>
           <div className="flex-col gap-2">
             {TEMPLATES.map(t => (
               <button
                 key={t.id}
-                onClick={() => handleTemplate(t)}
-                disabled={loading}
-                className="card"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '12px 14px', textAlign: 'left', width: '100%',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
-                }}
+                onClick={() => configureTemplate(t)}
+                className="card card-press tmpl-card"
+                aria-label={`${t.label} template, ${TYPE_LABELS[t.type]} list, ${t.items.length} starter items`}
               >
-                <span style={{ fontSize: 26 }}>{t.emoji}</span>
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: 14 }}>{t.label}</p>
-                  <p className="text-xs text-hint" style={{ marginTop: 2 }}>
-                    {t.items.length} items · {TYPE_LABELS[t.type]}
-                  </p>
+                <span className="tmpl-emoji">{t.emoji}</span>
+                <div className="tmpl-text">
+                  <p className="tmpl-name truncate">{t.label}</p>
+                  <p className="tmpl-meta">{TYPE_LABELS[t.type]} · {t.items.length} starter items</p>
                 </div>
+                <ChevronRight size={17} className="tmpl-chevron" />
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" aria-hidden="true">
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span className="text-xs text-hint">or start blank</span>
+            <span className="text-xs" style={{ color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.08em' }}>OR</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
-          <button className="btn btn-secondary btn-full" onClick={() => setStep('custom')}>
-            Create Custom List
+          <button className="btn btn-secondary btn-full" onClick={startBlank}>
+            <Plus size={18} /> Create Blank List
           </button>
         </div>
       ) : (
@@ -246,12 +256,23 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
             </div>
           </div>
 
+          {pendingItems && pendingItems.length > 0 && (
+            <div className="input-group">
+              <label className="input-label">Starter items · {pendingItems.length}</label>
+              <div className="tmpl-items-review">
+                {pendingItems.map((it, i) => (
+                  <span key={i} className="tmpl-item-chip">{it.title}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             className="btn btn-primary btn-full"
             disabled={!name.trim() || loading}
             aria-busy={loading}
-            onClick={() => handleCreate()}
+            onClick={() => handleCreate(pendingItems)}
           >
             {loading ? <><span className="spinner" style={{ marginRight: 8 }} />Creating…</> : 'Create List'}
           </button>

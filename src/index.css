@@ -131,7 +131,9 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   gap: 4px;
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  color: var(--text-3);
+  /* Inactive items: a touch brighter than --text-3 so Profile stays legible
+     without competing with the green active tab (empty-state spec §10). */
+  color: rgba(221, 238, 255, 0.46);
   font-size: 11px;
   font-weight: 500;
   transition: color 0.2s;
@@ -177,13 +179,15 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .btn-primary {
   background: var(--accent);
   color: #030a14;
-  box-shadow: 0 0 20px rgba(22,163,74,0.38), 0 4px 14px rgba(22,163,74,0.18);
+  /* Subtle elevation, minimal green glow — primary reads via hierarchy and
+     contrast, not neon (empty-state spec §8). */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18), 0 3px 10px rgba(22,163,74,0.20);
   font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.10);
-  box-shadow: 0 0 32px rgba(22,163,74,0.55), 0 4px 20px rgba(22,163,74,0.28);
+  filter: brightness(1.06);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.20), 0 5px 16px rgba(22,163,74,0.26);
 }
 
 .btn-primary:disabled { box-shadow: none; filter: none; }
@@ -386,6 +390,31 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .btn:disabled { cursor: not-allowed; }
 .btn-primary:disabled { background: var(--bg-input); color: var(--text-3); box-shadow: none; filter: none; }
 
+/* ── Template cards (Create a List sheet) ────────────────────── */
+.tmpl-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  color: var(--text-3); text-transform: uppercase;
+}
+.tmpl-card {
+  display: flex; align-items: center; gap: 14px;
+  /* ~15% less vertical padding than the old 12px, still a comfy 44px+ target */
+  padding: 10px 14px;
+  text-align: left; width: 100%; cursor: pointer;
+}
+.tmpl-card:disabled { cursor: not-allowed; opacity: 0.6; }
+.tmpl-emoji { font-size: 24px; flex-shrink: 0; }
+.tmpl-text { flex: 1; min-width: 0; }
+.tmpl-name { font-weight: 600; font-size: 14px; color: var(--text); }
+.tmpl-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.tmpl-chevron { color: var(--text-3); flex-shrink: 0; }
+
+/* Read-only starter-items review in the template config form */
+.tmpl-items-review { display: flex; flex-wrap: wrap; gap: 6px; }
+.tmpl-item-chip {
+  font-size: 12.5px; padding: 5px 10px; border-radius: 8px;
+  background: var(--bg-input); color: var(--text-2);
+}
+
 /* ── Progress bar ────────────────────────────────────────────── */
 .progress-bar {
   height: 4px;
@@ -428,6 +457,60 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
 .empty-state h3 { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .empty-state p { font-size: 14px; line-height: 1.6; }
+
+/* First-run full-screen empty state — sits in the visual centre of the area
+   between the Lists header and the bottom nav (not the whole viewport), with a
+   gentle fade-up entrance (spec §2/§16). */
+.empty-state--full {
+  padding: 20px 20px;
+  min-height: calc(100svh - var(--safe-top) - var(--safe-bottom) - var(--nav-h) - 104px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: empty-in 320ms var(--ease);
+}
+
+.empty-illustration { color: var(--text-2); margin-bottom: 18px; }
+
+/* Two clearly-separate actions (not a segmented pair); wrap to stacked,
+   full-width buttons on narrow screens (spec §6/§18). */
+.empty-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 22px;
+}
+.empty-cta-row .btn { flex: 1 1 150px; min-height: 46px; }
+
+/* Compact tertiary starter shortcuts (spec §11/§12) */
+.empty-starters { margin-top: 24px; text-align: center; }
+.empty-starters-label {
+  display: block;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--text-3); text-transform: uppercase; margin-bottom: 4px;
+}
+.starter-link {
+  display: inline-block;
+  padding: 11px 6px; margin: -5px 0;
+  font-size: 13.5px; font-weight: 600;
+  color: var(--accent-text);
+  background: none; border: none; cursor: pointer;
+}
+.starter-link + .starter-link::before {
+  content: '·';
+  color: var(--text-3);
+  margin: 0 8px 0 -2px;
+  font-weight: 400;
+}
+
+@keyframes empty-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ── FAB ─────────────────────────────────────────────────────── */
 .fab {
@@ -846,7 +929,8 @@ html[data-theme="light"] body {
   border-top-color: rgba(21,128,61,0.10);
 }
 
-[data-theme="light"] .nav-item.active { text-shadow: none; }
+[data-theme="light"] .nav-item { color: rgba(10, 22, 40, 0.50); }
+[data-theme="light"] .nav-item.active { text-shadow: none; color: var(--accent); }
 
 /* Card */
 [data-theme="light"] .card {

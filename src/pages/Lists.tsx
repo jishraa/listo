@@ -34,6 +34,35 @@ const SORTS: { id: Sort; label: string }[] = [
 
 const SORT_KEY = 'listo-lists-sort'
 
+// Compact first-run starter shortcuts. Each opens the Create List sheet
+// prefilled (name + type + icon), all still editable before creating.
+const STARTERS: { label: string; name: string; type: ListType; emoji: string }[] = [
+  { label: 'Shopping',       name: 'Shopping',         type: 'shopping', emoji: '🛒' },
+  { label: 'Travel',         name: 'Travel Checklist', type: 'personal', emoji: '✈️' },
+  { label: 'Personal Tasks', name: 'Personal Tasks',   type: 'tasks',    emoji: '✅' },
+]
+
+// Minimal Listo-style empty-list mark: a stacked checklist with one green
+// check (Create → Organize → Complete). Decorative — kept quieter than the
+// heading (spec §3). Colour/size come from the .empty-illustration class.
+function EmptyListsIcon() {
+  return (
+    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true" focusable="false" className="empty-illustration">
+      <rect x="14" y="9" width="32" height="42" rx="9" fill="none" stroke="currentColor" strokeWidth="2.4" opacity="0.45" />
+      {/* row 1 — completed, green accent */}
+      <rect x="20" y="17" width="8" height="8" rx="2.6" fill="var(--accent)" />
+      <path d="M22 21l1.7 1.7 3-3.2" stroke="#04120a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="31" y="19.4" width="10" height="2.6" rx="1.3" fill="currentColor" opacity="0.5" />
+      {/* row 2 */}
+      <rect x="20" y="29" width="8" height="8" rx="2.6" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.5" />
+      <rect x="31" y="31.4" width="10" height="2.6" rx="1.3" fill="currentColor" opacity="0.4" />
+      {/* row 3 — shorter */}
+      <rect x="20" y="41" width="8" height="8" rx="2.6" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
+      <rect x="31" y="43.4" width="6.5" height="2.6" rx="1.3" fill="currentColor" opacity="0.3" />
+    </svg>
+  )
+}
+
 function ListCard({ list, isPinned, onOpen, items, collab }: {
   list: List; isPinned: boolean; items: { completed: boolean }[]
   // Consolidated collaborator label (names or "N members"); undefined = personal
@@ -148,6 +177,8 @@ export default function Lists() {
   const [shareTarget, setShareTarget] = useState<List | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createStep, setCreateStep] = useState<'templates' | 'custom'>('templates')
+  // Preselection for a starter shortcut (undefined = normal create flow)
+  const [createInitial, setCreateInitial] = useState<{ name: string; type: ListType; emoji: string } | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<List | null>(null)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
   const [customOrder, setCustomOrder] = useState<string[]>([])
@@ -448,8 +479,8 @@ export default function Lists() {
               <button className="btn btn-primary mt-4" onClick={() => store.refreshLists()}>Retry</button>
             </div>
           ) : !hasLists ? (
-            <div className="empty-state">
-              <div className="icon">📋</div>
+            <div className="empty-state empty-state--full">
+              <EmptyListsIcon />
               {isGuest ? (
                 <>
                   <h3>No shared lists yet</h3>
@@ -459,13 +490,29 @@ export default function Lists() {
               ) : (
                 <>
                   <h3>No lists yet</h3>
-                  <p>Create your first list or start from a template.</p>
-                  <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
-                    <Plus size={18} /> Create List
-                  </button>
-                  <button className="btn btn-secondary mt-2" onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}>
-                    Browse Templates
-                  </button>
+                  <p>Create your first list or explore a template.</p>
+                  <div className="empty-cta-row">
+                    <button className="btn btn-primary" onClick={() => { setCreateInitial(undefined); setCreateStep('custom'); setCreateOpen(true) }}>
+                      <Plus size={18} /> Create List
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => { setCreateInitial(undefined); setCreateStep('templates'); setCreateOpen(true) }}>
+                      Browse Templates
+                    </button>
+                  </div>
+                  <div className="empty-starters">
+                    <span className="empty-starters-label">Start with</span>
+                    <div>
+                      {STARTERS.map(s => (
+                        <button
+                          key={s.label}
+                          className="starter-link"
+                          onClick={() => { setCreateInitial({ name: s.name, type: s.type, emoji: s.emoji }); setCreateStep('custom'); setCreateOpen(true) }}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </>
               )}
             </div>
@@ -552,7 +599,13 @@ export default function Lists() {
         </div>
       </div>
 
-      <CreateListSheet open={createOpen} onClose={() => setCreateOpen(false)} onCreate={handleCreate} initialStep={createStep} />
+      <CreateListSheet
+        open={createOpen}
+        onClose={() => { setCreateOpen(false); setCreateInitial(undefined) }}
+        onCreate={handleCreate}
+        initialStep={createStep}
+        initial={createInitial}
+      />
 
       {shareTarget && (
         <ShareListSheet
