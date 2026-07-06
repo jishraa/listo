@@ -71,7 +71,7 @@ export default function Landing() {
         <div className="lp-container lp-nav-inner">
           <a className="lp-brand" href="#top" onClick={(e) => { e.preventDefault(); scrollTo('#top') }}>
             <img src="/brand.png" alt="" aria-hidden />
-            <span>Listo</span>
+            <img src="/wordmark.png" alt="Listo" className="lp-wordmark" />
           </a>
           <div className="lp-nav-links">
             <a className="lp-nav-link" href="#features" onClick={(e) => { e.preventDefault(); scrollTo('#features') }}>Features</a>
@@ -587,7 +587,7 @@ export default function Landing() {
         <div className="lp-container">
           <div className="lp-footer-grid">
             <div className="lp-footer-brand lp-footer-col">
-              <div className="lp-brand"><img src="/brand.png" alt="" aria-hidden /><span>Listo</span></div>
+              <div className="lp-brand"><img src="/brand.png" alt="" aria-hidden /><img src="/wordmark.png" alt="Listo" className="lp-wordmark" /></div>
               <p className="lp-footer-tag">Type less. Forget less. Get more done.</p>
             </div>
             <div className="lp-footer-col">

@@ -108,7 +108,11 @@
   color: var(--text);
   flex-shrink: 0;
 }
-.lp-brand img { width: 32px; height: 32px; border-radius: 9px; display: block; }
+.lp-brand img { width: 30px; height: 30px; border-radius: 9px; display: block; }
+/* Glossy "Listo" wordmark used in place of the text — width follows the
+   image's aspect ratio, so only the height is constrained. */
+.lp-brand .lp-wordmark { width: auto; height: 24px; border-radius: 0; }
+.lp-footer .lp-brand .lp-wordmark { height: 30px; }
 
 .lp-nav-links {
   display: flex;
