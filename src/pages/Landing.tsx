@@ -4,7 +4,7 @@ import {
   Check, ArrowRight, Sparkles, Users, Layers,
   Brain, PlusCircle, ShoppingBag, Plane, Home as HomeIcon,
   Briefcase, CalendarDays, User as UserIcon, Share2, EyeOff,
-  ShieldCheck, Zap,
+  ShieldCheck, Zap, TrendingUp, RefreshCw,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { openYft } from '../lib/yft'
@@ -188,9 +188,11 @@ export default function Landing() {
           </Reveal>
           <Reveal className="lp-steps" style={{ marginTop: 40 }}>
             {LIFECYCLE.map((s, i) => (
-              <div className="lp-step" key={s.title}>
-                <div className="lp-step-num">{i + 1}</div>
-                <h4>{s.title}</h4>
+              <div className={`lp-card lp-cap lp-step ${i === LIFECYCLE.length - 1 ? 'loop' : ''}`} key={s.title}>
+                <div className="lp-cap-head">
+                  <div className="lp-card-icon"><s.Icon size={20} /></div>
+                  <h3><span className="lp-step-seq">{i + 1}</span>{s.title}</h3>
+                </div>
                 <p>{s.desc}</p>
               </div>
             ))}
@@ -239,17 +241,29 @@ export default function Landing() {
                   <button className="lp-btn lp-btn-secondary lp-btn-sm" type="button" tabIndex={-1}>Keep Both</button>
                   <button className="lp-btn lp-btn-primary lp-btn-sm" type="button" tabIndex={-1}>Merge to Milk ×5</button>
                 </div>
+                <div className="divider" style={{ margin: '18px 0 14px' }} />
+                <div className="flex items-center justify-between">
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>Travel Checklist</span>
+                  <span className="badge badge-green">80%</span>
+                </div>
+                <div className="lp-progress-track" style={{ marginTop: 12 }}><div style={{ width: '80%' }} /></div>
+                <div className="flex items-center justify-between" style={{ fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600 }}>
+                  <span>8 of 10 completed</span><span>2 items left</span>
+                </div>
               </div>
             </Reveal>
             <Reveal style={{ transitionDelay: '80ms' }}>
               <span className="lp-eyebrow">Smart Organization</span>
-              <h2 className="lp-h2">Stay organized without the cleanup.</h2>
+              <h2 className="lp-h2">Stay organized, and always know what's left.</h2>
               <p className="lp-lead">
                 Listo helps keep your lists clean by understanding similar items and preventing accidental duplicates.
               </p>
               <p className="lp-lead" style={{ marginTop: 16, fontWeight: 600, color: 'var(--text-2)' }}>
                 Already completed an item? Add it again whenever you need it. Listo understands the difference
                 between a duplicate and a repeat.
+              </p>
+              <p className="lp-lead" style={{ marginTop: 16, fontWeight: 700, color: 'var(--text)' }}>
+                Simple progress tracking keeps you focused on what still needs attention.
               </p>
             </Reveal>
           </div>
@@ -294,34 +308,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 10. Progress Tracking ─────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature reverse">
-            <Reveal className="lp-feature-media">
-              <div className="lp-panel">
-                <div className="lp-panel-label">Travel Checklist</div>
-                <div className="flex items-center justify-between">
-                  <span style={{ fontSize: 17, fontWeight: 800 }}>Almost there</span>
-                  <span className="badge badge-green">80%</span>
-                </div>
-                <div className="lp-progress-track" style={{ marginTop: 14 }}><div style={{ width: '80%' }} /></div>
-                <div className="flex items-center justify-between" style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>
-                  <span>8 of 10 completed</span>
-                  <span>2 items left</span>
-                </div>
-              </div>
-            </Reveal>
-            <Reveal style={{ transitionDelay: '80ms' }}>
-              <span className="lp-eyebrow">Progress Tracking</span>
-              <h2 className="lp-h2">Always know what's left.</h2>
-              <p className="lp-lead">Simple progress tracking helps you focus on what still needs attention.</p>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 11. Listo Intelligence (memory · before-you-go · next list) ── */}
+      {/* ── Listo Intelligence (memory · before-you-go · next list) ── */}
       <section className="lp-section">
         <div className="lp-container lp-center">
           <Reveal>
@@ -341,9 +328,11 @@ export default function Landing() {
             ))}
           </Reveal>
           <Reveal className="lp-grid lp-grid-3" style={{ marginTop: 36, textAlign: 'left' }}>
-            <div className="lp-card">
-              <div className="lp-card-icon"><Brain size={22} /></div>
-              <h3>Lists that remember</h3>
+            <div className="lp-card lp-cap">
+              <div className="lp-cap-head">
+                <div className="lp-card-icon"><Brain size={22} /></div>
+                <h3>Lists that remember</h3>
+              </div>
               <p>Frequently added items, typical quantities, and recurring patterns power better suggestions over time — every list makes the next one easier.</p>
               <div className="lp-pills" style={{ marginTop: 14 }}>
                 <span className="lp-pill"><PlusCircle size={15} /> Milk ×2</span>
@@ -351,9 +340,11 @@ export default function Landing() {
                 <span className="lp-pill"><PlusCircle size={15} /> Rice 5kg</span>
               </div>
             </div>
-            <div className="lp-card">
-              <div className="lp-card-icon"><Sparkles size={22} /></div>
-              <h3>Forget less</h3>
+            <div className="lp-card lp-cap">
+              <div className="lp-cap-head">
+                <div className="lp-card-icon"><Sparkles size={22} /></div>
+                <h3>Forget less</h3>
+              </div>
               <p>Before you start, Listo flags frequently used items that may be missing — a small reminder before forgotten items become a problem.</p>
               <div className="lp-pills" style={{ marginTop: 14 }}>
                 <span className="lp-pill">Milk</span>
@@ -361,9 +352,11 @@ export default function Landing() {
                 <span className="lp-pill">Bread</span>
               </div>
             </div>
-            <div className="lp-card">
-              <div className="lp-card-icon"><PlusCircle size={22} /></div>
-              <h3>Done doesn't mean starting over</h3>
+            <div className="lp-card lp-cap">
+              <div className="lp-cap-head">
+                <div className="lp-card-icon"><PlusCircle size={22} /></div>
+                <h3>Done doesn't mean starting over</h3>
+              </div>
               <p>Completed lists help Listo prepare what comes next, so every finished list gives you a faster head start on the next one.</p>
               <div className="lp-pills" style={{ marginTop: 14 }}>
                 <span className="lp-pill">Rice 5kg</span>
@@ -415,7 +408,7 @@ export default function Landing() {
             <h2 className="lp-h2">One Listo. Every kind of list.</h2>
             <p className="lp-lead">Simple enough for everyday tasks. Flexible enough for almost anything.</p>
           </Reveal>
-          <Reveal className="lp-grid lp-grid-3" style={{ marginTop: 40 }}>
+          <Reveal className="lp-grid lp-grid-3 lp-usecases" style={{ marginTop: 40 }}>
             {USE_CASES.map(u => (
               <div className="lp-card" key={u.title}>
                 <div className="lp-card-icon">{u.icon}</div>
@@ -506,7 +499,7 @@ export default function Landing() {
             <p className="lp-lead">Create, collaborate, track progress, and get more from every list.</p>
             <div className="lp-final-cta">
               <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted} style={{ minWidth: 220 }}>
-                {isAuthed ? 'Open Listo' : 'Get Started Free'} <ArrowRight size={18} />
+                {isAuthed ? 'Open Listo' : 'Create your first list'} <ArrowRight size={18} />
               </button>
               {!isAuthed && (
                 <span className="lp-final-sign">
@@ -570,9 +563,11 @@ function PreviewList({ emoji, name, meta, pct }: { emoji: string; name: string; 
 
 function Capability({ icon, title, desc, extra }: { icon: ReactNode; title: string; desc: string; extra?: ReactNode }) {
   return (
-    <div className="lp-card">
-      <div className="lp-card-icon">{icon}</div>
-      <h3>{title}</h3>
+    <div className="lp-card lp-cap">
+      <div className="lp-cap-head">
+        <div className="lp-card-icon">{icon}</div>
+        <h3>{title}</h3>
+      </div>
       <p>{desc}</p>
       {extra}
     </div>
@@ -590,12 +585,12 @@ function Transform({ inp, out }: { inp: string; out: ReactNode }) {
 }
 
 const LIFECYCLE = [
-  { title: 'Create', desc: 'Start any list.' },
-  { title: 'Organize', desc: 'Add items naturally and let Listo keep things structured.' },
-  { title: 'Collaborate', desc: 'Invite others and stay updated in real time.' },
-  { title: 'Track', desc: 'See progress and know exactly what remains.' },
-  { title: 'Complete', desc: 'Finish your list and understand how you did.' },
-  { title: 'Repeat Smarter', desc: 'Use your history to prepare future lists faster.' },
+  { title: 'Create', desc: 'Start any list.', Icon: PlusCircle },
+  { title: 'Organize', desc: 'Add items naturally and let Listo keep things structured.', Icon: Layers },
+  { title: 'Collaborate', desc: 'Invite others and stay updated in real time.', Icon: Users },
+  { title: 'Track', desc: 'See progress and know exactly what remains.', Icon: TrendingUp },
+  { title: 'Complete', desc: 'Finish your list and understand how you did.', Icon: Check },
+  { title: 'Repeat Smarter', desc: 'Use your history to prepare future lists faster.', Icon: RefreshCw },
 ]
 
 const USE_CASES = [

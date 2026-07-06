@@ -150,11 +150,13 @@ export default function Login() {
       )}
       <div className={`auth-card ${shake ? 'auth-shake' : ''}`}>
         <div className="auth-logo">
-          <img
-            src="/brand.png"
-            alt="Listo"
-            style={{ width: 62, height: 62, display: 'block', margin: '0 auto 20px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', borderRadius: 16 }}
-          />
+          <Link to="/about" aria-label="About Listo" style={{ display: 'block' }}>
+            <img
+              src="/brand.png"
+              alt="Listo"
+              style={{ width: 62, height: 62, display: 'block', margin: '0 auto 20px', boxShadow: '0 3px 10px rgba(0,0,0,0.25)', borderRadius: 16 }}
+            />
+          </Link>
           {mode === 'register' ? (
             <>
               <h1>Create your account</h1>
@@ -403,6 +405,10 @@ export default function Login() {
               ) : (
                 <>Already have an account? <a onClick={() => switchMode('login')}>Sign In</a></>
               )}
+            </div>
+
+            <div className="auth-switch" style={{ marginTop: 4 }}>
+              New to Listo? <Link to="/about">See what it's about</Link>
             </div>
           </>
         )}
