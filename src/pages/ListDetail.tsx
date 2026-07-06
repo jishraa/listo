@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X, ListChecks, ClipboardList } from 'lucide-react'
+import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X, ListChecks, ClipboardList, ChevronDown, Undo2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { parseItemInput, detectCategoryIn } from '../lib/constants'
-import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
+import { friendlyName, formatRelativeTime, capitalize, formatQuantity } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../store/useMemoryStore'
 import { pendingDuplicateGroups } from '../lib/duplicates'
@@ -123,6 +123,9 @@ export default function ListDetail() {
   const [viewPrefs,        setViewPrefs]        = useState<ViewPrefs>(() => readViewPrefs(id))
   const [customizeOpen,    setCustomizeOpen]    = useState(false)
   const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set())
+  // Tapping a completed item opens a small action sheet (Add Again / Move to
+  // Pending / Edit / Delete) rather than mutating it directly.
+  const [completedAction,  setCompletedAction]  = useState<ListItem | null>(null)
 
   function updateViewPref(patch: Partial<ViewPrefs>) {
     setViewPrefs(prev => {
@@ -437,7 +440,7 @@ export default function ListDetail() {
             🛒 Last item
           </div>
         )}
-        <div className="flex items-center gap-3" style={{ padding: '12px 14px', background: isFinalItem ? 'var(--accent-dim)' : 'var(--bg-card)' }}>
+        <div className="flex items-center gap-3" style={{ padding: '11px 14px', background: isFinalItem ? 'var(--accent-dim)' : 'var(--bg-card)' }}>
           {/* Checkbox — 44px touch target around the 22px control (spec §17) */}
           <button
             onClick={() => { if (canEdit) store.toggleItem(list.id, item) }}
@@ -460,15 +463,21 @@ export default function ListDetail() {
             </span>
           </button>
 
-          {/* Title area — tap to edit. 17px/600 title, one 13px metadata line (spec §5/§13) */}
+          {/* Title area — pending: tap to edit; completed: tap for actions
+              (Add Again / Move to Pending / Edit / Delete). */}
           <div
-            onClick={() => { if (canEdit && !item.completed) { cancelEdit(); startEdit(item) } }}
-            style={{ flex: 1, minWidth: 0, cursor: canEdit && !item.completed ? 'pointer' : 'default' }}
+            onClick={() => {
+              if (!canEdit) return
+              if (item.completed) setCompletedAction(item)
+              else { cancelEdit(); startEdit(item) }
+            }}
+            style={{ flex: 1, minWidth: 0, cursor: canEdit ? 'pointer' : 'default' }}
           >
             <div className="flex items-center gap-2">
               <span style={{
                 fontSize: 17, fontWeight: 600,
-                color: item.completed ? 'var(--text-3)' : 'var(--text)',
+                // Completed items are secondary, not disabled — keep them readable.
+                color: item.completed ? 'var(--text-2)' : 'var(--text)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 transition: 'color 200ms ease',
               }}>{item.title}</span>
@@ -485,10 +494,11 @@ export default function ListDetail() {
               // "Category · Member" — friendly names, "You" for own items.
               const showCat = cat && viewPrefs.categories
               const person = (n: string) => n === displayName ? 'You' : friendlyName(n)
+              // No "✓" here — the green check already signals completion (spec).
               const rawWho = !viewPrefs.addedBy ? null : item.completed
-                ? (item.completed_by_name ? `✓ ${person(item.completed_by_name)}` : null)
+                ? (item.completed_by_name ? person(item.completed_by_name) : null)
                 : (members.length > 1 && item.added_by_name ? person(item.added_by_name) : null)
-              const who = rawWho && showCat && !item.completed ? `· ${rawWho}` : rawWho
+              const who = rawWho && showCat ? `· ${rawWho}` : rawWho
               if (!showCat && !who) return null
               return (
                 <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
@@ -497,11 +507,11 @@ export default function ListDetail() {
                       flexShrink: 0, fontSize: 11, fontWeight: 600, lineHeight: 1,
                       padding: '3px 7px', borderRadius: 6,
                       background: item.completed ? 'var(--bg-input)' : `${cat!.color}1f`,
-                      color: item.completed ? 'var(--text-3)' : 'var(--text-2)',
+                      color: 'var(--text-2)',
                     }}>{cat!.name}</span>
                   )}
                   {who && (
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
                   )}
                 </div>
               )
@@ -539,21 +549,22 @@ export default function ListDetail() {
               <button
                 onClick={e => { e.stopPropagation(); if (canEdit) { setQtyDraft(item.quantity ?? ''); setQtyEditId(item.id) } }}
                 disabled={!canEdit}
+                aria-label={`Quantity ${formatQuantity(item.quantity)}`}
                 style={{
                   flexShrink: 0, padding: '3px 9px', borderRadius: 99,
                   background: 'var(--bg-input)', border: '1px solid var(--border)',
                   fontSize: 12, fontWeight: 600, cursor: canEdit ? 'pointer' : 'default',
                   color: 'var(--text-2)',
                 }}
-              >{item.quantity}</button>
+              >{formatQuantity(item.quantity)}</button>
             )
           )}
           {list.type === 'shopping' && item.completed && item.quantity && (
-            <span style={{
+            <span aria-label={`Quantity ${formatQuantity(item.quantity)}`} style={{
               flexShrink: 0, padding: '3px 9px', borderRadius: 99,
               background: 'var(--bg-input)', border: '1px solid var(--border)',
-              fontSize: 12, fontWeight: 600, color: 'var(--text-3)', opacity: 0.6,
-            }}>{item.quantity}</span>
+              fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
+            }}>{formatQuantity(item.quantity)}</span>
           )}
         </div>
       </SwipeRow>
@@ -576,7 +587,7 @@ export default function ListDetail() {
     { label: 'View & Tools', rows: [
       { icon: <ArrowUpDown size={16} />, label: 'Sort', right: sortHint, onClick: () => { closeMenu(); setSortMenuOpen(true) } },
       ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', badge: 'PRO', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
-      ...(list.type === 'shopping' && canEdit && items.length > 0 ? [{ icon: <ShoppingCart size={16} />, label: 'Shop Mode', onClick: () => { closeMenu(); setShopModeOpen(true) } }] : []),
+      // Shop Mode is reached from the header action, so it's not repeated here.
       // Shopping-only, and only once there are forgotten regulars to suggest (§11)
       ...(list.type === 'shopping' && canEdit && forgotten.length > 0 ? [{ icon: <ShoppingBag size={16} />, label: 'Before you go', onClick: () => { closeMenu(); setBeforeYouGoOpen(true) } }] : []),
       { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', onClick: () => { closeMenu(); setCustomizeOpen(true) } },
@@ -669,7 +680,7 @@ export default function ListDetail() {
         {/* Compact contextual progress (spec §1–2): one line + 4px bar,
             bar hidden until something is completed */}
         {items.length > 0 && (
-          <div style={{ padding: '10px 16px 16px' }}>
+          <div style={{ padding: '10px 16px 20px' }}>
             <div className="flex items-center justify-between" style={{ marginBottom: doneCount > 0 ? 6 : 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: isAllComplete ? 'var(--accent)' : 'var(--text-2)' }}>
                 {progressMsg}
@@ -693,12 +704,12 @@ export default function ListDetail() {
         {/* Category filter strip — horizontally scrollable, labels never
             truncate or wrap (spec §1.1); soft green tint when active (§1.2) */}
         {list.type === 'shopping' && usedCatIds.size > 0 && (
-          <div className="cat-filter-strip" style={{ display: 'flex', gap: 8, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' as const }}>
-            <button onClick={() => setFilterCategories(new Set())} style={pillStyle(filterCategories.size === 0)}>All</button>
+          <div className="cat-filter-strip" role="group" aria-label="Filter by category" style={{ display: 'flex', gap: 8, padding: '0 16px 10px', overflowX: 'auto', scrollbarWidth: 'none' as const }}>
+            <button aria-pressed={filterCategories.size === 0} onClick={() => setFilterCategories(new Set())} style={pillStyle(filterCategories.size === 0)}>All</button>
             {cats.filter(c => usedCatIds.has(c.id)).map(c => {
               const active = filterCategories.has(c.id)
               return (
-                <button key={c.id} onClick={() => setFilterCategories(prev => {
+                <button key={c.id} aria-pressed={active} onClick={() => setFilterCategories(prev => {
                   const next = new Set(prev); active ? next.delete(c.id) : next.add(c.id); return next
                 })} style={pillStyle(active)}>{c.name}</button>
               )
@@ -897,18 +908,24 @@ export default function ListDetail() {
                 </>
               )}
 
-              {/* Completed */}
+              {/* Completed — the whole header row is the toggle (no button-like
+                  Hide/Show control); a chevron rotates with the state. */}
               {completed.length > 0 && (
                 <>
-                  <div className="flex items-center justify-between" style={{ margin: '4px 2px 0' }}>
+                  <button
+                    className="completed-toggle"
+                    aria-expanded={showCompleted}
+                    onClick={() => setShowCompleted(v => !v)}
+                  >
                     <span style={sectionLabel}>Completed ({completed.length})</span>
-                    <button onClick={() => setShowCompleted(v => !v)}
-                      style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-3)', background: 'none', cursor: 'pointer', padding: '8px 4px', margin: '-8px -4px' }}>
-                      {showCompleted ? 'Hide ▲' : 'Show ▼'}
-                    </button>
-                  </div>
+                    <ChevronDown
+                      size={18}
+                      style={{ color: 'var(--text-3)', transition: 'transform 200ms var(--ease)', transform: showCompleted ? 'rotate(180deg)' : 'none' }}
+                    />
+                  </button>
                   {showCompleted && (
-                    <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', opacity: 0.6 }}>
+                    // Readable, secondary — not blanket-dimmed like a disabled block.
+                    <div style={{ borderRadius: 14, overflow: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                       {completed.map((item, idx) => (
                         <div key={item.id} style={{ borderTop: idx > 0 ? '1px solid var(--border)' : 'none' }}>
                           {renderItem(item)}
@@ -949,6 +966,57 @@ export default function ListDetail() {
         items={items}
         cats={cats}
       />
+
+      {/* ── Completed item actions (Add Again / Move to Pending / Edit / Delete) ── */}
+      {completedAction && (
+        <>
+          <Overlay onClick={() => setCompletedAction(null)} />
+          <div className="sheet">
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <div className="sheet-heading">
+                <span className="sheet-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                  {completedAction.title}{completedAction.quantity ? ` · ${formatQuantity(completedAction.quantity)}` : ''}
+                </span>
+              </div>
+              <button className="btn btn-ghost btn-sm" aria-label="Close" onClick={() => setCompletedAction(null)}><X size={18} /></button>
+            </div>
+            <div className="ld-menu" role="menu">
+              <div className="ld-menu-group">
+                {/* Add Again — legitimate repeat purchase: a fresh pending item,
+                    never routed through the active-duplicate merge warning. */}
+                <button role="menuitem" className="ld-menu-row" onClick={async () => {
+                  const it = completedAction; setCompletedAction(null)
+                  await store.addItem(list.id, it.title, it.quantity ?? '', it.category)
+                }}>
+                  <span className="ld-row-icon"><Plus size={16} /></span>
+                  <span className="ld-row-label">Add Again</span>
+                </button>
+                <button role="menuitem" className="ld-menu-row" onClick={() => {
+                  const it = completedAction; setCompletedAction(null); store.toggleItem(list.id, it)
+                }}>
+                  <span className="ld-row-icon"><Undo2 size={16} /></span>
+                  <span className="ld-row-label">Move to Pending</span>
+                </button>
+                <button role="menuitem" className="ld-menu-row" onClick={() => {
+                  const it = completedAction; setCompletedAction(null); cancelEdit(); startEdit(it); setTimeout(() => editTitleRef.current?.focus(), 80)
+                }}>
+                  <span className="ld-row-icon"><Pencil size={16} /></span>
+                  <span className="ld-row-label">Edit</span>
+                </button>
+              </div>
+              <div className="ld-menu-group">
+                <button role="menuitem" className="ld-menu-row danger" onClick={() => {
+                  const it = completedAction; setCompletedAction(null); handleDelete(it)
+                }}>
+                  <span className="ld-row-icon"><Trash2 size={16} /></span>
+                  <span className="ld-row-label">Delete</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <BeforeYouGoSheet
         open={beforeYouGoOpen}

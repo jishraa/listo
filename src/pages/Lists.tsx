@@ -15,7 +15,8 @@ import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
 type Filter = 'active' | 'shared' | 'completed' | 'archived'
-type Sort = 'recent' | 'alpha' | 'created' | 'items' | 'progress'
+// 'created'/'progress' ids kept stable so saved selections keep working.
+type Sort = 'recent' | 'alpha' | 'created' | 'items' | 'progressHigh' | 'progress'
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'active',    label: 'Active' },
@@ -25,11 +26,12 @@ const FILTERS: { id: Filter; label: string }[] = [
 ]
 
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'recent',   label: 'Recently Updated' },
-  { id: 'alpha',    label: 'Alphabetical' },
-  { id: 'created',  label: 'Recently Created' },
-  { id: 'items',    label: 'Most Items' },
-  { id: 'progress', label: 'Least Progress' },
+  { id: 'recent',       label: 'Recently Updated' },
+  { id: 'created',      label: 'Newest First' },
+  { id: 'alpha',        label: 'Alphabetical' },
+  { id: 'items',        label: 'Most Items' },
+  { id: 'progressHigh', label: 'Highest Progress' },
+  { id: 'progress',     label: 'Lowest Progress' },
 ]
 
 const SORT_KEY = 'listo-lists-sort'
@@ -238,18 +240,18 @@ export default function Lists() {
   const byRecent = (a: List, b: List) =>
     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
 
+  const progressPct = (l: List) => {
+    const its = store.items[l.id] ?? []
+    return its.length === 0 ? 1 : its.filter(i => i.completed).length / its.length
+  }
+
   const comparator: Record<Sort, (a: List, b: List) => number> = {
     recent:  byRecent,
     alpha:   (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
     created: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     items:   (a, b) => (store.items[b.id]?.length ?? 0) - (store.items[a.id]?.length ?? 0),
-    progress: (a, b) => {
-      const pct = (l: List) => {
-        const its = store.items[l.id] ?? []
-        return its.length === 0 ? 1 : its.filter(i => i.completed).length / its.length
-      }
-      return pct(a) - pct(b)
-    },
+    progressHigh: (a, b) => progressPct(b) - progressPct(a),  // most complete first
+    progress:     (a, b) => progressPct(a) - progressPct(b),  // least complete first
   }
 
   // Pins always float; the user's manual order only applies in Recent mode
@@ -616,18 +618,22 @@ export default function Lists() {
       )}
 
       <Sheet open={sortOpen} onClose={() => setSortOpen(false)} title="Sort by">
-        <div className="sheet-body" style={{ gap: 8 }}>
-          {SORTS.map(s => (
-            <button
-              key={s.id}
-              className="btn btn-secondary btn-full"
-              style={{ justifyContent: 'space-between' }}
-              onClick={() => { setSort(s.id); localStorage.setItem(SORT_KEY, s.id); setSortOpen(false) }}
-            >
-              {s.label}
-              {sort === s.id && <Check size={16} color="var(--accent)" strokeWidth={2.5} />}
-            </button>
-          ))}
+        <div className="sheet-body" style={{ gap: 7 }} role="radiogroup" aria-label="Sort lists by">
+          {SORTS.map(s => {
+            const selected = sort === s.id
+            return (
+              <button
+                key={s.id}
+                role="radio"
+                aria-checked={selected}
+                className={`sort-row${selected ? ' selected' : ''}`}
+                onClick={() => { setSort(s.id); localStorage.setItem(SORT_KEY, s.id); setSortOpen(false) }}
+              >
+                <span>{s.label}</span>
+                {selected && <Check size={17} color="var(--accent-text)" strokeWidth={2.6} />}
+              </button>
+            )
+          })}
         </div>
       </Sheet>
 

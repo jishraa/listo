@@ -415,6 +415,24 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: var(--bg-input); color: var(--text-2);
 }
 
+/* ── Sort rows (Lists sort sheet) ────────────────────────────── */
+/* Flat single-select rows, not cards; clear selected state without glow. */
+.sort-row {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; height: 50px; padding: 0 14px; border-radius: 12px;
+  background: var(--bg-input); border: 1px solid transparent;
+  color: var(--text-2); font-size: 15px; font-weight: 500;
+  cursor: pointer; text-align: left;
+  transition: background 160ms var(--ease), color 160ms var(--ease), border-color 160ms var(--ease);
+}
+.sort-row:active { transform: scale(0.99); }
+.sort-row.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* Horizontal chip scroller (Your Regulars) — single row, hidden scrollbar */
 .hscroll {
   display: flex;
@@ -424,6 +442,21 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   -webkit-overflow-scrolling: touch;
 }
 .hscroll::-webkit-scrollbar { display: none; }
+
+/* Completed-section toggle — the whole header row is tappable, no button chrome */
+.completed-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 10px 2px; min-height: 44px; margin-top: 4px;
+  background: none; border: none; cursor: pointer; text-align: left; border-radius: 8px;
+}
+
+/* Listo-consistent keyboard focus for the sort / menu / completed controls */
+.completed-toggle:focus-visible,
+.sort-row:focus-visible,
+.ld-menu-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 /* ── List Options menu (grouped, context-aware) ──────────────── */
 .ld-menu { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0 8px; }

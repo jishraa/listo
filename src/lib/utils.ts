@@ -19,6 +19,17 @@ export function formatRelativeTime(dateStr: string): string {
 // Normalise item titles for display: "rice" → "Rice".
 export const capitalize = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
 
+// Centralized quantity display: normalize the stored qty ("2L", "5kg", "×10",
+// "1kg", "500g") to a consistent "<number> <unit>" form — "2 L", "5 kg", "10",
+// "1 kg", "500 g". The × count symbol is dropped (shows the bare number).
+// Anything that doesn't match (e.g. a merged "3+2") is returned unchanged.
+export function formatQuantity(qty: string | null | undefined): string {
+  if (!qty) return ''
+  const m = String(qty).trim().match(/^×?\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]*)$/)
+  if (!m) return String(qty).trim()
+  return m[2] ? `${m[1]} ${m[2]}` : m[1]
+}
+
 // Humanise technical usernames for display: "anjana1995ks" / "anjana@x.com"
 // → "Anjana". Real display names (with spaces / no digits) pass through.
 export function friendlyName(name: string): string {

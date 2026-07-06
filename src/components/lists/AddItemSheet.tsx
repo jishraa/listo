@@ -4,7 +4,7 @@ import { useListsStore } from '../../store/useListsStore'
 import { useMemoryStore, memoryKey, regularsOf, suggestOf, type MemoryItem } from '../../store/useMemoryStore'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../../lib/constants'
 import { findPendingMergeTarget, hasCompletedMatch } from '../../lib/duplicates'
-import { capitalize } from '../../lib/utils'
+import { capitalize, formatQuantity } from '../../lib/utils'
 import CategoryPickerSheet from './CategoryPickerSheet'
 import type { List, ListItem } from '../../types'
 import type { ListCategory } from '../../lib/constants'
@@ -23,18 +23,11 @@ function describeQty(qty: string): { quantity: string; unit: string } | null {
   return { quantity: m[1], unit: m[2] || '' }
 }
 
-// "Milk · 2" / "Rice · 2 kg" / "Milk" — never the × symbol (spec §confirmation)
+// "Milk · 2" / "Rice · 2 kg" / "Milk" — never the × symbol (spec §confirmation).
+// Uses the shared formatQuantity util so display is consistent app-wide.
 function formatItemLabel(title: string, qty: string): string {
-  const d = describeQty(qty)
-  if (!d) return title
-  return d.unit ? `${title} · ${d.quantity} ${d.unit}` : `${title} · ${d.quantity}`
-}
-
-// Compact qty for chips: "2" / "2kg" (no × symbol)
-function qtyShort(qty: string | null | undefined): string {
-  const d = describeQty(qty ?? '')
-  if (!d) return ''
-  return d.unit ? `${d.quantity}${d.unit}` : d.quantity
+  const q = formatQuantity(qty)
+  return q ? `${title} · ${q}` : title
 }
 
 function mergeQuantities(a: string | null | undefined, b: string): string {
@@ -289,7 +282,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                   {/* Single scrolling row — never a crowded wrap (spec §Your Regulars) */}
                   <div className="hscroll" role="list" aria-label="Your regulars" style={{ margin: '0 -16px', padding: '0 16px 2px' }}>
                     {regulars.map(m => {
-                      const q = qtyShort(m.lastQuantity)
+                      const q = formatQuantity(m.lastQuantity)
                       return (
                         <button
                           key={m.nameKey}
@@ -367,7 +360,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
             <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <p style={{ fontWeight: 700, fontSize: 16 }}>"{mergeTarget.title}" already exists</p>
               <p className="text-muted text-sm">
-                Existing: <strong>{mergeTarget.quantity || '—'}</strong> · Adding: <strong>{pendingAdd.qty}</strong> → Combined: <strong>{mergeQuantities(mergeTarget.quantity, pendingAdd.qty)}</strong>
+                Existing: <strong>{formatQuantity(mergeTarget.quantity) || '—'}</strong> · Adding: <strong>{formatQuantity(pendingAdd.qty)}</strong> → Combined: <strong>{formatQuantity(mergeQuantities(mergeTarget.quantity, pendingAdd.qty))}</strong>
               </p>
               <div className="flex gap-2">
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(formatItemLabel(pendingAdd.title, pendingAdd.qty)) }}>Add Separate</button>
