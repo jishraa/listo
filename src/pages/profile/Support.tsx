@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { Heart, Star, Gift, MessageCircle } from 'lucide-react'
+import { Heart, Star, MessageCircle } from 'lucide-react'
 import { SubPage, Section, Row } from './common'
 
 // India-friendly support via UPI (no signup). The deep link opens the user's
@@ -10,8 +9,6 @@ const SUPPORT_URL = `upi://pay?pa=${encodeURIComponent(UPI_VPA)}&pn=${encodeURIC
 const FEEDBACK_EMAIL = 'grk766@gmail.com'
 
 export default function SupportPage() {
-  const navigate = useNavigate()
-
   // Custom-scheme deep links must navigate (window.open is blocked for upi://).
   const handleSupport = () => { window.location.href = SUPPORT_URL }
   const mailTo = (subject: string) => {
@@ -47,7 +44,6 @@ export default function SupportPage() {
       {/* Other ways to help — inclusive of non-financial support */}
       <Section title="Other ways to help">
         <Row icon={<Star size={17} />} label="Rate Listo" onPress={() => mailTo('I love Listo ⭐')} />
-        <Row icon={<Gift size={17} />} label="Invite Friends" onPress={() => navigate('/profile/invite')} />
         <Row icon={<MessageCircle size={17} />} label="Send Feedback" onPress={() => mailTo('Listo feedback')} last />
       </Section>
 

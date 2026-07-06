@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
+import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { useListsStore } from './useListsStore'
 import { useSyncStore } from './useSyncStore'
@@ -23,6 +26,35 @@ interface AuthState {
   setDisplayName: (name: string) => void
 }
 
+// Custom URL scheme the native apps register (iOS Info.plist / Android
+// intent-filter). OAuth returns here as listo://auth/callback#access_token=…
+const NATIVE_REDIRECT = 'listo://auth/callback'
+
+let nativeDeepLinkBound = false
+
+// On native, OAuth runs in an in-app browser and returns via the listo://
+// deep link with the session tokens in the URL fragment (implicit flow — the
+// web client stays on implicit so cross-device reset/confirm links keep
+// working). Parse them out and hand them to setSession.
+function bindNativeDeepLink() {
+  if (nativeDeepLinkBound || !Capacitor.isNativePlatform()) return
+  nativeDeepLinkBound = true
+  App.addListener('appUrlOpen', async ({ url }) => {
+    if (!url.startsWith(NATIVE_REDIRECT)) return
+    // The in-app browser has served its purpose — dismiss it.
+    await Browser.close().catch(() => { /* already closed */ })
+    const fragment = url.split('#')[1]
+    if (!fragment) return
+    const params = new URLSearchParams(fragment)
+    const access_token = params.get('access_token')
+    const refresh_token = params.get('refresh_token')
+    if (access_token && refresh_token) {
+      // Populates the session; onAuthStateChange then updates the store.
+      await supabase.auth.setSession({ access_token, refresh_token })
+    }
+  })
+}
+
 export const useAuthStore = create<AuthState>(set => ({
   session: null,
   user: null,
@@ -31,6 +63,7 @@ export const useAuthStore = create<AuthState>(set => ({
   loading: true,
 
   init: async () => {
+    bindNativeDeepLink()
     const { data: { session } } = await supabase.auth.getSession()
     const isGuest = session?.user?.is_anonymous ?? false
     const storedName = localStorage.getItem('listo-display-name') ?? ''
@@ -72,7 +105,19 @@ export const useAuthStore = create<AuthState>(set => ({
   },
 
   signInWithProvider: async (provider, redirectTo) => {
-    // Redirect flow: on success the browser leaves the page and returns to
+    // Native (iOS/Android): open the provider page in an in-app browser and
+    // return through the listo:// deep link — a full-page web redirect can't
+    // come back into the app. skipBrowserRedirect gives us the URL to open.
+    if (Capacitor.isNativePlatform()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true },
+      })
+      if (error) return error.message
+      if (data?.url) await Browser.open({ url: data.url, presentationStyle: 'popover' })
+      return null
+    }
+    // Web redirect flow: on success the browser leaves the page and returns to
     // redirectTo (default origin) with a session; only config errors surface
     // here. The invite flow passes /join/:code so the join resumes after auth.
     const { error } = await supabase.auth.signInWithOAuth({
