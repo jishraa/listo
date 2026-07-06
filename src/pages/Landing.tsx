@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Check, ArrowRight, ArrowDown, Sparkles, Users, Layers,
+  Check, ArrowRight, Sparkles, Users, Layers,
   Brain, PlusCircle, ShoppingBag, Plane, Home as HomeIcon,
   Briefcase, CalendarDays, User as UserIcon, Share2, EyeOff,
   ShieldCheck, Zap,
@@ -321,7 +321,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 11. Listo Intelligence ────────────────────────────── */}
+      {/* ── 11. Listo Intelligence (memory · before-you-go · next list) ── */}
       <section className="lp-section">
         <div className="lp-container lp-center">
           <Reveal>
@@ -332,78 +332,46 @@ export default function Landing() {
               better use of every list.
             </p>
           </Reveal>
-          <Reveal className="lp-flow" style={{ marginTop: 40 }}>
-            {['You create lists', 'Listo remembers', 'Listo finds patterns', 'Listo suggests', 'You save time'].map((n, i, a) => (
-              <div key={n}>
-                <div className="lp-flow-node"><span className="n">{String(i + 1).padStart(2, '0')}</span>{n}</div>
-                {i < a.length - 1 && <div className="lp-flow-arrow"><ArrowDown size={18} /></div>}
-              </div>
+          <Reveal className="lp-flow-row" style={{ marginTop: 32 }}>
+            {['You create lists', 'Listo remembers', 'Finds patterns', 'Suggests', 'You save time'].map((n, i, a) => (
+              <span className="lp-flow-chip-wrap" key={n}>
+                <span className="lp-flow-chip">{n}</span>
+                {i < a.length - 1 && <ArrowRight className="lp-flow-sep" size={16} aria-hidden />}
+              </span>
             ))}
           </Reveal>
-        </div>
-      </section>
-
-      {/* ── 12. List Memory ───────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature">
-            <Reveal>
-              <span className="lp-eyebrow">List Memory</span>
-              <h2 className="lp-h2">Lists that remember.</h2>
-              <p className="lp-lead">
-                Frequently added items, typical quantities, and recurring patterns help Listo make better
-                suggestions over time.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 18, fontWeight: 700, color: 'var(--text)' }}>
-                Every list helps make the next one easier.
-              </p>
-            </Reveal>
-            <Reveal className="lp-feature-media" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-panel">
-                <div className="lp-panel-label">Suggested for you</div>
-                <div className="lp-pills">
-                  <span className="lp-pill"><PlusCircle size={15} /> Milk ×2</span>
-                  <span className="lp-pill"><PlusCircle size={15} /> Eggs ×12</span>
-                  <span className="lp-pill"><PlusCircle size={15} /> Rice 5kg</span>
-                  <span className="lp-pill"><PlusCircle size={15} /> Bread</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 14 }}>Based on your previous lists</div>
+          <Reveal className="lp-grid lp-grid-3" style={{ marginTop: 36, textAlign: 'left' }}>
+            <div className="lp-card">
+              <div className="lp-card-icon"><Brain size={22} /></div>
+              <h3>Lists that remember</h3>
+              <p>Frequently added items, typical quantities, and recurring patterns power better suggestions over time — every list makes the next one easier.</p>
+              <div className="lp-pills" style={{ marginTop: 14 }}>
+                <span className="lp-pill"><PlusCircle size={15} /> Milk ×2</span>
+                <span className="lp-pill"><PlusCircle size={15} /> Eggs ×12</span>
+                <span className="lp-pill"><PlusCircle size={15} /> Rice 5kg</span>
               </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 13. Before You Go ─────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature reverse">
-            <Reveal className="lp-feature-media">
-              <div className="lp-panel">
-                <div className="lp-panel-label">Ready to go?</div>
-                <div style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 600, marginBottom: 12 }}>You usually include:</div>
-                <div className="lp-pills" style={{ marginBottom: 16 }}>
-                  <span className="lp-pill">Milk</span>
-                  <span className="lp-pill">Eggs</span>
-                  <span className="lp-pill">Bread</span>
-                </div>
-                <div className="lp-dupe-actions">
-                  <button className="lp-btn lp-btn-primary lp-btn-sm" type="button" tabIndex={-1}>Add All</button>
-                  <button className="lp-btn lp-btn-secondary lp-btn-sm" type="button" tabIndex={-1}>Review</button>
-                </div>
+            </div>
+            <div className="lp-card">
+              <div className="lp-card-icon"><Sparkles size={22} /></div>
+              <h3>Forget less</h3>
+              <p>Before you start, Listo flags frequently used items that may be missing — a small reminder before forgotten items become a problem.</p>
+              <div className="lp-pills" style={{ marginTop: 14 }}>
+                <span className="lp-pill">Milk</span>
+                <span className="lp-pill">Eggs</span>
+                <span className="lp-pill">Bread</span>
               </div>
-            </Reveal>
-            <Reveal style={{ transitionDelay: '80ms' }}>
-              <span className="lp-eyebrow">Before You Go</span>
-              <h2 className="lp-h2">Forget less.</h2>
-              <p className="lp-lead">
-                Before you start, Listo can help identify frequently used items that may be missing.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 18, fontWeight: 700, color: 'var(--text)' }}>
-                A small reminder before forgotten items become a problem.
-              </p>
-            </Reveal>
-          </div>
+            </div>
+            <div className="lp-card">
+              <div className="lp-card-icon"><PlusCircle size={22} /></div>
+              <h3>Done doesn't mean starting over</h3>
+              <p>Completed lists help Listo prepare what comes next, so every finished list gives you a faster head start on the next one.</p>
+              <div className="lp-pills" style={{ marginTop: 14 }}>
+                <span className="lp-pill">Rice 5kg</span>
+                <span className="lp-pill">Bananas</span>
+                <span className="lp-pill">Bread</span>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -490,39 +458,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 17. Next List ─────────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature">
-            <Reveal>
-              <span className="lp-eyebrow">Next List</span>
-              <h2 className="lp-h2">Done doesn't mean starting over.</h2>
-              <p className="lp-lead">Completed lists help Listo prepare what comes next.</p>
-              <p className="lp-lead" style={{ marginTop: 18, fontWeight: 700, color: 'var(--text)' }}>
-                Every completed list makes the next one easier.
-              </p>
-            </Reveal>
-            <Reveal className="lp-feature-media" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-panel">
-                <div className="lp-panel-label">Suggested next list</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600, marginBottom: 12 }}>Based on your previous activity</div>
-                <div className="lp-pills" style={{ marginBottom: 16 }}>
-                  <span className="lp-pill">Milk ×2</span>
-                  <span className="lp-pill">Rice 5kg</span>
-                  <span className="lp-pill">Eggs ×12</span>
-                  <span className="lp-pill">Bread</span>
-                  <span className="lp-pill">Bananas</span>
-                </div>
-                <button className="lp-btn lp-btn-primary lp-btn-sm lp-btn" style={{ width: '100%' }} type="button" tabIndex={-1}>
-                  Review &amp; Create
-                </button>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 18. Listo + YFT ───────────────────────────────────── */}
+      {/* ── Listo + YFT ───────────────────────────────────────── */}
       <section className="lp-section-sm">
         <div className="lp-container lp-center">
           <Reveal>
