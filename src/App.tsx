@@ -177,7 +177,7 @@ function AppRoutes() {
       <Route path="/join/:code" element={<JoinList />} />
       {/* Public marketing landing — always reachable, even when signed in
           (so authenticated visitors see it with the "Open Listo" CTA). */}
-      <Route path="/welcome" element={<Landing />} />
+      <Route path="/about" element={<Landing />} />
       {/* "/" is public: RootGate shows the landing to signed-out visitors and
           the Lists workspace (AppShell → index route) to authenticated ones. */}
       <Route path="/" element={<RootGate />}>
