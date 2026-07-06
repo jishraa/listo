@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check, Users, Sparkles, ChevronRight } from 'lucide-react'
+import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
@@ -364,7 +364,7 @@ export default function Lists() {
         {/* Header — counts give context (spec §1) */}
         <div style={{ padding: '20px 16px 12px' }} className="flex items-center justify-between">
           <div>
-            <span style={{ fontWeight: 800, fontSize: 22, letterSpacing: -0.6, display: 'block' }}>Lists</span>
+            <img src="/wordmark.png" alt="Listo" style={{ height: 26, width: 'auto', display: 'block' }} />
             {hasLists && (
               <span style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'block' }}>
                 {headerSummary}
@@ -508,24 +508,6 @@ export default function Lists() {
                       <span style={{ ...sectionLabel, padding: '8px 2px 0', display: 'block' }}>Templates</span>
                       {templatesFiltered.map(renderTemplate)}
                     </>
-                  )}
-
-                  {/* Template nudge only while the workspace is nearly empty
-                      (1–2 active lists); templates otherwise live behind the
-                      + action — never a permanent dashboard card (spec) */}
-                  {!isGuest && !q && activeAll.length > 0 && activeAll.length <= 2 && (
-                    <button
-                      onClick={() => { setCreateStep('templates'); setCreateOpen(true) }}
-                      className="card card-press"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', cursor: 'pointer', textAlign: 'left' }}
-                    >
-                      <Sparkles size={17} color="var(--accent)" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 14, fontWeight: 600 }}>Need inspiration?</p>
-                        <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 2 }}>Browse ready-made templates</p>
-                      </div>
-                      <ChevronRight size={15} color="var(--text-3)" style={{ flexShrink: 0 }} />
-                    </button>
                   )}
 
                   {completedAll.length > 0 && (
