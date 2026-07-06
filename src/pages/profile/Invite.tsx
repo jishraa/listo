@@ -6,7 +6,9 @@ const REFERRAL_MESSAGE =
 
 export default function InvitePage() {
   const handleInvite = async () => {
-    const url = window.location.origin
+    // Send friends to the public marketing landing so they see what Listo is
+    // before signing up.
+    const url = `${window.location.origin}/about`
     if (navigator.share) {
       await navigator.share({ title: 'Listo', text: REFERRAL_MESSAGE, url }).catch(() => {})
     } else {
