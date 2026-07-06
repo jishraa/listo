@@ -1,19 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { Sparkles } from 'lucide-react'
 import Sheet from '../ui/Sheet'
 import type { List, ListType } from '../../types'
-import { TEMPLATES } from '../../lib/constants'
+import { TEMPLATES, LIST_TYPE_ICONS, suggestListMeta } from '../../lib/constants'
 import { useListsStore, templateLists } from '../../store/useListsStore'
-
-const TYPE_EMOJIS: Record<ListType, string[]> = {
-  personal: ['📋', '📝', '🗒️', '📌', '🏠', '💼'],
-  tasks: ['✅', '🎯', '⚡', '🚀', '📅', '🔧'],
-  shopping: ['🛒', '🧺', '🛍️', '🍎', '🥗', '🏪'],
-}
 
 const TYPE_LABELS: Record<ListType, string> = {
   personal: 'Personal',
   tasks: 'Tasks',
   shopping: 'Shopping',
+}
+
+// Accessible names for the icon buttons — emoji alone reads inconsistently on
+// screen readers (a11y §Screen-reader labels for icons).
+const ICON_LABELS: Record<string, string> = {
+  '🏠': 'Home', '✈️': 'Travel', '⭐': 'Star', '📅': 'Calendar', '📝': 'Notes',
+  '✅': 'Checklist', '💼': 'Briefcase', '🎯': 'Target', '🔧': 'Tools',
+  '🛒': 'Shopping cart', '🧺': 'Basket', '🛍️': 'Shopping bags', '🍎': 'Food', '🏪': 'Store',
 }
 
 // User preference set in Profile → Preferences → Default List Type
@@ -35,7 +38,11 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   const [step, setStep] = useState<'templates' | 'custom'>(initialStep)
   const [name, setName] = useState('')
   const [type, setType] = useState<ListType>(getDefaultListType)
-  const [emoji, setEmoji] = useState(() => TYPE_EMOJIS[getDefaultListType()][0])
+  // Latches once the user picks a type, so smart suggestions never override a
+  // manual choice (Create List spec §5).
+  const [typeManual, setTypeManual] = useState(false)
+  // 'auto' = let the name/type decide; otherwise an explicit emoji.
+  const [iconChoice, setIconChoice] = useState<'auto' | string>('auto')
   const [loading, setLoading] = useState(false)
 
   const lists = useListsStore(s => s.lists)
@@ -43,25 +50,40 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   const createFromTemplate = useListsStore(s => s.createFromTemplate)
   const myTemplates = templateLists(lists)
 
+  // Lightweight local keyword match → suggested { type, emoji }
+  const suggestion = useMemo(() => suggestListMeta(name), [name])
+
+  // Follow the suggested type only until the user picks one themselves.
+  useEffect(() => {
+    if (!typeManual && suggestion) setType(suggestion.type)
+  }, [suggestion, typeManual])
+
+  // Auto icon: the suggestion's emoji while the type is still auto-driven,
+  // otherwise the chosen type's default icon (predictable, spec §5/§11).
+  const autoEmoji = (!typeManual && suggestion) ? suggestion.emoji : LIST_TYPE_ICONS[type][0]
+  const resolvedEmoji = iconChoice === 'auto' ? autoEmoji : iconChoice
+
   // Re-sync when reopened — the same instance can be opened with a
-  // different initialStep (e.g. Home's "New List" vs "Templates" actions).
+  // different initialStep (e.g. Lists' "New List" vs "Templates" actions).
   useEffect(() => { if (open) setStep(initialStep) }, [open, initialStep])
 
   const reset = () => {
-    const t = getDefaultListType()
-    setStep(initialStep); setName(''); setType(t); setEmoji(TYPE_EMOJIS[t][0])
+    setStep(initialStep); setName(''); setType(getDefaultListType())
+    setTypeManual(false); setIconChoice('auto')
   }
 
   const handleCreate = async (templateItems?: { title: string; category?: string }[]) => {
-    if (!name.trim()) return
+    // Guard also blocks duplicate submissions while a create is in flight (§8).
+    if (!name.trim() || loading) return
     setLoading(true)
-    await onCreate(name.trim(), type, emoji, templateItems)
+    await onCreate(name.trim(), type, resolvedEmoji, templateItems)
     reset()
     setLoading(false)
     onClose()
   }
 
   const handleTemplate = async (t: typeof TEMPLATES[0]) => {
+    if (loading) return
     setLoading(true)
     await onCreate(t.label, t.type, t.emoji, t.items)
     setLoading(false)
@@ -69,6 +91,7 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
   }
 
   const handleUserTemplate = async (t: List) => {
+    if (loading) return
     setLoading(true)
     await createFromTemplate(t.id)
     setLoading(false)
@@ -77,9 +100,19 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
 
   const handleClose = () => { reset(); onClose() }
 
+  const isCustom = step === 'custom'
+
   return (
-    <Sheet open={open} onClose={handleClose} title={step === 'templates' ? 'New List' : 'Custom List'}>
-      {step === 'templates' ? (
+    <Sheet
+      open={open}
+      onClose={handleClose}
+      title={isCustom ? 'Create List' : 'New List'}
+      subtitle={isCustom ? 'Choose a name and type to get started.' : undefined}
+      // Step navigation back to the gallery (only when we came from it) — not a
+      // dismissal, so it doesn't compete with X / swipe / backdrop (spec §7).
+      onBack={isCustom && initialStep === 'templates' ? () => setStep('templates') : undefined}
+    >
+      {!isCustom ? (
         <div className="sheet-body">
           {myTemplates.length > 0 && (
             <>
@@ -154,32 +187,31 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
           </button>
         </div>
       ) : (
-        <div className="sheet-body">
+        <div className="sheet-body sheet-body--form">
           <div className="input-group">
-            <label className="input-label">List name</label>
+            <label className="input-label" htmlFor="new-list-name">List Name</label>
             <input
+              id="new-list-name"
               className="input"
-              placeholder="e.g. Weekly groceries"
+              placeholder="e.g. Weekend Trip"
               value={name}
-              onChange={e => setName(e.target.value)}
               autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              enterKeyHint="done"
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
             />
           </div>
 
           <div className="input-group">
-            <label className="input-label">Type</label>
-            <div className="flex gap-2">
+            <label className="input-label" id="list-type-label">List Type</label>
+            <div className="seg-group" role="group" aria-labelledby="list-type-label">
               {(['personal', 'tasks', 'shopping'] as ListType[]).map(t => (
                 <button
                   key={t}
-                  onClick={() => { setType(t); setEmoji(TYPE_EMOJIS[t][0]) }}
-                  className="btn btn-sm"
-                  style={{
-                    flex: 1,
-                    background: type === t ? 'var(--accent)' : 'var(--bg-input)',
-                    color: type === t ? '#fff' : 'var(--text-2)',
-                  }}
+                  type="button"
+                  className="seg-btn"
+                  aria-pressed={type === t}
+                  onClick={() => { setType(t); setTypeManual(true) }}
                 >
                   {TYPE_LABELS[t]}
                 </button>
@@ -188,18 +220,25 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
           </div>
 
           <div className="input-group">
-            <label className="input-label">Emoji</label>
-            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-              {TYPE_EMOJIS[type].map(e => (
+            <label className="input-label" id="list-icon-label">Choose an Icon</label>
+            <div className="icon-grid" role="group" aria-labelledby="list-icon-label">
+              <button
+                type="button"
+                className="icon-btn icon-btn--auto"
+                aria-pressed={iconChoice === 'auto'}
+                aria-label={`Auto — pick an icon automatically (currently ${ICON_LABELS[autoEmoji] ?? 'suggested'})`}
+                onClick={() => setIconChoice('auto')}
+              >
+                <Sparkles size={15} /> Auto
+              </button>
+              {LIST_TYPE_ICONS[type].map(e => (
                 <button
                   key={e}
-                  onClick={() => setEmoji(e)}
-                  style={{
-                    width: 44, height: 44, borderRadius: 10, fontSize: 22,
-                    background: emoji === e ? 'var(--accent-dim)' : 'var(--bg-input)',
-                    border: emoji === e ? '2px solid var(--accent)' : '2px solid transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
+                  type="button"
+                  className="icon-btn"
+                  aria-pressed={iconChoice === e}
+                  aria-label={ICON_LABELS[e] ?? 'Icon'}
+                  onClick={() => setIconChoice(e)}
                 >
                   {e}
                 </button>
@@ -207,17 +246,15 @@ export default function CreateListSheet({ open, onClose, onCreate, initialStep =
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep('templates')}>Back</button>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 2, opacity: !name.trim() || loading ? 0.6 : 1 }}
-              onClick={() => handleCreate()}
-              disabled={!name.trim() || loading}
-            >
-              {loading ? <span className="spinner" /> : 'Create List'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-primary btn-full"
+            disabled={!name.trim() || loading}
+            aria-busy={loading}
+            onClick={() => handleCreate()}
+          >
+            {loading ? <><span className="spinner" style={{ marginRight: 8 }} />Creating…</> : 'Create List'}
+          </button>
         </div>
       )}
     </Sheet>

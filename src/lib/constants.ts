@@ -124,6 +124,38 @@ export const GROCERY_VOCAB = [
   'Toilet paper', 'Tissues', 'Garbage bags',
 ]
 
+// Context-aware icon options shown in the Create List sheet, per list type.
+// Kept short (5 each) so the row never overflows on a 320px screen and never
+// balloons into a full emoji picker (Create List spec §6).
+export const LIST_TYPE_ICONS: Record<ListType, string[]> = {
+  personal: ['🏠', '✈️', '⭐', '📅', '📝'],
+  tasks:    ['✅', '💼', '🎯', '📅', '🔧'],
+  shopping: ['🛒', '🧺', '🛍️', '🍎', '🏪'],
+}
+
+// Lightweight, local keyword → (type, icon) matcher for the Create List sheet's
+// "Auto" suggestion (spec §5/§11). Ordered — first match wins — and deliberately
+// predictable: no AI/network. Returns null when nothing clearly matches so the
+// caller can fall back to the current type's default icon.
+const SUGGEST_RULES: { type: ListType; emoji: string; keywords: string[] }[] = [
+  { type: 'personal', emoji: '✈️', keywords: ['trip', 'travel', 'vacation', 'holiday', 'packing', 'flight', 'tour', 'getaway', 'weekend'] },
+  { type: 'personal', emoji: '🎉', keywords: ['birthday', 'party', 'wedding', 'gift', 'celebration', 'anniversary', 'reunion'] },
+  { type: 'personal', emoji: '📚', keywords: ['book', 'read', 'reading', 'study', 'course', 'learn', 'wishlist', 'bucket'] },
+  { type: 'shopping', emoji: '🛒', keywords: ['grocery', 'groceries', 'supermarket', 'market', 'shopping', 'shop', 'mart', 'store', 'cart', 'buy'] },
+  { type: 'tasks',    emoji: '🏠', keywords: ['chore', 'chores', 'clean', 'cleaning', 'laundry', 'household', 'housework', 'repair', 'fix'] },
+  { type: 'tasks',    emoji: '💼', keywords: ['office', 'work', 'project', 'meeting', 'standup', 'sprint', 'client', 'deadline', 'task', 'tasks', 'todo'] },
+  { type: 'tasks',    emoji: '❤️', keywords: ['gym', 'workout', 'fitness', 'health', 'doctor', 'medicine', 'appointment'] },
+]
+
+export function suggestListMeta(name: string): { type: ListType; emoji: string } | null {
+  const text = name.trim().toLowerCase()
+  if (!text) return null
+  for (const rule of SUGGEST_RULES) {
+    if (rule.keywords.some(k => text.includes(k))) return { type: rule.type, emoji: rule.emoji }
+  }
+  return null
+}
+
 export const TEMPLATES: { id: string; label: string; emoji: string; type: ListType; items: { title: string; category?: string }[] }[] = [
   { id: 'groceries', label: 'Monthly Groceries', emoji: '🛒', type: 'shopping', items: [
     { title: 'Rice',        category: 'pantry'  },
