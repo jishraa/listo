@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Plus } from 'lucide-react'
+import { Check, Plus, ChevronDown } from 'lucide-react'
 import { useListsStore } from '../../store/useListsStore'
 import { useMemoryStore, memoryKey, regularsOf, suggestOf, type MemoryItem } from '../../store/useMemoryStore'
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../../lib/constants'
@@ -13,6 +13,29 @@ import type { ListCategory } from '../../lib/constants'
 // parsing, category auto-detect, GROCERY_VOCAB suggestions, frequent-item
 // one-tap chips, the "✓ added" confirmation, and the duplicate-merge
 // confirm. Rapid entry: adding clears the field and keeps the keyboard open.
+
+// Split the encoded qty ("×2", "2kg", "500g", "1.5L") into number + unit for
+// display. Returns null when there's nothing to show.
+function describeQty(qty: string): { quantity: string; unit: string } | null {
+  if (!qty) return null
+  const m = qty.match(/^×?(\d+(?:\.\d+)?)\s*([a-zA-Z]*)$/)
+  if (!m) return null
+  return { quantity: m[1], unit: m[2] || '' }
+}
+
+// "Milk · 2" / "Rice · 2 kg" / "Milk" — never the × symbol (spec §confirmation)
+function formatItemLabel(title: string, qty: string): string {
+  const d = describeQty(qty)
+  if (!d) return title
+  return d.unit ? `${title} · ${d.quantity} ${d.unit}` : `${title} · ${d.quantity}`
+}
+
+// Compact qty for chips: "2" / "2kg" (no × symbol)
+function qtyShort(qty: string | null | undefined): string {
+  const d = describeQty(qty ?? '')
+  if (!d) return ''
+  return d.unit ? `${d.quantity}${d.unit}` : d.quantity
+}
 
 function mergeQuantities(a: string | null | undefined, b: string): string {
   if (!a) return b
@@ -55,7 +78,9 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     setAddedToast(title)
     setAddedRepeat(repeat)
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setAddedToast(null), repeat ? 3500 : 2200)
+    // ~1.8s for a normal add, then it fades and Your Regulars take over; the
+    // repeat note lingers a little longer since it carries more to read.
+    toastTimer.current = setTimeout(() => setAddedToast(null), repeat ? 3000 : 1800)
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
@@ -153,7 +178,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     resetAdd(); setFlashing(true)
     await store.addItem(list.id, t, qty, finalCat ?? null)
     setFlashing(false)
-    flashAddedToast(qty ? `${t} ${qty}` : t, repeat)
+    flashAddedToast(formatItemLabel(t, qty), repeat)
     setTimeout(() => inputRef.current?.focus(), 60)
   }
 
@@ -168,11 +193,12 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
   async function addRegular(m: MemoryItem) {
     const cat = m.category ?? detectCategoryIn(cats, m.name) ?? null
     await store.addItem(list.id, m.name, m.lastQuantity ?? '', cat)
-    flashAddedToast(m.lastQuantity ? `${m.name} ${m.lastQuantity}` : m.name)
+    flashAddedToast(formatItemLabel(m.name, m.lastQuantity ?? ''))
     inputRef.current?.focus()
   }
 
   const currentCat = category ? catById.get(category) : null
+  const qtyInfo = describeQty(parsedInput.qty)
 
   return (
     <>
@@ -192,8 +218,11 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    placeholder={list.type === 'shopping' ? 'Add item… e.g. Milk ×2 or Rice 2kg' : 'Add an item…'}
+                    aria-label={`Add item to ${list.name}`}
+                    placeholder={list.type === 'shopping' ? 'Add item… e.g. Milk 2L or Rice 5kg' : 'Add an item…'}
                     maxLength={200}
+                    autoComplete="off"
+                    enterKeyHint="done"
                     style={{
                       flex: 1, height: 48, borderRadius: 10, padding: '0 14px',
                       background: 'var(--bg-input)', border: '1.5px solid transparent',
@@ -207,11 +236,13 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                     onClick={handleAdd}
                     disabled={!parsedInput.item || flashing}
                     aria-label="Add item"
+                    aria-disabled={!parsedInput.item || flashing}
                     style={{
                       flexShrink: 0, width: 48, height: 48, borderRadius: 10, border: 'none',
                       background: parsedInput.item ? 'var(--accent)' : 'var(--bg-input)',
                       color: parsedInput.item ? '#fff' : 'var(--text-3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: parsedInput.item && !flashing ? 'pointer' : 'not-allowed',
                       transition: 'all 0.15s',
                     }}
                   ><Plus size={22} /></button>
@@ -238,7 +269,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
               {/* "✓ added" confirmation — directly below the input, close to the
                   action that triggered it; auto-hides after ~2s (spec §2.1) */}
               {addedToast && (
-                <span className="list-fade-in" style={{
+                <span className="list-fade-in" role="status" aria-live="polite" style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
                   padding: '4px 2px', color: 'var(--accent)', fontSize: 13, fontWeight: 600,
                 }}>
@@ -251,55 +282,75 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
 
               {/* Your regulars — one-tap add (with usual quantity) while empty */}
               {!input && regulars.length > 0 && (
-                <div>
+                <div className="list-fade-in">
                   <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>
                     Your regulars
                   </p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {regulars.map(m => (
-                      <button
-                        key={m.nameKey}
-                        onClick={() => addRegular(m)}
-                        style={{
-                          height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
-                          background: 'var(--bg-input)', border: '1px solid var(--border)',
-                          fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        + {m.name}{m.lastQuantity ? ` ${m.lastQuantity}` : ''}
-                      </button>
-                    ))}
+                  {/* Single scrolling row — never a crowded wrap (spec §Your Regulars) */}
+                  <div className="hscroll" role="list" aria-label="Your regulars" style={{ margin: '0 -16px', padding: '0 16px 2px' }}>
+                    {regulars.map(m => {
+                      const q = qtyShort(m.lastQuantity)
+                      return (
+                        <button
+                          key={m.nameKey}
+                          role="listitem"
+                          onClick={() => addRegular(m)}
+                          aria-label={`Add ${m.name}${q ? ` ${q}` : ''}`}
+                          style={{
+                            flexShrink: 0, height: 40, padding: '0 14px', borderRadius: 20, cursor: 'pointer',
+                            background: 'var(--bg-input)', border: '1px solid var(--border)',
+                            fontSize: 13.5, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
+                          }}
+                        >
+                          + {m.name}{q ? ` ${q}` : ''}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Parsed qty badge */}
-              {parsedInput.qty && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qty</span>
-                  <span style={{ padding: '2px 10px', borderRadius: 100, fontSize: 12, fontWeight: 700, background: 'var(--accent)', color: '#04080f' }}>{parsedInput.qty}</span>
+              {/* Parsed quantity / unit — shopping only, where it adds value
+                  (spec §quantity, §list-type-awareness). Clear labels, no × symbol. */}
+              {list.type === 'shopping' && qtyInfo && (
+                <div className="list-fade-in" role="group" aria-label={`Quantity ${qtyInfo.quantity}${qtyInfo.unit ? `, unit ${qtyInfo.unit}` : ''}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Quantity</span>
+                  <span style={{ color: 'var(--text)', fontWeight: 700 }}>{qtyInfo.quantity}</span>
+                  {qtyInfo.unit && (
+                    <>
+                      <span style={{ color: 'var(--text-3)' }}>·</span>
+                      <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Unit</span>
+                      <span style={{ color: 'var(--text)', fontWeight: 700 }}>{qtyInfo.unit}</span>
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* Category — hidden until auto-detect picks one from the typed
-                  item; Change opens the dedicated picker sheet */}
+              {/* Category chip — directly interactive (no separate Change button);
+                  auto-suggested, always overridable (spec §category). */}
               {cats.length > 0 && currentCat && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '4px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600,
-                    background: `${currentCat.color}1f`, color: 'var(--text)',
-                  }}>{currentCat.emoji} {currentCat.name}</span>
-                  <button onClick={() => setPickerOpen(true)}
-                    style={{ padding: '6px 10px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-2)', border: 'none' }}>
-                    Change
-                  </button>
-                </div>
+                <button
+                  onClick={() => setPickerOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label={`Category: ${currentCat.name}. Tap to change.`}
+                  className="list-fade-in"
+                  style={{
+                    alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6,
+                    height: 40, padding: '0 12px', borderRadius: 100, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600, color: 'var(--text)', border: 'none',
+                    background: `${currentCat.color}1f`,
+                  }}
+                >
+                  {currentCat.emoji} {currentCat.name}
+                  <ChevronDown size={15} style={{ opacity: 0.55, marginLeft: -1 }} />
+                </button>
               )}
               {cats.length > 0 && !category && parsedInput.item && (
                 <button onClick={() => setPickerOpen(true)}
-                  style={{ alignSelf: 'flex-start', padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: 'none' }}>
-                  ＋ Category
+                  aria-haspopup="dialog" aria-label="Choose a category"
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 5, height: 40, padding: '0 14px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: 'var(--bg-input)', color: 'var(--text-3)', border: 'none' }}>
+                  <Plus size={14} /> Category
                 </button>
               )}
             </div>
@@ -319,7 +370,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                 Existing: <strong>{mergeTarget.quantity || '—'}</strong> · Adding: <strong>{pendingAdd.qty}</strong> → Combined: <strong>{mergeQuantities(mergeTarget.quantity, pendingAdd.qty)}</strong>
               </p>
               <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(pendingAdd.title) }}>Add Separate</button>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(formatItemLabel(pendingAdd.title, pendingAdd.qty)) }}>Add Separate</button>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleMerge}>Merge Qty</button>
               </div>
             </div>

@@ -415,6 +415,16 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: var(--bg-input); color: var(--text-2);
 }
 
+/* Horizontal chip scroller (Your Regulars) — single row, hidden scrollbar */
+.hscroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.hscroll::-webkit-scrollbar { display: none; }
+
 /* ── List Options menu (grouped, context-aware) ──────────────── */
 .ld-menu { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0 8px; }
 .ld-menu-group { padding: 2px 0 4px; }
