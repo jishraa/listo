@@ -589,7 +589,7 @@ export default function ListDetail() {
       ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', badge: 'PRO', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
       // Shop Mode is reached from the header action, so it's not repeated here.
       // Shopping-only, and only once there are forgotten regulars to suggest (§11)
-      ...(list.type === 'shopping' && canEdit && forgotten.length > 0 ? [{ icon: <ShoppingBag size={16} />, label: 'Before you go', onClick: () => { closeMenu(); setBeforeYouGoOpen(true) } }] : []),
+      ...(list.type === 'shopping' && canEdit && forgotten.length > 0 ? [{ icon: <ShoppingBag size={16} />, label: 'Before You Go', onClick: () => { closeMenu(); setBeforeYouGoOpen(true) } }] : []),
       { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', onClick: () => { closeMenu(); setCustomizeOpen(true) } },
     ]},
     { label: 'Manage List', rows: [

@@ -549,12 +549,15 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: none; border: none; cursor: pointer; text-align: left; border-radius: 8px;
 }
 
-/* Listo-consistent keyboard focus for the sort / menu / completed controls */
+/* Subtle, rounded keyboard-focus ring for the full-width sort / menu /
+   completed rows — visible for keyboard users without reading as a selected
+   state (never shows on touch: it's :focus-visible only). */
 .completed-toggle:focus-visible,
 .sort-row:focus-visible,
 .ld-menu-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(22, 163, 74, 0.5);
+  border-radius: 8px;
 }
 
 /* ── List Options menu (grouped, context-aware) ──────────────── */
