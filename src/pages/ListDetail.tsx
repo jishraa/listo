@@ -12,6 +12,7 @@ import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../sto
 import { pendingDuplicateGroups } from '../lib/duplicates'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
+import Sheet from '../components/ui/Sheet'
 import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
@@ -22,6 +23,8 @@ import BeforeYouGoSheet from '../components/lists/BeforeYouGoSheet'
 import ShopMode from '../components/lists/ShopMode'
 import NextTripSheet from '../components/lists/NextTripSheet'
 import { useEnsureData } from '../hooks/useEnsureData'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
+import PullIndicator from '../components/ui/PullIndicator'
 
 type SortMode = 'date' | 'alpha' | 'category'
 
@@ -60,10 +63,6 @@ function formatCompletedAt(iso: string): string {
   const yest = new Date(now); yest.setDate(now.getDate() - 1)
   if (d.toDateString() === yest.toDateString()) return `yesterday at ${time}`
   return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${time}`
-}
-
-function Overlay({ onClick }: { onClick?: () => void }) {
-  return <div className="sheet-overlay" onClick={onClick} />
 }
 
 // Lists that have already shown the auto "Before you go" nudge this session —
@@ -119,6 +118,7 @@ export default function ListDetail() {
   const [renaming,         setRenaming]         = useState(false)
   const [renameValue,      setRenameValue]      = useState('')
   const [confirmDelete,    setConfirmDelete]    = useState(false)
+  const [confirmClearDone, setConfirmClearDone] = useState(false)
   const [showCompleted,    setShowCompleted]    = useState(() => readViewPrefs(id).autoExpand)
   const [viewPrefs,        setViewPrefs]        = useState<ViewPrefs>(() => readViewPrefs(id))
   const [customizeOpen,    setCustomizeOpen]    = useState(false)
@@ -152,6 +152,13 @@ export default function ListDetail() {
   })
   const renameRef = useRef<HTMLInputElement>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Manual refresh alongside realtime — covers dropped subscriptions and
+  // member/role changes, which don't push (items are the only realtime feed).
+  const pull = usePullToRefresh(async () => {
+    if (!id) return
+    await Promise.all([store.loadItems(id), store.loadMembers(id)])
+  })
 
   useEffect(() => {
     if (!id) return
@@ -268,8 +275,10 @@ export default function ListDetail() {
   const dupeIds = useMemo(() => {
     const s = new Set<string>(); dupeGroups.forEach(g => g.forEach(i => s.add(i.id))); return s
   }, [dupeGroups])
+  // Orphaned ids (category deleted in /categories) count as uncategorized too,
+  // so the "Categorize" banner can offer to re-label them.
   const uncategorizedPending = useMemo(
-    () => items.filter(i => !i.completed && !i.category), [items]
+    () => items.filter(i => !i.completed && (!i.category || !catById.has(i.category))), [items, catById]
   )
 
   // Latest change by another member — a subtle shared-list activity hint
@@ -350,14 +359,31 @@ export default function ListDetail() {
     await store.addItem(list.id, item.title, item.quantity ?? '', item.category)
   }
 
-  if (!list) return (
-    <div className="app-container">
-      <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
-        <span className="header-title">Loading…</span>
+  if (!list) {
+    // Lists are loaded but this id isn't among them: deleted, revoked access,
+    // or a stale link. Show a way out instead of loading forever.
+    const notFound = store.initialized && !store.loading
+    return (
+      <div className="app-container">
+        <div className="header">
+          <button className="btn btn-ghost btn-sm" aria-label="Go back" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
+          <span className="header-title">{notFound ? 'List not found' : 'Loading…'}</span>
+        </div>
+        {notFound ? (
+          <div className="empty-state">
+            <div className="icon">🔍</div>
+            <h3>This list isn't available</h3>
+            <p>It may have been deleted, or it's no longer shared with you.</p>
+            <button className="btn btn-primary mt-4" onClick={() => navigate('/', { replace: true })}>Go to My Lists</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+            <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+          </div>
+        )}
       </div>
-    </div>
-  )
+    )
+  }
 
   // ── Render item row ─────────────────────────────────────────
   const renderItem = (item: ListItem) => {
@@ -416,13 +442,20 @@ export default function ListDetail() {
             </button>
           ) : <div />}
           <div className="flex gap-2" style={{ marginLeft: 8, flexShrink: 0 }}>
-            <button onClick={() => commitEdit(item)}
-              style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-              <Check size={14} strokeWidth={2.5} />
+            {/* Delete here too — swipe is touch-only, this keeps removal
+                reachable with a mouse or keyboard (undo toast still applies) */}
+            <button onClick={() => { cancelEdit(); handleDelete(item) }}
+              aria-label={`Delete ${item.title}`}
+              style={{ width: 32, height: 32, borderRadius: '50%', background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
+              <Trash2 size={14} strokeWidth={2} />
             </button>
-            <button onClick={cancelEdit}
+            <button onClick={cancelEdit} aria-label="Cancel editing"
               style={{ width: 32, height: 32, borderRadius: '50%', background: 'transparent', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
               <X size={14} strokeWidth={2.2} />
+            </button>
+            <button onClick={() => commitEdit(item)} aria-label="Save changes"
+              style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+              <Check size={14} strokeWidth={2.5} />
             </button>
           </div>
         </div>
@@ -580,13 +613,13 @@ export default function ListDetail() {
   // ── List Options menu, grouped + context-aware (spec §6–§20) ──
   // Actions only appear when relevant to the list's type and state, so the
   // sheet stays short. Empty groups are dropped when rendering.
-  type MenuRow = { icon: ReactNode; label: string; onClick: () => void; right?: string; badge?: string; danger?: boolean }
+  type MenuRow = { icon: ReactNode; label: string; onClick: () => void; right?: string; danger?: boolean }
   const sortHint = sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added'
   const closeMenu = () => setMenuOpen(false)
   const menuGroups: { label: string; rows: MenuRow[] }[] = [
     { label: 'View & Tools', rows: [
       { icon: <ArrowUpDown size={16} />, label: 'Sort', right: sortHint, onClick: () => { closeMenu(); setSortMenuOpen(true) } },
-      ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', badge: 'PRO', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
+      ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
       // Shop Mode is reached from the header action, so it's not repeated here.
       // Shopping-only, and only once there are forgotten regulars to suggest (§11)
       ...(list.type === 'shopping' && canEdit && forgotten.length > 0 ? [{ icon: <ShoppingBag size={16} />, label: 'Before You Go', onClick: () => { closeMenu(); setBeforeYouGoOpen(true) } }] : []),
@@ -602,8 +635,10 @@ export default function ListDetail() {
     { label: 'Reports', rows: items.length > 0 ? [
       { icon: <FileText size={16} />, label: 'Export Report', onClick: async () => { closeMenu(); await exportListReport(list, items, members) } },
     ] : [] },
-    { label: 'Cleanup', rows: completed.length > 0 ? [
-      { icon: <Check size={16} />, label: 'Clear Completed', right: String(completed.length), onClick: async () => { closeMenu(); await store.uncheckAll(list.id) } },
+    // Clear Completed permanently deletes checked-off items (confirmed first).
+    // Counted from all items, not the category-filtered view.
+    { label: 'Cleanup', rows: doneCount > 0 ? [
+      { icon: <Trash2 size={16} />, label: 'Clear Completed', right: String(doneCount), onClick: () => { closeMenu(); setConfirmClearDone(true) } },
     ] : [] },
     { label: 'Danger Zone', rows: isOwner ? [
       { icon: <Trash2 size={16} />, label: 'Delete List', danger: true, onClick: () => { closeMenu(); setConfirmDelete(true) } },
@@ -647,7 +682,8 @@ export default function ListDetail() {
         <button className="btn btn-ghost btn-sm" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
       </div>
 
-      <div className="page">
+      <div className="page" ref={pull.scrollRef} {...pull.handlers}>
+        <PullIndicator pullY={pull.pullY} isRefreshing={pull.isRefreshing} />
         {/* Member avatars */}
         {members.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 16px 0' }}>
@@ -753,7 +789,7 @@ export default function ListDetail() {
 
         {/* Error banner */}
         {store.lastError && (
-          <div className="error-msg" style={{ margin: '0 16px 8px' }}>
+          <div className="error-msg" role="alert" style={{ margin: '0 16px 8px' }}>
             {store.lastError}
             <button onClick={store.clearError} style={{ float: 'right', fontWeight: 700, background: 'none', color: '#dc2626', fontSize: 16 }}>✕</button>
           </div>
@@ -969,18 +1005,11 @@ export default function ListDetail() {
 
       {/* ── Completed item actions (Add Again / Move to Pending / Edit / Delete) ── */}
       {completedAction && (
-        <>
-          <Overlay onClick={() => setCompletedAction(null)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div className="sheet-header">
-              <div className="sheet-heading">
-                <span className="sheet-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                  {completedAction.title}{completedAction.quantity ? ` · ${formatQuantity(completedAction.quantity)}` : ''}
-                </span>
-              </div>
-              <button className="btn btn-ghost btn-sm" aria-label="Close" onClick={() => setCompletedAction(null)}><X size={18} /></button>
-            </div>
+        <Sheet
+          open
+          onClose={() => setCompletedAction(null)}
+          title={`${completedAction.title}${completedAction.quantity ? ` · ${formatQuantity(completedAction.quantity)}` : ''}`}
+        >
             <div className="ld-menu" role="menu">
               <div className="ld-menu-group">
                 {/* Add Again — legitimate repeat purchase: a fresh pending item,
@@ -1014,8 +1043,7 @@ export default function ListDetail() {
                 </button>
               </div>
             </div>
-          </div>
-        </>
+        </Sheet>
       )}
 
       <BeforeYouGoSheet
@@ -1044,48 +1072,37 @@ export default function ListDetail() {
       />
 
       {/* ── List Options menu (titled, grouped, context-aware) ── */}
-      {menuOpen && (
-        <>
-          <Overlay onClick={() => setMenuOpen(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div className="sheet-header">
-              <div className="sheet-heading"><span className="sheet-title">List Options</span></div>
-              <button className="btn btn-ghost btn-sm" aria-label="Close" onClick={() => setMenuOpen(false)}><X size={18} /></button>
-            </div>
-            <div className="ld-menu" role="menu">
-              {menuGroups.filter(g => g.rows.length > 0).map(g => (
-                <div key={g.label} className="ld-menu-group">
-                  <p className="ld-menu-label">{g.label}</p>
-                  {g.rows.map((r, i) => (
-                    <button
-                      key={i}
-                      role="menuitem"
-                      className={`ld-menu-row${r.danger ? ' danger' : ''}`}
-                      onClick={r.onClick}
-                    >
-                      <span className="ld-row-icon">{r.icon}</span>
-                      <span className="ld-row-label">{r.label}</span>
-                      {r.badge && <span className="ld-pro-badge">{r.badge}</span>}
-                      {r.right && <span className="ld-row-right">{r.right}</span>}
-                    </button>
-                  ))}
-                </div>
+      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="List Options">
+        <div className="ld-menu" role="menu">
+          {menuGroups.filter(g => g.rows.length > 0).map(g => (
+            <div key={g.label} className="ld-menu-group">
+              <p className="ld-menu-label">{g.label}</p>
+              {g.rows.map((r, i) => (
+                <button
+                  key={i}
+                  role="menuitem"
+                  className={`ld-menu-row${r.danger ? ' danger' : ''}`}
+                  onClick={r.onClick}
+                >
+                  <span className="ld-row-icon">{r.icon}</span>
+                  <span className="ld-row-label">{r.label}</span>
+                  {r.right && <span className="ld-row-right">{r.right}</span>}
+                </button>
               ))}
             </div>
-          </div>
-        </>
-      )}
+          ))}
+        </div>
+      </Sheet>
 
       {/* ── Customize List View (spec §4.2) ── */}
-      {customizeOpen && (
-        <>
-          <Overlay onClick={() => setCustomizeOpen(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '6px 20px 22px' }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 2px' }}>Customize List View</p>
-              <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 12px' }}>Choose what shows on each item.</p>
+      <Sheet
+        open={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        title="Customize List View"
+        subtitle="Choose what shows on each item."
+      >
+        <div className="sheet-body">
+          <div>
               {([
                 { key: 'categories', title: 'Categories', desc: 'Show item categories' },
                 { key: 'addedBy', title: 'Added By', desc: 'Show who added each item' },
@@ -1116,46 +1133,35 @@ export default function ListDetail() {
                   </div>
                 )
               })}
-              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={() => setCustomizeOpen(false)}>Done</button>
-            </div>
           </div>
-        </>
-      )}
+          <button className="btn btn-primary btn-full" onClick={() => setCustomizeOpen(false)}>Done</button>
+        </div>
+      </Sheet>
 
       {/* ── Sort sheet ── */}
-      {sortMenuOpen && (
-        <>
-          <Overlay onClick={() => setSortMenuOpen(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-3)', margin: '10px 20px 6px' }}>Sort by</p>
-            {([
-              { key: 'date', label: 'Date added', hint: 'Newest first' },
-              { key: 'alpha', label: 'Alphabetical', hint: 'A → Z' },
-              { key: 'category', label: 'Category', hint: 'Grouped' },
-            ] as { key: SortMode; label: string; hint: string }[]).map(opt => {
-              const active = sortMode === opt.key
-              return (
-                <button key={opt.key} onClick={() => { setSortMode(opt.key); setSortMenuOpen(false) }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ fontSize: 15, fontWeight: active ? 700 : 500, color: active ? 'var(--accent)' : 'var(--text)', flex: 1 }}>{opt.label}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{opt.hint}</span>
-                  {active && <Check size={16} strokeWidth={2.5} color="var(--accent)" />}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+      <Sheet open={sortMenuOpen} onClose={() => setSortMenuOpen(false)} title="Sort by">
+        <div style={{ padding: '4px 0 8px' }}>
+          {([
+            { key: 'date', label: 'Date added', hint: 'Newest first' },
+            { key: 'alpha', label: 'Alphabetical', hint: 'A → Z' },
+            { key: 'category', label: 'Category', hint: 'Grouped' },
+          ] as { key: SortMode; label: string; hint: string }[]).map(opt => {
+            const active = sortMode === opt.key
+            return (
+              <button key={opt.key} onClick={() => { setSortMode(opt.key); setSortMenuOpen(false) }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontSize: 15, fontWeight: active ? 700 : 500, color: active ? 'var(--accent)' : 'var(--text)', flex: 1 }}>{opt.label}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{opt.hint}</span>
+                {active && <Check size={16} strokeWidth={2.5} color="var(--accent)" />}
+              </button>
+            )
+          })}
+        </div>
+      </Sheet>
 
       {/* ── Rename sheet ── */}
-      {renaming && (
-        <>
-          <Overlay onClick={() => setRenaming(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Rename list</p>
+      <Sheet open={renaming} onClose={() => setRenaming(false)} title="Rename list">
+        <div className="sheet-body">
               <input
                 ref={renameRef}
                 value={renameValue}
@@ -1175,33 +1181,44 @@ export default function ListDetail() {
                   Save
                 </button>
               </div>
-            </div>
+        </div>
+      </Sheet>
+
+      {/* ── Clear Completed confirm ── */}
+      <Sheet open={confirmClearDone} onClose={() => setConfirmClearDone(false)} ariaLabel="Clear completed items">
+        <div className="sheet-body" style={{ gap: 12 }}>
+          <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
+            Delete {doneCount} completed {doneCount === 1 ? 'item' : 'items'}?
+          </p>
+          <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
+            They'll be removed from the list for everyone. This can't be undone.
+          </p>
+          <div className="flex gap-2">
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmClearDone(false)}>Cancel</button>
+            <button className="btn btn-danger" style={{ flex: 1 }}
+              onClick={async () => { setConfirmClearDone(false); await store.deleteCompleted(list.id) }}>
+              Delete
+            </button>
           </div>
-        </>
-      )}
+        </div>
+      </Sheet>
 
       {/* ── Delete confirm ── */}
-      {confirmDelete && (
-        <>
-          <Overlay onClick={() => setConfirmDelete(false)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Delete this list?</p>
-              <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
-                "<strong>{list.name}</strong>" and all its items will be removed for everyone with access. This can't be undone.
-              </p>
-              <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Cancel</button>
-                <button className="btn btn-danger" style={{ flex: 1 }}
-                  onClick={async () => { setConfirmDelete(false); await store.deleteList(list.id); navigate('/') }}>
-                  Delete List
-                </button>
-              </div>
-            </div>
+      <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} ariaLabel="Delete list">
+        <div className="sheet-body" style={{ gap: 12 }}>
+          <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Delete this list?</p>
+          <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
+            "<strong>{list.name}</strong>" and all its items will be removed for everyone with access. This can't be undone.
+          </p>
+          <div className="flex gap-2">
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Cancel</button>
+            <button className="btn btn-danger" style={{ flex: 1 }}
+              onClick={async () => { setConfirmDelete(false); await store.deleteList(list.id); navigate('/') }}>
+              Delete List
+            </button>
           </div>
-        </>
-      )}
+        </div>
+      </Sheet>
 
       {/* ── Insights (full screen, redesign spec) ── */}
       {insightsOpen && (
@@ -1245,7 +1262,7 @@ export default function ListDetail() {
 
       {/* ── Undo delete toast ── */}
       {undoItem && (
-        <div style={{
+        <div role="status" aria-live="polite" style={{
           position: 'fixed', bottom: 84, left: 16, right: 16, zIndex: 200,
           display: 'flex', alignItems: 'center', gap: 12,
           background: 'var(--bg-card)',

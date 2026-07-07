@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
@@ -9,7 +9,9 @@ import { SwipeCard } from '../components/lists/SwipeCard'
 import type { SwipeAction } from '../components/lists/SwipeCard'
 import Sheet from '../components/ui/Sheet'
 import InstallBanner from '../components/InstallBanner'
+import PullIndicator from '../components/ui/PullIndicator'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { formatRelativeTime, friendlyName } from '../lib/utils'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
@@ -138,32 +140,7 @@ export default function Lists() {
   const navigate = useNavigate()
   const installPrompt = useInstallPrompt()
 
-  const pageRef = useRef<HTMLDivElement>(null)
-  const touchStartY = useRef(0)
-  const [pullY, setPullY] = useState(0)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const scrollTop = pageRef.current?.scrollTop ?? 0
-    if (scrollTop > 0 || isRefreshing) return
-    const delta = e.touches[0].clientY - touchStartY.current
-    if (delta > 0) setPullY(Math.min(delta * 0.55, 72))
-  }
-
-  const handleTouchEnd = async () => {
-    if (pullY >= 60) {
-      setIsRefreshing(true)
-      setPullY(0)
-      await store.refreshLists()
-      setIsRefreshing(false)
-    } else {
-      setPullY(0)
-    }
-  }
+  const pull = usePullToRefresh(() => store.refreshLists())
 
   // Category display names (user-customized) for search matching
   const allCategories = useCategoriesStore(s2 => s2.categories)
@@ -183,7 +160,6 @@ export default function Lists() {
   const [createInitial, setCreateInitial] = useState<{ name: string; type: ListType; emoji: string } | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<List | null>(null)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
-  const [customOrder, setCustomOrder] = useState<string[]>([])
   const [showCompleted, setShowCompleted] = useState(false)
   const [filter, setFilter] = useState<Filter>(
     () => FILTERS.some(f => f.id === urlFilter) ? urlFilter as Filter : 'active'
@@ -201,9 +177,7 @@ export default function Lists() {
     if (!user?.id) return
     try {
       const pins = JSON.parse(localStorage.getItem(`listo-pins-${user.id}`) ?? '[]') as string[]
-      const order = JSON.parse(localStorage.getItem(`listo-order-${user.id}`) ?? '[]') as string[]
       setPinnedIds(new Set(pins))
-      setCustomOrder(order)
     } catch { /* ignore */ }
   }, [user?.id])
 
@@ -216,13 +190,7 @@ export default function Lists() {
 
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
     if (isGuest) return   // guests can't own lists — backstop; CTAs are hidden
-    const list = await store.createList({ name, type, emoji })
-    if (!list) return
-    if (templateItems?.length) {
-      for (const item of templateItems) {
-        await store.addItem(list.id, item.title, '', item.category ?? null)
-      }
-    }
+    await store.createList({ name, type, emoji, items: templateItems })
   }
 
   const handleDelete = async () => {
@@ -254,22 +222,9 @@ export default function Lists() {
     progress:     (a, b) => progressPct(a) - progressPct(b),  // least complete first
   }
 
-  // Pins always float; the user's manual order only applies in Recent mode
-  // (an explicit sort choice overrides it).
+  // Pins always float above the chosen sort order.
   const applySort = (lists: List[]) => {
-    let all: List[]
-    if (sort === 'recent') {
-      const remaining = [...lists]
-      const ordered: List[] = []
-      for (const id of customOrder) {
-        const idx = remaining.findIndex(l => l.id === id)
-        if (idx !== -1) ordered.push(...remaining.splice(idx, 1))
-      }
-      remaining.sort(byRecent)
-      all = [...ordered, ...remaining]
-    } else {
-      all = [...lists].sort(comparator[sort])
-    }
+    const all = [...lists].sort(comparator[sort])
     return [...all.filter(l => pinnedIds.has(l.id)), ...all.filter(l => !pinnedIds.has(l.id))]
   }
 
@@ -371,28 +326,8 @@ export default function Lists() {
 
   return (
     <>
-      <div
-        className="page"
-        ref={pageRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Pull-to-refresh indicator */}
-        {(pullY > 0 || isRefreshing) && (
-          <div style={{
-            height: isRefreshing ? 56 : pullY,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden', transition: isRefreshing ? 'none' : 'height 0.15s ease',
-          }}>
-            <div className={isRefreshing ? 'spinner' : undefined} style={{
-              width: 22, height: 22, borderRadius: '50%',
-              border: '2px solid var(--accent)', borderTopColor: 'transparent',
-              transform: isRefreshing ? undefined : `rotate(${pullY * 5}deg)`,
-              opacity: Math.min(pullY / 40, 1),
-            }} />
-          </div>
-        )}
+      <div className="page" ref={pull.scrollRef} {...pull.handlers}>
+        <PullIndicator pullY={pull.pullY} isRefreshing={pull.isRefreshing} />
 
         {/* Header — counts give context (spec §1); sticks to the top on scroll */}
         <div style={{ padding: '20px 16px 12px' }} className="lists-header flex items-center justify-between">
@@ -430,7 +365,16 @@ export default function Lists() {
 
         {hasLists && searchOpen && (
           <div style={{ padding: '0 16px 12px' }}>
-            <input className="input" placeholder="Search by name, member or category…" value={search} onChange={e => setSearch(e.target.value)} autoFocus />
+            <input
+              className="input"
+              type="search"
+              enterKeyHint="search"
+              aria-label="Search lists"
+              placeholder="Search by name, member or category…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+            />
           </div>
         )}
 
@@ -463,7 +407,7 @@ export default function Lists() {
 
         <div className="page-padded" style={{ paddingTop: 0 }}>
           {store.lastError && (
-            <div className="error-msg" style={{ marginBottom: 12 }}>
+            <div className="error-msg" role="alert" style={{ marginBottom: 12 }}>
               {store.lastError}
               <button onClick={store.clearError} style={{ float: 'right', fontWeight: 700, background: 'none', color: '#dc2626', fontSize: 16 }}>✕</button>
             </div>
@@ -638,21 +582,17 @@ export default function Lists() {
       </Sheet>
 
       {deleteTarget && (
-        <>
-          <div className="sheet-overlay" onClick={() => setDeleteTarget(null)} />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div className="sheet-body" style={{ textAlign: 'center' }}>
-              <Trash2 size={32} color="#dc2626" style={{ margin: '0 auto 12px' }} />
-              <p style={{ fontWeight: 700, fontSize: 17 }}>Delete "{deleteTarget.name}"?</p>
-              <p className="text-muted text-sm mt-2">All items will be permanently deleted.</p>
-              <div className="flex gap-2 mt-4">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>Cancel</button>
-                <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleDelete}>Delete</button>
-              </div>
+        <Sheet open onClose={() => setDeleteTarget(null)} ariaLabel="Delete list">
+          <div className="sheet-body" style={{ textAlign: 'center' }}>
+            <Trash2 size={32} color="#dc2626" style={{ margin: '0 auto 12px' }} />
+            <p style={{ fontWeight: 700, fontSize: 17 }}>Delete "{deleteTarget.name}"?</p>
+            <p className="text-muted text-sm mt-2">All items will be permanently deleted.</p>
+            <div className="flex gap-2 mt-4">
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleDelete}>Delete</button>
             </div>
           </div>
-        </>
+        </Sheet>
       )}
     </>
   )
