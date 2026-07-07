@@ -649,7 +649,7 @@ export default function ListDetail() {
     <div className="app-container">
       {/* Header */}
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
+        <button className="btn btn-ghost btn-sm" aria-label="Back to lists" onClick={() => navigate('/')}><ChevronLeft size={20} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="flex items-center" style={{ gap: 7, minWidth: 0 }}>
             <p style={{ fontSize: 17, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -679,7 +679,7 @@ export default function ListDetail() {
             <ShoppingCart size={20} />
           </button>
         )}
-        <button className="btn btn-ghost btn-sm" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
+        <button className="btn btn-ghost btn-sm" aria-label="List options" onClick={() => setMenuOpen(true)}><MoreVertical size={20} /></button>
       </div>
 
       <div className="page" ref={pull.scrollRef} {...pull.handlers}>
