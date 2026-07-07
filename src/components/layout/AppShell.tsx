@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { ListChecks, Plus, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -36,13 +36,17 @@ export default function AppShell() {
   }, [user])
 
   // Items/members power every tab (Home stats, Insights, Lists progress),
-  // so load them here rather than in any one page. Always refetch — the
-  // persisted offline cache pre-fills entries, and these calls keep them
-  // fresh (they no-op harmlessly when offline). Keyed on the id set (not the
-  // count) so a swap that keeps the length still triggers a reload.
+  // so load them here rather than in any one page. The first pass on mount
+  // refetches everything (the persisted offline cache pre-fills entries and
+  // this keeps them fresh; no-ops harmlessly offline). After that, id-set
+  // changes only fetch the ADDED lists — creating/joining list N must not
+  // re-issue 2×N queries for the ones already loaded.
+  const fetchedIds = useRef(new Set<string>())
   const listIdsKey = store.lists.map(l => l.id).join(',')
   useEffect(() => {
     for (const list of store.lists) {
+      if (fetchedIds.current.has(list.id)) continue
+      fetchedIds.current.add(list.id)
       store.loadItems(list.id)
       store.loadMembers(list.id)
     }
