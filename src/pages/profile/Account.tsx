@@ -1,19 +1,28 @@
 import { useState } from 'react'
-import { KeyRound, Link2, Mail, User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { KeyRound, Link2, Mail, Trash2, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import Sheet from '../../components/ui/Sheet'
 import { SubPage, Section, Row } from './common'
 
 export default function AccountPage() {
-  const { user, displayName, setDisplayName, isGuest, changePassword, signIn } = useAuthStore()
+  const { user, displayName, setDisplayName, isGuest, changePassword, signIn, deleteAccount } = useAuthStore()
+  const navigate = useNavigate()
 
-  const [sheet, setSheet] = useState<'name' | 'password' | null>(null)
+  const [sheet, setSheet] = useState<'name' | 'password' | 'delete' | null>(null)
   const [nameInput, setNameInput] = useState(displayName)
   const [curPw, setCurPw]         = useState('')
   const [newPw, setNewPw]         = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [pwBusy, setPwBusy] = useState(false)
   const [pwMsg, setPwMsg]   = useState<{ ok: boolean; text: string } | null>(null)
+  const [delBusy, setDelBusy] = useState(false)
+  const [delError, setDelError] = useState('')
+
+  // Password management only applies to accounts with an email/password
+  // identity — for OAuth-only accounts the "current password" check can never
+  // pass, so the row would be a dead end.
+  const hasEmailIdentity = (user?.identities ?? []).some(i => i.provider === 'email')
 
   const openPasswordSheet = () => {
     setCurPw(''); setNewPw(''); setConfirmPw(''); setPwMsg(null); setSheet('password')
@@ -60,8 +69,11 @@ export default function AccountPage() {
       <Section>
         <Row icon={<User size={17} />} label="Display Name" value={displayName || '—'}
           onPress={() => { setNameInput(displayName); setSheet('name') }} last={isGuest} />
-        {!isGuest && <Row icon={<Mail size={17} />} label="Email" value={user?.email ?? '—'} />}
         {!isGuest && (
+          <Row icon={<Mail size={17} />} label="Email" value={user?.email ?? '—'}
+            last={!hasEmailIdentity && !connectedProviders} />
+        )}
+        {!isGuest && hasEmailIdentity && (
           <Row icon={<KeyRound size={17} />} label="Password" value="Change"
             onPress={openPasswordSheet} last={!connectedProviders} />
         )}
@@ -74,6 +86,21 @@ export default function AccountPage() {
         <p className="text-sm text-muted" style={{ padding: '0 4px' }}>
           You're using a guest session — create an account from the Profile screen to manage email and password.
         </p>
+      )}
+
+      {/* Account deletion — self-serve (App Store 5.1.1(v)); confirmed below */}
+      {!isGuest && (
+        <button
+          onClick={() => { setDelError(''); setSheet('delete') }}
+          className="btn btn-full"
+          style={{
+            justifyContent: 'center', gap: 10,
+            background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.35)',
+            color: '#ef4444', fontWeight: 700,
+          }}
+        >
+          <Trash2 size={17} /> Delete Account
+        </button>
       )}
 
       <Sheet open={sheet === 'name'} onClose={() => setSheet(null)} title="Display Name">
@@ -145,6 +172,35 @@ export default function AccountPage() {
           >
             {pwBusy ? <span className="spinner" /> : 'Update Password'}
           </button>
+        </div>
+      </Sheet>
+      <Sheet open={sheet === 'delete'} onClose={() => { if (!delBusy) setSheet(null) }} title="Delete Account">
+        <div className="sheet-body">
+          <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: 1.55 }}>
+            This permanently deletes your account, every list you own, and your
+            memberships in shared lists. This can't be undone.
+          </p>
+          {delError && <div className="error-msg" role="alert">{delError}</div>}
+          <div className="flex gap-2">
+            <button className="btn btn-secondary" style={{ flex: 1 }} disabled={delBusy} onClick={() => setSheet(null)}>Cancel</button>
+            <button
+              className="btn btn-danger"
+              style={{ flex: 1 }}
+              disabled={delBusy}
+              onClick={async () => {
+                setDelBusy(true); setDelError('')
+                const err = await deleteAccount()
+                if (err) {
+                  setDelBusy(false)
+                  setDelError("Couldn't delete your account. Please try again.")
+                  return
+                }
+                navigate('/login', { replace: true })
+              }}
+            >
+              {delBusy ? <span className="spinner" /> : 'Delete Account'}
+            </button>
+          </div>
         </div>
       </Sheet>
     </SubPage>

@@ -23,6 +23,8 @@ interface AuthState {
   changePassword: (newPassword: string) => Promise<string | null>
   signInAsGuest: (displayName: string) => Promise<string | null>
   signOut: () => Promise<void>
+  /** Permanently delete the account and all its data (RPC, migration v16). */
+  deleteAccount: () => Promise<string | null>
   setDisplayName: (name: string) => void
 }
 
@@ -55,7 +57,7 @@ function bindNativeDeepLink() {
   })
 }
 
-export const useAuthStore = create<AuthState>(set => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   user: null,
   displayName: '',
@@ -165,8 +167,35 @@ export const useAuthStore = create<AuthState>(set => ({
     set({ session: null, user: null, displayName: '', isGuest: false })
   },
 
+  deleteAccount: async () => {
+    const { error } = await supabase.rpc('delete_my_account')
+    if (error) return error.message
+    // Server row is gone (cascades removed all data) — clear everything local.
+    // supabase.auth.signOut() inside may 4xx against the dead session; the
+    // local session and caches are still cleared.
+    await get().signOut()
+    return null
+  },
+
   setDisplayName: (name) => {
     localStorage.setItem('listo-display-name', name)
     set({ displayName: name })
+    const { user, isGuest } = get()
+    if (!user) return
+    // Members: persist to user_metadata, otherwise init() reverts the name on
+    // the next launch (it reads metadata, not localStorage, for non-guests).
+    if (!isGuest) {
+      supabase.auth.updateUser({ data: { name } }).then(() => {})
+    }
+    // Update this user's membership rows so collaborators see the new name.
+    // Via RPC — RLS has no UPDATE policy on list_members (migration v15).
+    // Best effort: cosmetic, never blocks the rename locally.
+    supabase.rpc('set_my_display_name', { p_name: name }).then(() => {})
+    const lists = useListsStore.getState()
+    useListsStore.setState({
+      displayName: name,
+      members: Object.fromEntries(Object.entries(lists.members).map(([listId, mem]) =>
+        [listId, mem.map(m => m.user_id === user.id ? { ...m, display_name: name } : m)])),
+    })
   },
 }))
