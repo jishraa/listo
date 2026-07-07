@@ -59,17 +59,26 @@ export const LIST_CATEGORIES: Record<ListType, ListCategory[]> = {
   ],
 }
 
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 // Keyword match against a caller-supplied category list (user-customized
 // categories come from useCategoriesStore, not the static defaults).
+// Whole-word matching, not substring — "toilet paper" must not hit Pantry via
+// "oil", nor "popcorn" hit Produce via "corn". The LONGEST matching keyword
+// wins, so specific phrases beat generic words ("ice cream" > "cream").
 export function detectCategoryIn(cats: ListCategory[], text: string): string | null {
   const lower = text.toLowerCase().trim()
   if (!lower) return null
+  let best: { id: string; len: number } | null = null
   for (const cat of cats) {
     for (const k of cat.keywords) {
-      if (lower.includes(k.toLowerCase())) return cat.id
+      const kw = k.toLowerCase()
+      if ((!best || kw.length > best.len) && new RegExp(`\\b${escapeRegex(kw)}\\b`).test(lower)) {
+        best = { id: cat.id, len: kw.length }
+      }
     }
   }
-  return null
+  return best?.id ?? null
 }
 
 export function detectCategory(text: string, type: ListType): string | null {
