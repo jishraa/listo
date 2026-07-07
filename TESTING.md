@@ -41,11 +41,32 @@ don't lower the thresholds.
 referenced from `dist/index.html` (entry + modulepreloads). Initial JS must
 stay ≤300 KB gzip (currently ~158 KB). Lazy chunks are reported, not gated.
 
+**E2E (Playwright, `tests/e2e/`)** — runs against the production build
+(`vite preview`), locally and in CI:
+- `public.spec.ts` — unauthenticated journeys: landing, login validation,
+  register rules, forgot-password, invalid invite links, legal pages,
+  redirects and route guards.
+- `auth-journey.spec.ts` — the critical flow against real Supabase with the
+  dedicated E2E account (`E2E_EMAIL`/`E2E_PASSWORD`, in `.env` locally and
+  repo secrets in CI): login → create list → smart-parse adds → complete →
+  rename → delete → sign out. Self-cleaning; skips when unconfigured.
+- `a11y.spec.ts` — axe-core in a real browser: zero critical/serious
+  violations on public screens, both themes (includes color-contrast).
+- `responsive.spec.ts` — no horizontal overflow at 320–768px.
+- `visual.spec.ts` — screenshot baselines (light/dark × mobile/desktop).
+  Platform-specific, so **local-only for now** (auto-skips on CI);
+  regenerate intentionally with `npm run test:visual:update`.
+
+Commands: `npm run test:e2e` (headless) / `npm run test:e2e:ui` (debug UI).
+
 ## CI
 
-`.github/workflows/ci.yml`: install → lint → typecheck → test+coverage →
-build → bundle budget, on every push to `main` and every PR. No secrets
-needed — the gated tests never touch Supabase.
+`.github/workflows/ci.yml`, on every push to `main` and every PR:
+1. **quality** — install → lint → typecheck → test+coverage → build →
+   bundle budget. No secrets needed.
+2. **e2e** (after quality) — Playwright chromium against the built app,
+   using the `VITE_SUPABASE_*` and `E2E_*` repo secrets; uploads the HTML
+   report as an artifact on failure.
 
 ## Conventions
 
@@ -60,14 +81,11 @@ needed — the gated tests never touch Supabase.
 
 ## Roadmap (not yet implemented)
 
-- **E2E (Playwright)** — highest-value next layer. Unauthenticated journeys
-  (landing → login validation, invalid join links, legal pages) need no
-  setup; authenticated journeys (create/share/shop flows) need a dedicated
-  Supabase test user + env secrets in CI.
-- **Visual regression** — Playwright screenshot snapshots (free, in-repo)
-  across light/dark × 320/375/768 px, or Percy/Chromatic (paid) if review
-  UI is wanted.
+- **Visual regression in CI** — generate linux baselines (docker or a
+  one-off CI update run) so `visual.spec.ts` stops skipping on CI; or move
+  to Percy/Chromatic if a review UI is wanted.
+- **More E2E journeys** — sharing/invite redemption (needs a second test
+  account), Shop Mode, offline queue replay (network interception),
+  PWA install prompt + SW update toast.
 - **Performance** — Lighthouse CI against the deployed preview (LCP/CLS/INP,
   score ≥95 gate).
-- **PWA/offline** — Playwright with network interception: offline queue
-  replay, install prompt, SW update toast.
