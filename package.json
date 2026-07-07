@@ -11,6 +11,9 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "check:bundle": "node scripts/check-bundle-size.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:visual:update": "playwright test visual --update-snapshots",
     "verify": "npm run lint && npm run test:coverage && npm run build && npm run check:bundle",
     "preview": "vite preview",
     "deploy": "npm run verify && npx wrangler deploy",
@@ -34,7 +37,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@capacitor/cli": "^8.4.1",
+    "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
