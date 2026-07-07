@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { FileText, Info, Shield } from 'lucide-react'
 import { SubPage, Section, Row } from './common'
+import { APP_VERSION } from '../../lib/version'
 
 export default function AboutPage() {
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export default function AboutPage() {
         </p>
       </div>
       <Section>
-        <Row icon={<Info size={17} />} label="Version" value="1.0.0" />
+        <Row icon={<Info size={17} />} label="Version" value={APP_VERSION} />
         <Row icon={<Shield size={17} />} label="Privacy Policy" onPress={() => navigate('/privacy')} />
         <Row icon={<FileText size={17} />} label="Terms of Service" onPress={() => navigate('/terms')} last />
       </Section>
