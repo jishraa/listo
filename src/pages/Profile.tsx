@@ -7,8 +7,8 @@ import { useCategoriesStore } from '../store/useCategoriesStore'
 import Sheet from '../components/ui/Sheet'
 import { openYft } from '../lib/yft'
 import { SubPage, Section, Row } from './profile/common'
+import { APP_VERSION } from '../lib/version'
 
-const APP_VERSION = '1.3.0'
 const THEME_LABEL: Record<string, string> = { light: 'Light', dark: 'Dark', system: 'System' }
 
 export default function Profile() {

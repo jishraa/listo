@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { FileText, Heart, Info, MessageCircle, ScrollText } from 'lucide-react'
 import { SubPage, Section, Row } from './common'
+import { APP_VERSION } from '../../lib/version'
 
 // Help & Support hub — feedback + support up top, About & Legal below.
 const FEEDBACK_EMAIL = 'grk766@gmail.com'
-const APP_VERSION = '1.3.0'
 
 export default function HelpSupportPage() {
   const navigate = useNavigate()
