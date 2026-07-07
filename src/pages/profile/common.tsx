@@ -34,8 +34,8 @@ export function Section({ title, children }: { title?: string; children: React.R
   )
 }
 
-export function Row({ icon, label, value, valueColor, onPress, last = false }: {
-  icon?: React.ReactNode; label: string; value?: string; valueColor?: string
+export function Row({ icon, label, subtitle, value, valueColor, onPress, last = false }: {
+  icon?: React.ReactNode; label: string; subtitle?: string; value?: string; valueColor?: string
   onPress?: () => void; last?: boolean
 }) {
   return (
@@ -49,7 +49,14 @@ export function Row({ icon, label, value, valueColor, onPress, last = false }: {
       }}
     >
       {icon && <span style={{ color: 'var(--accent)', display: 'flex', flexShrink: 0 }}>{icon}</span>}
-      <span style={{ flex: 1, fontSize: 15, color: 'var(--text)', fontWeight: 500 }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500 }}>{label}</span>
+        {subtitle && (
+          <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitle}
+          </span>
+        )}
+      </span>
       {value && (
         <span style={{
           fontSize: 14, color: valueColor ?? 'var(--text-3)', fontWeight: valueColor ? 600 : 400,

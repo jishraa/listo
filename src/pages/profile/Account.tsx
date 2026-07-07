@@ -5,13 +5,19 @@ import Sheet from '../../components/ui/Sheet'
 import { SubPage, Section, Row } from './common'
 
 export default function AccountPage() {
-  const { user, displayName, setDisplayName, isGuest, changePassword } = useAuthStore()
+  const { user, displayName, setDisplayName, isGuest, changePassword, signIn } = useAuthStore()
 
   const [sheet, setSheet] = useState<'name' | 'password' | null>(null)
   const [nameInput, setNameInput] = useState(displayName)
-  const [pw, setPw]         = useState('')
+  const [curPw, setCurPw]         = useState('')
+  const [newPw, setNewPw]         = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
   const [pwBusy, setPwBusy] = useState(false)
   const [pwMsg, setPwMsg]   = useState<{ ok: boolean; text: string } | null>(null)
+
+  const openPasswordSheet = () => {
+    setCurPw(''); setNewPw(''); setConfirmPw(''); setPwMsg(null); setSheet('password')
+  }
 
   const connectedProviders = [...new Set(
     (user?.identities ?? []).map(i => i.provider === 'email' ? 'Email' : i.provider.charAt(0).toUpperCase() + i.provider.slice(1))
@@ -24,16 +30,27 @@ export default function AccountPage() {
   }
 
   const handleChangePassword = async () => {
-    if (pw.length < 8 || pwBusy) return
-    setPwBusy(true)
+    if (pwBusy) return
     setPwMsg(null)
-    const err = await changePassword(pw)
+    if (!curPw) { setPwMsg({ ok: false, text: 'Enter your current password.' }); return }
+    if (newPw.length < 8) { setPwMsg({ ok: false, text: 'New password must be at least 8 characters.' }); return }
+    if (newPw !== confirmPw) { setPwMsg({ ok: false, text: "New passwords don't match." }); return }
+    if (newPw === curPw) { setPwMsg({ ok: false, text: 'New password must differ from the current one.' }); return }
+
+    setPwBusy(true)
+    // Re-verify the current password before changing it (updateUser alone
+    // wouldn't require it).
+    const email = user?.email
+    const verifyErr = email ? await signIn(email, curPw) : 'no-email'
+    if (verifyErr) { setPwBusy(false); setPwMsg({ ok: false, text: 'Current password is incorrect.' }); return }
+
+    const err = await changePassword(newPw)
     setPwBusy(false)
     if (err) {
       setPwMsg({ ok: false, text: err.toLowerCase().includes('different') ? 'New password must differ from the old one.' : 'Could not update password. Try again.' })
     } else {
       setPwMsg({ ok: true, text: 'Password updated.' })
-      setPw('')
+      setCurPw(''); setNewPw(''); setConfirmPw('')
       setTimeout(() => { setSheet(null); setPwMsg(null) }, 1200)
     }
   }
@@ -46,7 +63,7 @@ export default function AccountPage() {
         {!isGuest && <Row icon={<Mail size={17} />} label="Email" value={user?.email ?? '—'} />}
         {!isGuest && (
           <Row icon={<KeyRound size={17} />} label="Password" value="Change"
-            onPress={() => { setPw(''); setPwMsg(null); setSheet('password') }} last={!connectedProviders} />
+            onPress={openPasswordSheet} last={!connectedProviders} />
         )}
         {!isGuest && connectedProviders && (
           <Row icon={<Link2 size={17} />} label="Connected Accounts" value={connectedProviders} last />
@@ -78,23 +95,54 @@ export default function AccountPage() {
 
       <Sheet open={sheet === 'password'} onClose={() => setSheet(null)} title="Change Password">
         <div className="sheet-body">
-          <p className="text-sm text-muted">Minimum 8 characters.</p>
-          <input
-            className="input"
-            type="password"
-            placeholder="New password"
-            value={pw}
-            autoComplete="new-password"
-            onChange={e => setPw(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
-            autoFocus
-          />
+          <div className="input-group">
+            <label className="input-label" htmlFor="cur-pw">Current Password</label>
+            <input
+              id="cur-pw"
+              className="input"
+              type="password"
+              placeholder="Current password"
+              value={curPw}
+              autoComplete="current-password"
+              onChange={e => setCurPw(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label" htmlFor="new-pw">New Password</label>
+            <input
+              id="new-pw"
+              className="input"
+              type="password"
+              placeholder="Minimum 8 characters"
+              value={newPw}
+              autoComplete="new-password"
+              onChange={e => setNewPw(e.target.value)}
+            />
+          </div>
+          <div className="input-group">
+            <label className="input-label" htmlFor="confirm-pw">Confirm New Password</label>
+            <input
+              id="confirm-pw"
+              className="input"
+              type="password"
+              placeholder="Re-enter new password"
+              value={confirmPw}
+              autoComplete="new-password"
+              onChange={e => setConfirmPw(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
+            />
+          </div>
           {pwMsg && (
-            <p className="text-sm" style={{ color: pwMsg.ok ? 'var(--accent)' : '#f87171', fontWeight: 600 }}>
+            <p className="text-sm" role="alert" style={{ color: pwMsg.ok ? 'var(--accent)' : '#f87171', fontWeight: 600 }}>
               {pwMsg.text}
             </p>
           )}
-          <button className="btn btn-primary btn-full" onClick={handleChangePassword} disabled={pw.length < 8 || pwBusy}>
+          <button
+            className="btn btn-primary btn-full"
+            onClick={handleChangePassword}
+            disabled={!curPw || newPw.length < 8 || !confirmPw || pwBusy}
+          >
             {pwBusy ? <span className="spinner" /> : 'Update Password'}
           </button>
         </div>

@@ -152,6 +152,10 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.03);
   transition: border-color 0.22s, box-shadow 0.22s;
+  /* Never collapse below content inside a flex column (e.g. SubPage). An
+     overflow:hidden card otherwise gets min-height:0 and is shrunk to fit,
+     clipping its content instead of letting the page scroll. */
+  flex-shrink: 0;
 }
 
 .card:hover {
