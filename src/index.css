@@ -13,9 +13,11 @@
   --bg-card: rgba(8, 15, 30, 0.88);
   --bg-input: rgba(255, 255, 255, 0.05);
 
+  /* Secondary/tertiary text keep WCAG AA contrast (≥4.5:1) on --bg — they
+     carry real content (timestamps, hints, row values), not decoration. */
   --text:   #ddeeff;
-  --text-2: rgba(221, 238, 255, 0.55);
-  --text-3: rgba(221, 238, 255, 0.28);
+  --text-2: rgba(221, 238, 255, 0.65);
+  --text-3: rgba(221, 238, 255, 0.50);
 
   /* Neutral separators/edges — green is reserved for active states,
      progress, primary actions and completion feedback (lists spec). */
@@ -130,9 +132,9 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   gap: 4px;
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  /* Inactive items: a touch brighter than --text-3 so Profile stays legible
-     without competing with the green active tab (empty-state spec §10). */
-  color: rgba(221, 238, 255, 0.46);
+  /* Inactive items stay legible (AA) without competing with the green active
+     tab (empty-state spec §10). */
+  color: rgba(221, 238, 255, 0.55);
   font-size: 11px;
   font-weight: 500;
   transition: color 0.2s;
@@ -581,12 +583,6 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 .ld-row-right { font-size: 12.5px; color: var(--text-3); flex-shrink: 0; }
 .ld-menu-row.danger .ld-row-icon,
 .ld-menu-row.danger .ld-row-label { color: #ef4444; }
-/* Small, subtle premium badge sitting next to the Insights label (spec §12) */
-.ld-pro-badge {
-  font-size: 9.5px; font-weight: 800; letter-spacing: 0.04em;
-  color: var(--accent-text); background: var(--accent-soft);
-  padding: 2px 6px; border-radius: 5px; flex-shrink: 0;
-}
 
 /* ── Progress bar ────────────────────────────────────────────── */
 .progress-bar {
@@ -1067,8 +1063,8 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   --bg-input: rgba(0, 0, 0, 0.04);
 
   --text:   #0a1628;
-  --text-2: rgba(10, 22, 40, 0.58);
-  --text-3: rgba(10, 22, 40, 0.32);
+  --text-2: rgba(10, 22, 40, 0.70);
+  --text-3: rgba(10, 22, 40, 0.60);
 
   --border:   rgba(0, 0, 0, 0.08);
   --border-2: rgba(21, 128, 61, 0.26);
@@ -1101,7 +1097,7 @@ html[data-theme="light"] body {
   border-top-color: rgba(21,128,61,0.10);
 }
 
-[data-theme="light"] .nav-item { color: rgba(10, 22, 40, 0.50); }
+[data-theme="light"] .nav-item { color: rgba(10, 22, 40, 0.62); }
 [data-theme="light"] .nav-item.active { text-shadow: none; color: var(--accent); }
 
 /* Card */
