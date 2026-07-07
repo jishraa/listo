@@ -12,13 +12,16 @@ Deployed as a Cloudflare Worker serving static assets only (`wrangler.jsonc`, SP
 
 ```bash
 npm run dev        # Vite dev server
-npm run build      # tsc -b && vite build — must pass before pushing
+npm run verify     # full quality gate: lint → tests+coverage → build → bundle budget (see TESTING.md)
+npm run build      # tsc -b && vite build
 npm run lint       # oxlint (not eslint)
-npm test           # vitest — unit tests for lib/ (duplicates, suggest); must pass before pushing
-npm run deploy     # build + wrangler pages deploy (Cloudflare)
+npm test           # vitest — unit tests (lib/) + component tests (jsdom, RTL + axe-core)
+npm run deploy     # verify + wrangler deploy — a failing gate blocks the deploy
 npm run sync       # build + cap sync (after Capacitor-related changes)
 npm run open:ios / open:android
 ```
+
+`npm run verify` must pass before pushing; CI (`.github/workflows/ci.yml`) runs the same gate on every push/PR. Testing conventions and the QE roadmap live in `TESTING.md`.
 
 ## Architecture
 

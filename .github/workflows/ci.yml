@@ -1,0 +1,37 @@
+# Listo QE pipeline — every layer must pass before anything ships.
+# Local mirror: `npm run verify` (also runs automatically inside `npm run deploy`).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Static analysis (oxlint)
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit + component tests (coverage gate ≥90% lines)
+        run: npm run test:coverage
+
+      - name: Production build
+        run: npm run build
+
+      - name: Bundle budget (initial JS ≤300KB gzip)
+        run: npm run check:bundle
