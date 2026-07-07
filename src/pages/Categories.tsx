@@ -264,7 +264,7 @@ export default function Categories() {
                       onClick={e => { e.stopPropagation(); removeKeyword(k) }}
                       aria-label={`Remove ${k}`}
                       style={{
-                        width: 18, height: 18, borderRadius: 99, border: 'none', cursor: 'pointer',
+                        width: 24, height: 24, borderRadius: 99, border: 'none', cursor: 'pointer',
                         background: 'rgba(0,0,0,0.25)', color: 'var(--text-2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                       }}

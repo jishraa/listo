@@ -341,10 +341,11 @@ export default function Lists() {
           </div>
           {hasLists && (
             <div className="flex items-center" style={{ gap: 2 }}>
+              {/* 44px targets (a11y) — icon size unchanged */}
               <button
                 className="btn btn-ghost btn-sm"
                 aria-label="Sort lists"
-                style={{ padding: 8, borderRadius: 10, color: sort !== 'recent' ? 'var(--accent)' : 'var(--text-2)' }}
+                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, color: sort !== 'recent' ? 'var(--accent)' : 'var(--text-2)' }}
                 onClick={() => setSortOpen(true)}
               >
                 <ArrowUpDown size={18} />
@@ -352,7 +353,7 @@ export default function Lists() {
               <button
                 className="btn btn-ghost btn-sm"
                 aria-label="Search lists"
-                style={{ padding: 8, borderRadius: 10, color: searchOpen ? 'var(--accent)' : 'var(--text-2)' }}
+                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, color: searchOpen ? 'var(--accent)' : 'var(--text-2)' }}
                 onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch('') }}
               >
                 {searchOpen ? <X size={18} /> : <Search size={18} />}
@@ -389,7 +390,7 @@ export default function Lists() {
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   style={{
-                    flexShrink: 0, height: 32, padding: '0 12px', borderRadius: 99, cursor: 'pointer',
+                    flexShrink: 0, height: 36, padding: '0 13px', borderRadius: 99, cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     background: active ? 'var(--accent-soft)' : 'var(--bg-input)',
                     border: 'none',

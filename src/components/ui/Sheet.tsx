@@ -52,13 +52,31 @@ export default function Sheet({ open, onClose, title, subtitle, onBack, ariaLabe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Escape closes the topmost open sheet (a11y §keyboard).
+  // Keyboard dialog behavior for the topmost open sheet (a11y §keyboard):
+  // Escape closes; Tab cycles inside the sheet instead of escaping to the
+  // page behind the overlay.
   useEffect(() => {
     if (!open) return
     const id = Symbol('sheet')
     sheetStack.push(id)
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && sheetStack[sheetStack.length - 1] === id) onCloseRef.current()
+      if (sheetStack[sheetStack.length - 1] !== id) return
+      if (e.key === 'Escape') { onCloseRef.current(); return }
+      if (e.key !== 'Tab') return
+      const el = sheetRef.current
+      if (!el) return
+      const focusables = [...el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )].filter(f => !f.hasAttribute('disabled') && f.offsetParent !== null)
+      if (focusables.length === 0) { e.preventDefault(); el.focus(); return }
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey) {
+        if (active === first || !el.contains(active)) { e.preventDefault(); last.focus() }
+      } else if (active === last || !el.contains(active)) {
+        e.preventDefault(); first.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => {

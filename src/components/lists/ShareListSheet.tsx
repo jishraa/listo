@@ -322,7 +322,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
             onClick={() => setDraftIdx(i => (i + 1) % MESSAGE_DRAFTS.length)}
             aria-label="Try another message"
             style={{
-              flexShrink: 0, width: 32, height: 32, borderRadius: 10,
+              flexShrink: 0, width: 38, height: 38, borderRadius: 11,
               background: 'var(--bg-card)', border: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: 'var(--text-2)',

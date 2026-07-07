@@ -18,9 +18,10 @@ export default function InstallBanner({ canShow, platform, install, dismiss }: I
       {/* Dismiss */}
       <button
         onClick={dismiss}
+        aria-label="Dismiss install prompt"
         style={{
-          position: 'absolute', top: 10, right: 10,
-          width: 26, height: 26, borderRadius: '50%',
+          position: 'absolute', top: 7, right: 7,
+          width: 34, height: 34, borderRadius: '50%',
           background: 'rgba(255,255,255,0.07)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0,

@@ -111,6 +111,15 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   color: var(--text);
 }
 
+/* Header icon buttons (back / menu / add) — full 44px touch targets (a11y) */
+.header > .btn-ghost.btn-sm {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.header > .btn-ghost.btn-sm:first-child { margin-left: -10px; }
+
 /* ── Bottom Nav ──────────────────────────────────────────────── */
 .bottom-nav {
   height: var(--nav-h);

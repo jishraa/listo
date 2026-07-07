@@ -446,15 +446,15 @@ export default function ListDetail() {
                 reachable with a mouse or keyboard (undo toast still applies) */}
             <button onClick={() => { cancelEdit(); handleDelete(item) }}
               aria-label={`Delete ${item.title}`}
-              style={{ width: 32, height: 32, borderRadius: '50%', background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
+              style={{ width: 36, height: 36, borderRadius: '50%', background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
               <Trash2 size={14} strokeWidth={2} />
             </button>
             <button onClick={cancelEdit} aria-label="Cancel editing"
-              style={{ width: 32, height: 32, borderRadius: '50%', background: 'transparent', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
+              style={{ width: 36, height: 36, borderRadius: '50%', background: 'transparent', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
               <X size={14} strokeWidth={2.2} />
             </button>
             <button onClick={() => commitEdit(item)} aria-label="Save changes"
-              style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
+              style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
               <Check size={14} strokeWidth={2.5} />
             </button>
           </div>
@@ -1010,24 +1010,24 @@ export default function ListDetail() {
           onClose={() => setCompletedAction(null)}
           title={`${completedAction.title}${completedAction.quantity ? ` · ${formatQuantity(completedAction.quantity)}` : ''}`}
         >
-            <div className="ld-menu" role="menu">
+            <div className="ld-menu">
               <div className="ld-menu-group">
                 {/* Add Again — legitimate repeat purchase: a fresh pending item,
                     never routed through the active-duplicate merge warning. */}
-                <button role="menuitem" className="ld-menu-row" onClick={async () => {
+                <button className="ld-menu-row" onClick={async () => {
                   const it = completedAction; setCompletedAction(null)
                   await store.addItem(list.id, it.title, it.quantity ?? '', it.category)
                 }}>
                   <span className="ld-row-icon"><Plus size={16} /></span>
                   <span className="ld-row-label">Add Again</span>
                 </button>
-                <button role="menuitem" className="ld-menu-row" onClick={() => {
+                <button className="ld-menu-row" onClick={() => {
                   const it = completedAction; setCompletedAction(null); store.toggleItem(list.id, it)
                 }}>
                   <span className="ld-row-icon"><Undo2 size={16} /></span>
                   <span className="ld-row-label">Move to Pending</span>
                 </button>
-                <button role="menuitem" className="ld-menu-row" onClick={() => {
+                <button className="ld-menu-row" onClick={() => {
                   const it = completedAction; setCompletedAction(null); cancelEdit(); startEdit(it); setTimeout(() => editTitleRef.current?.focus(), 80)
                 }}>
                   <span className="ld-row-icon"><Pencil size={16} /></span>
@@ -1035,7 +1035,7 @@ export default function ListDetail() {
                 </button>
               </div>
               <div className="ld-menu-group">
-                <button role="menuitem" className="ld-menu-row danger" onClick={() => {
+                <button className="ld-menu-row danger" onClick={() => {
                   const it = completedAction; setCompletedAction(null); handleDelete(it)
                 }}>
                   <span className="ld-row-icon"><Trash2 size={16} /></span>
@@ -1073,14 +1073,13 @@ export default function ListDetail() {
 
       {/* ── List Options menu (titled, grouped, context-aware) ── */}
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="List Options">
-        <div className="ld-menu" role="menu">
+        <div className="ld-menu">
           {menuGroups.filter(g => g.rows.length > 0).map(g => (
             <div key={g.label} className="ld-menu-group">
               <p className="ld-menu-label">{g.label}</p>
               {g.rows.map((r, i) => (
                 <button
                   key={i}
-                  role="menuitem"
                   className={`ld-menu-row${r.danger ? ' danger' : ''}`}
                   onClick={r.onClick}
                 >
