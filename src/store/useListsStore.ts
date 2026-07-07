@@ -21,7 +21,8 @@ interface ListsState {
 
   init: (userId: string, displayName: string) => Promise<void>
   refreshLists: () => Promise<void>
-  createList: (params: { name: string; type: List['type']; emoji: string }) => Promise<List | null>
+  /** Create a list; optional starter items (from a template) are inserted with it. */
+  createList: (params: { name: string; type: List['type']; emoji: string; items?: { title: string; category?: string }[] }) => Promise<List | null>
   renameList: (listId: string, name: string) => Promise<void>
   deleteList: (listId: string) => Promise<void>
   duplicateList: (listId: string) => Promise<void>
@@ -37,6 +38,8 @@ interface ListsState {
   updateItem: (listId: string, itemId: string, patch: { title?: string; quantity?: string | null; category?: string | null }) => Promise<void>
   deleteItem: (listId: string, itemId: string) => Promise<void>
   uncheckAll: (listId: string) => Promise<void>
+  /** Permanently delete every completed item on a list. */
+  deleteCompleted: (listId: string) => Promise<void>
   /** Remove every item from a list (used to start a fresh next trip). Online-only. */
   clearItems: (listId: string) => Promise<void>
   removeMember: (listId: string, memberId: string) => Promise<void>
@@ -157,7 +160,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     }
   },
 
-  createList: async ({ name, type, emoji }) => {
+  createList: async ({ name, type, emoji, items }) => {
     const { userId, displayName } = get()
     const { data, error } = await supabase
       .from('lists')
@@ -169,6 +172,13 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     await supabase.from('list_members').insert({
       list_id: list.id, user_id: userId, role: 'owner', display_name: displayName,
     })
+    if (items?.length) {
+      await copyItems(
+        items.map((t, i) => ({ title: t.title, quantity: null, category: t.category ?? null, sort_order: i })),
+        list.id, displayName,
+      )
+      await get().loadItems(list.id)
+    }
     set({ lists: [list, ...get().lists] })
     return list
   },
@@ -426,6 +436,32 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
         .update({ completed: false, completed_by_name: null }).eq('list_id', listId))
     }
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
+    else bumpUpdatedAt(listId, get, set)
+  },
+
+  deleteCompleted: async (listId) => {
+    const prev = get().items[listId] ?? []
+    const completed = prev.filter(i => i.completed)
+    if (completed.length === 0) return
+    set({ items: { ...get().items, [listId]: prev.filter(i => !i.completed) } })
+    const sync = useSyncStore.getState()
+    // Temp items never reached the server — just cancel their queued ops.
+    completed.filter(i => isTempId(i.id)).forEach(i => sync.dropForItem(i.id))
+    const real = completed.filter(i => !isTempId(i.id))
+    if (real.length === 0) return
+    if (!sync.online) {
+      real.forEach(i => sync.enqueue({ kind: 'delete', opId: newOpId(), listId, itemId: i.id }))
+      return
+    }
+    const { error } = await supabase.from('list_items')
+      .delete().eq('list_id', listId).eq('completed', true)
+    if (error) {
+      if (isNetworkError(error.message)) {
+        real.forEach(i => sync.enqueue({ kind: 'delete', opId: newOpId(), listId, itemId: i.id }))
+        return
+      }
+      set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't clear completed — try again" })
+    }
     else bumpUpdatedAt(listId, get, set)
   },
 
