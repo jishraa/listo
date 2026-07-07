@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Eye, MessageCircle, MoreHorizontal, Pencil, Shuffle, X } from 'lucide-react'
+import { Check, Copy, Eye, MessageCircle, MoreHorizontal, Pencil, RefreshCw, Shuffle } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import { useListsStore } from '../../store/useListsStore'
 import type { List, ListMember } from '../../types'
 
@@ -157,38 +158,62 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
   const [generating, setGenerating]   = useState(true)
   const [copied, setCopied]           = useState(false)
   const [draftIdx, setDraftIdx]       = useState(() => Math.floor(Math.random() * MESSAGE_DRAFTS.length))
-  // The access level this link grants. Owners can switch it; each switch mints
-  // a fresh link so the old level can't be reused. The invite secret is never
-  // sent to non-owners, so it's read/minted lazily here, owner-only.
+  // The access level this link grants. The invite secret is never sent to
+  // non-owners, so it's read/minted lazily here, owner-only.
   const [access, setAccess] = useState<'collaborator' | 'viewer'>('collaborator')
   const [seeded, setSeeded] = useState(false)
+  // True once an existing link has been invalidated (access switch or an
+  // explicit reset) — drives the "older links no longer work" notice.
+  const [rotated, setRotated] = useState(false)
   // StrictMode double-invoke guard: mint once per distinct access level so the
   // DB, currentCode, and the visible level always agree.
   const lastGenAccess = useRef<string | null>(null)
 
-  // Seed the selector from the list's current invite level (owner-only read).
+  // Reuse the list's existing invite (opening the sheet must never silently
+  // invalidate links already shared). Mint only when none exists yet.
   useEffect(() => {
     if (!isOwner) { setGenerating(false); return }
     let cancelled = false
     store.getInvite(list.id)
-      .then(inv => { if (!cancelled) { if (inv) setAccess(inv.role); setSeeded(true) } })
+      .then(inv => {
+        if (cancelled) return
+        if (inv) {
+          setAccess(inv.role)
+          setCurrentCode(inv.code)
+          lastGenAccess.current = inv.role
+          setGenerating(false)
+        }
+        setSeeded(true)
+      })
       .catch(() => { if (!cancelled) setSeeded(true) })
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Once seeded, mint a fresh link at the selected level; re-mint on change.
+  // Mint when there's no link yet; rotate when the owner changes the access
+  // level (a deliberate act — the old level must stop working).
   useEffect(() => {
     if (!isOwner || !seeded) return
     if (lastGenAccess.current === access) return
+    const isRotation = lastGenAccess.current !== null
     lastGenAccess.current = access
     setGenerating(true)
     store.regenerateInvite(list.id, access).then(newCode => {
-      if (newCode) setCurrentCode(newCode)
+      if (newCode) { setCurrentCode(newCode); if (isRotation) setRotated(true) }
       setGenerating(false)
     }).catch(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [access, seeded, isOwner])
+
+  // Explicit reset: invalidate the current link and mint a fresh one.
+  const resetLink = () => {
+    if (generating || !isOwner) return
+    setGenerating(true)
+    store.regenerateInvite(list.id, access).then(newCode => {
+      if (newCode) { setCurrentCode(newCode); setRotated(true) }
+      setGenerating(false)
+    }).catch(() => setGenerating(false))
+  }
 
   const joinUrl   = currentCode ? `${window.location.origin}/join/${currentCode}` : ''
   const shareUrl  = joinUrl
@@ -213,35 +238,40 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
   }
 
   return (
-    <>
-      <div className="sheet-overlay" onClick={onClose} />
-      <div className="sheet" style={{ maxHeight: '80vh', overflowY: 'auto', paddingBottom: 24 }}>
-        <div className="sheet-handle" />
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px 0' }}>
-          <p style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
-            Share list
-          </p>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{ width: 32, height: 32, borderRadius: 99, background: 'var(--bg-input)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}
-          >
-            <X size={16} strokeWidth={2.5} />
-          </button>
-        </div>
-        <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '6px 20px 14px' }}>
-          {generating ? 'Generating a fresh link…' : 'A fresh link was generated — older links no longer work.'}
+    <Sheet open onClose={onClose} title="Share list">
+      <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingBottom: 24 }}>
+        <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '12px 20px 14px' }}>
+          {generating
+            ? 'Preparing your invite link…'
+            : rotated
+              ? 'A fresh link was generated — older links no longer work.'
+              : 'Anyone with this link can join the list.'}
         </p>
 
         {/* Access level — owners choose what the link grants. Switching mints a
             fresh link at the new level. */}
         {isOwner && (
           <div style={{ margin: '0 20px 18px' }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 8px' }}>
-              Anyone with the link
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 8px' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>
+                Anyone with the link
+              </p>
+              {/* Deliberate invalidation lives here — nowhere else rotates the link */}
+              <button
+                onClick={resetLink}
+                disabled={generating}
+                aria-label="Generate a new link — older links stop working"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '10px 4px', margin: '-10px -4px',
+                  background: 'none', border: 'none', cursor: generating ? 'default' : 'pointer',
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
+                  opacity: generating ? 0.5 : 1,
+                }}
+              >
+                <RefreshCw size={12} strokeWidth={2.2} /> Reset link
+              </button>
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {([
                 { key: 'collaborator' as const, icon: <Pencil size={15} />, label: 'Can edit', hint: 'Add & tick off items' },
@@ -318,7 +348,9 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
               disabled={disabled}
-              onClick={() => window.open(`sms:?body=${encodeURIComponent(shareText)}`, '_blank')}
+              // Custom-scheme links must navigate — window.open is unreliable
+              // for sms: in standalone PWAs (same as the upi:// handling).
+              onClick={() => { window.location.href = `sms:?body=${encodeURIComponent(shareText)}` }}
               style={{ ...btnBase, background: 'var(--bg-input)', color: 'var(--text)' }}
             >
               <MessageCircle size={22} strokeWidth={2} />
@@ -379,6 +411,6 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
           </>
         )}
       </div>
-    </>
+    </Sheet>
   )
 }
