@@ -62,7 +62,7 @@ Tables: `lists` (name, type, emoji, owner_id, is_template, archived_at), `list_i
 
 Templates and archived lists are regular `lists` rows flagged by `is_template` / `archived_at` — no separate tables. Every "normal" list view must filter through the store's exported helpers `visibleLists` / `templateLists` / `archivedLists` (rows loaded before migration v3 lack the columns, so the helpers use truthiness, never `=== false`).
 
-RPCs (SECURITY DEFINER): `redeem_list_invite(code, display_name)` — validates code + expiry, inserts membership, then rotates the code (links are single-use); raises `invalid_code` / `expired_code` / `own_list` / `already_member`. `rotate_invite` / `invite_preview` / `member_list_id_for_code` — invite mint/preview/resolve. `remove_list_member` + `set_member_role` — owner only. `touch_list` — members bump `updated_at`. `record_item_use` — List Memory. `set_my_display_name` (v15) + `delete_my_account` (v16) — self-serve profile ops.
+RPCs (SECURITY DEFINER): `redeem_list_invite(code, display_name)` — validates code + expiry, inserts membership; links are multi-use since v17 (revoked only by the owner's Reset link / access switch); raises `invalid_code` / `expired_code` / `own_list` / `already_member`. `rotate_invite` / `invite_preview` / `member_list_id_for_code` — invite mint/preview/resolve. `remove_list_member` + `set_member_role` — owner only. `touch_list` — members bump `updated_at`. `record_item_use` — List Memory. `set_my_display_name` (v15) + `delete_my_account` (v16) — self-serve profile ops.
 
 Guests are Supabase **anonymous users** (`user.is_anonymous`); their display name lives in localStorage, not user_metadata.
 
