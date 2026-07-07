@@ -53,13 +53,7 @@ export default function AppShell() {
     // Guests can't own lists — creation would orphan the data when their
     // anonymous session ends. The FAB is hidden for them; this is a backstop.
     if (isGuest) return
-    const list = await store.createList({ name, type, emoji })
-    if (!list) return
-    if (templateItems?.length) {
-      for (const item of templateItems) {
-        await store.addItem(list.id, item.title, '', item.category ?? null)
-      }
-    }
+    await store.createList({ name, type, emoji, items: templateItems })
   }
 
   return (

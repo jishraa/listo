@@ -75,11 +75,13 @@ function AuthGuard({ children, allowGuest = true }: { children: React.ReactNode;
 }
 
 // Root gate: the marketing landing page is public at "/" for signed-out
-// visitors, while authenticated users get their Lists workspace in place (so
-// the installed PWA still opens straight to their lists). AppShell renders the
-// <Outlet/> → the index route's <Lists/>.
+// visitors, while authenticated users get the tab shell in place (so the
+// installed PWA still opens straight to their lists). AppShell renders the
+// <Outlet/> → Lists or Profile — one shell instance across tab switches, so
+// the bottom nav persists and shell data loading doesn't re-fire per switch.
 function RootGate() {
   const { user, loading } = useAuthStore()
+  const { pathname } = useLocation()
 
   if (loading) {
     return (
@@ -89,7 +91,10 @@ function RootGate() {
     )
   }
 
-  if (!user) return <Landing />
+  if (!user) {
+    // "/" doubles as the public landing; other shell paths (/profile) need auth.
+    return pathname === '/' ? <Landing /> : <Navigate to="/login" replace />
+  }
   return <AppShell />
 }
 
@@ -181,9 +186,11 @@ function AppRoutes() {
           (so authenticated visitors see it with the "Open Listo" CTA). */}
       <Route path="/about" element={<Landing />} />
       {/* "/" is public: RootGate shows the landing to signed-out visitors and
-          the Lists workspace (AppShell → index route) to authenticated ones. */}
+          the tab shell (AppShell → Lists / Profile) to authenticated ones.
+          Profile lives here so the bottom nav persists across tab switches. */}
       <Route path="/" element={<RootGate />}>
         <Route index element={<Lists />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
       {/* Old dashboard/insights URLs — Lists is the root screen now */}
       <Route path="/lists" element={<Navigate to="/" replace />} />
@@ -202,14 +209,6 @@ function AppRoutes() {
         element={
           <AuthGuard allowGuest={false}>
             <Categories />
-          </AuthGuard>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <AuthGuard>
-            <Profile />
           </AuthGuard>
         }
       />

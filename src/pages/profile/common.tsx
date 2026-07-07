@@ -1,13 +1,13 @@
-import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSafeBack } from '../../hooks/useSafeBack'
 
 // Drill-in page scaffold: back header + scrolling padded content.
 export function SubPage({ title, children }: { title: string; children: React.ReactNode }) {
-  const navigate = useNavigate()
+  const goBack = useSafeBack()
   return (
     <div className="app-container">
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
+        <button className="btn btn-ghost btn-sm" onClick={goBack} aria-label="Go back">
           <ChevronLeft size={20} />
         </button>
         <span className="header-title">{title}</span>

@@ -6,7 +6,7 @@ import { useThemeStore } from '../store/useThemeStore'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import Sheet from '../components/ui/Sheet'
 import { openYft } from '../lib/yft'
-import { SubPage, Section, Row } from './profile/common'
+import { Section, Row } from './profile/common'
 import { APP_VERSION } from '../lib/version'
 
 const THEME_LABEL: Record<string, string> = { light: 'Light', dark: 'Dark', system: 'System' }
@@ -18,6 +18,9 @@ export default function Profile() {
   const categoryCount = Object.values(categories).flat().length
   const navigate = useNavigate()
   const [confirmSignOut, setConfirmSignOut] = useState(false)
+  // Guest → account: signing up ends the anonymous session, so joined lists
+  // don't carry over. Never do that silently — confirm with the consequences.
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false)
 
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
@@ -58,8 +61,12 @@ export default function Profile() {
   )
 
   return (
-    <SubPage title="Profile">
-      <>
+    // Tab page (renders inside AppShell, bottom nav below) — no back header.
+    <div className="page">
+      <div style={{ padding: '20px 16px 4px' }}>
+        <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-0.4px', margin: 0 }}>Profile</h1>
+      </div>
+      <div className="page-padded" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Profile card — the whole card is tappable → account (members only) */}
         {isGuest ? (
           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -87,9 +94,9 @@ export default function Profile() {
               You're browsing as a guest
             </p>
             <p className="text-sm text-muted" style={{ marginBottom: 12 }}>
-              Create an account to own lists and access them across devices.
+              Create an account to make your own lists and use Listo across devices.
             </p>
-            <button className="btn btn-primary btn-sm" onClick={() => { signOut(); navigate('/login') }}>
+            <button className="btn btn-primary btn-sm" onClick={() => setConfirmUpgrade(true)}>
               Create Account
             </button>
           </div>
@@ -144,6 +151,23 @@ export default function Profile() {
           <p className="text-xs" style={{ color: 'var(--text-3)', marginTop: 2 }}>Version {APP_VERSION} · Made with 💚</p>
         </div>
 
+      {/* Guest → account confirmation: make the trade-off explicit */}
+      <Sheet open={confirmUpgrade} onClose={() => setConfirmUpgrade(false)} title="Create your account">
+        <div className="sheet-body">
+          <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: 1.55 }}>
+            Your guest session on this device will end. Lists you joined as a guest
+            won't carry over — you can rejoin them anytime with their invite links.
+          </p>
+          <div className="flex gap-2">
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmUpgrade(false)}>Cancel</button>
+            <button className="btn btn-primary" style={{ flex: 1 }}
+              onClick={async () => { await signOut(); navigate('/login?mode=register') }}>
+              Continue
+            </button>
+          </div>
+        </div>
+      </Sheet>
+
       {/* Sign out confirmation */}
       <Sheet open={confirmSignOut} onClose={() => setConfirmSignOut(false)}>
         <div className="sheet-body" style={{ textAlign: 'center' }}>
@@ -164,7 +188,7 @@ export default function Profile() {
           </div>
         </div>
       </Sheet>
-      </>
-    </SubPage>
+      </div>
+    </div>
   )
 }

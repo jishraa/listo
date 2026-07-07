@@ -1,12 +1,12 @@
-import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
+import { useSafeBack } from '../hooks/useSafeBack'
 
 function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
-  const navigate = useNavigate()
+  const goBack = useSafeBack()
   return (
     <div className="app-container">
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
+        <button className="btn btn-ghost btn-sm" onClick={goBack} aria-label="Go back">
           <ChevronLeft size={20} />
         </button>
         <span className="header-title">{title}</span>
@@ -41,7 +41,7 @@ export function Privacy() {
       <p><strong style={{ color: 'var(--text)' }}>How it's used.</strong> Solely to provide the app: syncing your lists across devices and sharing them with people you invite.</p>
       <p><strong style={{ color: 'var(--text)' }}>What we don't do.</strong> We don't sell your data, show ads, or share your information with third parties.</p>
       <p><strong style={{ color: 'var(--text)' }}>Where it lives.</strong> Data is stored with Supabase over encrypted connections (HTTPS).</p>
-      <p><strong style={{ color: 'var(--text)' }}>Deleting your data.</strong> Deleting a list removes its items permanently. Contact us to delete your account entirely.</p>
+      <p><strong style={{ color: 'var(--text)' }}>Deleting your data.</strong> Deleting a list removes its items permanently. You can delete your account and all its data anytime from Profile → Account → Delete Account.</p>
     </LegalPage>
   )
 }

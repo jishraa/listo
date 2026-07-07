@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Check, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import { useSafeBack } from '../hooks/useSafeBack'
 import { useAuthStore } from '../store/useAuthStore'
 import { useCategoriesStore, makeCategoryId } from '../store/useCategoriesStore'
 import type { ListCategory } from '../lib/constants'
@@ -32,7 +32,7 @@ interface Draft {
 const emptyDraft = (): Draft => ({ id: null, name: '', emoji: '🏷️', color: COLOR_SWATCHES[0], keywords: [] })
 
 export default function Categories() {
-  const navigate = useNavigate()
+  const goBack = useSafeBack()
   const { user } = useAuthStore()
   const categories = useCategoriesStore(s => s.categories)
   const init = useCategoriesStore(s => s.init)
@@ -101,7 +101,7 @@ export default function Categories() {
   return (
     <div className="app-container">
       <div className="header">
-        <button className="btn btn-ghost btn-sm" onClick={() => navigate(-1)} aria-label="Go back">
+        <button className="btn btn-ghost btn-sm" onClick={goBack} aria-label="Go back">
           <ChevronLeft size={20} />
         </button>
         <span className="header-title">Categories</span>
@@ -112,7 +112,7 @@ export default function Categories() {
 
       <div className="page page-padded" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {lastError && (
-          <div className="error-msg">
+          <div className="error-msg" role="alert">
             {lastError}
             <button onClick={clearError} style={{ float: 'right', fontWeight: 700, background: 'none', color: '#dc2626', fontSize: 16 }}>✕</button>
           </div>
