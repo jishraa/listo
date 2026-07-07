@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ChevronDown, ClipboardList, Cloud, History, Monitor, Moon, Palette, Sun } from 'lucide-react'
+import { Check, ClipboardList, Cloud, History, Monitor, Moon, Palette, Sun } from 'lucide-react'
+import Sheet from '../../components/ui/Sheet'
 import { useThemeStore } from '../../store/useThemeStore'
 import type { ThemePref } from '../../store/useThemeStore'
 import { useListsStore, visibleLists } from '../../store/useListsStore'
@@ -29,6 +30,7 @@ export default function PreferencesPage() {
   const syncing = useSyncStore(s => s.syncing)
   const queueLen = useSyncStore(s => s.queue.length)
   const [defaultType, setDefaultType] = useState<ListType>(getDefaultListType)
+  const [typePickerOpen, setTypePickerOpen] = useState(false)
 
   const visible = visibleLists(lists)
   const lastActivity = visible.length > 0
@@ -74,36 +76,36 @@ export default function PreferencesPage() {
       </Section>
 
       <Section title="General">
-        <div style={{ padding: '12px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ color: 'var(--accent)', display: 'flex', flexShrink: 0 }}><ClipboardList size={17} /></span>
-            <label htmlFor="default-list-type" style={{ flex: 1, fontSize: 15, fontWeight: 500, color: 'var(--text)' }}>
-              Default List
-            </label>
-            {/* Compact right-aligned dropdown value + chevron (matches the row pattern) */}
-            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', flexShrink: 0, maxWidth: '55%' }}>
-              <select
-                id="default-list-type"
-                value={defaultType}
-                onChange={e => pickDefaultType(e.target.value as ListType)}
-                style={{
-                  appearance: 'none', WebkitAppearance: 'none', background: 'transparent', border: 'none',
-                  color: 'var(--text-2)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  paddingRight: 20, textAlignLast: 'right', outline: 'none', maxWidth: '100%',
-                }}
-              >
-                {LIST_TYPE_OPTIONS.map(({ value, label, emoji }) => (
-                  <option key={value} value={value}>{emoji} {label}</option>
-                ))}
-              </select>
-              <ChevronDown size={16} style={{ position: 'absolute', right: 0, pointerEvents: 'none', color: 'var(--text-3)' }} />
-            </div>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--text-3)', margin: '8px 0 0 29px' }}>
-            Used as the default when creating a new list.
-          </p>
-        </div>
+        <Row
+          icon={<ClipboardList size={17} />}
+          label="Default List"
+          subtitle="Used as the default when creating a new list"
+          value={`${LIST_TYPE_OPTIONS.find(o => o.value === defaultType)?.emoji} ${LIST_TYPE_OPTIONS.find(o => o.value === defaultType)?.label}`}
+          onPress={() => setTypePickerOpen(true)}
+          last
+        />
       </Section>
+
+      {/* Same picker pattern as everywhere else — no native select */}
+      <Sheet open={typePickerOpen} onClose={() => setTypePickerOpen(false)} title="Default List Type">
+        <div className="sheet-body" style={{ gap: 7 }} role="radiogroup" aria-label="Default list type">
+          {LIST_TYPE_OPTIONS.map(({ value, label, emoji }) => {
+            const selected = defaultType === value
+            return (
+              <button
+                key={value}
+                role="radio"
+                aria-checked={selected}
+                className={`sort-row${selected ? ' selected' : ''}`}
+                onClick={() => { pickDefaultType(value); setTypePickerOpen(false) }}
+              >
+                <span>{emoji} {label}</span>
+                {selected && <Check size={17} color="var(--accent-text)" strokeWidth={2.6} />}
+              </button>
+            )
+          })}
+        </div>
+      </Sheet>
 
       <Section title="Cloud & Sync">
         <Row icon={<Cloud size={17} />} label="Cloud Sync" value={sync.label} valueColor={sync.color} />
