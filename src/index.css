@@ -442,6 +442,91 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 }
 .hscroll::-webkit-scrollbar { display: none; }
 
+/* ── Preferences selection tiles (theme / default type) ──────── */
+.pref-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 13px 8px; border-radius: 12px; cursor: pointer;
+  background: var(--bg-input); border: 1.5px solid var(--border); color: var(--text-2);
+  transition: background 180ms var(--ease), border-color 180ms var(--ease),
+              color 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+.pref-tile:active { transform: scale(0.98); }
+.pref-tile.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 1px 6px rgba(22,163,74,0.15);
+}
+.pref-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pref-tile-label { font-size: 12px; font-weight: 500; }
+.pref-tile.active .pref-tile-label { font-weight: 700; }
+
+/* Segmented pill toggle (Appearance / theme) */
+.seg-pill {
+  display: flex; gap: 4px; padding: 4px; border-radius: 13px;
+  background: var(--bg-input); border: 1px solid var(--border);
+}
+.seg-pill-item {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 38px; height: 34px; border-radius: 9px; cursor: pointer;
+  background: none; border: none; color: var(--text-2);
+  font-size: 13px; font-weight: 600;
+  transition: background 180ms var(--ease), color 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+/* Active segment reads as a filled green "thumb" */
+.seg-pill-item.active {
+  background: var(--accent); color: #04120a; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.seg-pill-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Shop Mode ───────────────────────────────────────────────── */
+.shop-cat-label {
+  font-size: 12px; font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 4px 4px 8px;
+}
+.shop-item {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  min-height: 62px; padding: 12px 16px; border-radius: 14px; cursor: pointer;
+  background: var(--bg-card); border: 1px solid var(--border); text-align: left;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+}
+.shop-item:active { background: var(--accent-dim); border-color: var(--border-2); }
+.shop-check {
+  flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
+  border: 2.5px solid var(--text-2);
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.shop-item:active .shop-check { border-color: var(--accent); }
+.shop-cart-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 10px 16px; border-radius: 12px; cursor: pointer;
+  background: var(--bg-card); border: 1px solid var(--border); text-align: left;
+}
+.shop-cart-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 11px 6px; min-height: 44px; background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.shop-item:focus-visible,
+.shop-cart-item:focus-visible,
+.shop-cart-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.shop-snackbar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(20px + var(--safe-bottom)); z-index: 320;
+  display: flex; align-items: center; gap: 12px;
+  max-width: 440px; width: calc(100% - 32px);
+  padding: 10px 10px 10px 16px; border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border-2);
+  box-shadow: var(--shadow); animation: snackbar-in 200ms var(--ease);
+}
+@keyframes snackbar-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
 /* Lists (home) header — pinned to the top while the list scrolls beneath it */
 .lists-header {
   position: sticky;
