@@ -1,5 +1,38 @@
-import { describe, expect, it } from 'vitest'
-import { friendlyName, formatQuantity } from './utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { friendlyName, formatQuantity, formatRelativeTime, capitalize } from './utils'
+
+describe('formatRelativeTime', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-07T15:00:00'))
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('uses minutes for recent activity', () => {
+    expect(formatRelativeTime('2026-07-07T14:59:40')).toBe('just now')
+    expect(formatRelativeTime('2026-07-07T14:55:00')).toBe('5m ago')
+  })
+
+  it('switches to calendar wording past an hour', () => {
+    expect(formatRelativeTime('2026-07-07T09:00:00')).toBe('today')
+    expect(formatRelativeTime('2026-07-06T23:00:00')).toBe('yesterday')
+    expect(formatRelativeTime('2026-07-04T12:00:00')).toBe('3 days ago')
+  })
+
+  it('falls back to a short date after a week', () => {
+    const out = formatRelativeTime('2026-06-01T12:00:00')
+    expect(out).not.toMatch(/ago|today|yesterday/)
+    expect(out.length).toBeGreaterThan(0)
+  })
+})
+
+describe('capitalize', () => {
+  it('uppercases the first letter only', () => {
+    expect(capitalize('rice')).toBe('Rice')
+    expect(capitalize('basmati rice')).toBe('Basmati rice')
+    expect(capitalize('')).toBe('')
+  })
+})
 
 describe('friendlyName', () => {
   it('strips digits from technical usernames', () => {
