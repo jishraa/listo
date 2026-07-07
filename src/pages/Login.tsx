@@ -19,6 +19,14 @@ function friendlyError(msg: string): string {
 }
 
 
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.78 1.3 10.32.86 1.24 1.89 2.63 3.24 2.58 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.26 3.15-2.51.99-1.44 1.4-2.83 1.42-2.9-.03-.01-2.72-1.04-2.75-4.13zM14.5 4.5c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.56-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.59 3.04-1.46z"/>
+    </svg>
+  )
+}
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -116,7 +124,7 @@ export default function Login() {
     }
   }
 
-  const handleProvider = async (provider: 'google') => {
+  const handleProvider = async (provider: 'google' | 'apple') => {
     setError('')
     // Return to the pending destination after the OAuth round-trip.
     const err = await signInWithProvider(provider, window.location.origin + next)
@@ -248,6 +256,11 @@ export default function Login() {
                 <>
                   <button type="button" className="auth-social" aria-label="Continue with Google" onClick={() => handleProvider('google')} disabled={disabled}>
                     <GoogleIcon /> Continue with Google
+                  </button>
+                  {/* Same options as the join screen; App Store guideline 4.8
+                      requires Apple wherever other social logins are offered. */}
+                  <button type="button" className="auth-social" aria-label="Continue with Apple" onClick={() => handleProvider('apple')} disabled={disabled}>
+                    <AppleIcon /> Continue with Apple
                   </button>
 
                   <div className="auth-divider">OR</div>
