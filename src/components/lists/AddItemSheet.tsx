@@ -5,6 +5,7 @@ import { useMemoryStore, memoryKey, regularsOf, suggestOf, type MemoryItem } fro
 import { detectCategoryIn, parseItemInput, GROCERY_VOCAB } from '../../lib/constants'
 import { findPendingMergeTarget, hasCompletedMatch } from '../../lib/duplicates'
 import { capitalize, formatQuantity } from '../../lib/utils'
+import Sheet from '../ui/Sheet'
 import CategoryPickerSheet from './CategoryPickerSheet'
 import type { List, ListItem } from '../../types'
 import type { ListCategory } from '../../lib/constants'
@@ -175,6 +176,13 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
     setTimeout(() => inputRef.current?.focus(), 60)
   }
 
+  // Back out of the merge question without adding anything — the typed text
+  // stays in the input so the user can tweak it.
+  function cancelMerge() {
+    setShowMerge(false); setMergeTarget(null); setPendingAdd(null)
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }
+
   async function handleMerge() {
     if (!mergeTarget || !pendingAdd) return
     const combined = mergeQuantities(mergeTarget.quantity, pendingAdd.qty)
@@ -195,11 +203,7 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
 
   return (
     <>
-      {open && (
-        <>
-          <div className="sheet-overlay" onClick={() => { resetAdd(); onClose() }} />
-          <div className="sheet">
-            <div className="sheet-handle" />
+      <Sheet open={open} onClose={() => { resetAdd(); onClose() }} ariaLabel={`Add to ${list.name}`}>
             <div style={{ padding: '10px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <p style={{ fontSize: 17, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>Add to {list.name}</p>
@@ -347,28 +351,22 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                 </button>
               )}
             </div>
-          </div>
-        </>
-      )}
+      </Sheet>
 
-      {/* Merge confirm */}
+      {/* Merge confirm — dismissable: backdrop, ✕ or Escape cancels the add
+          entirely, keeping the typed input so the user can adjust it instead. */}
       {showMerge && mergeTarget && pendingAdd && (
-        <>
-          <div className="sheet-overlay" />
-          <div className="sheet">
-            <div className="sheet-handle" />
-            <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontWeight: 700, fontSize: 16 }}>"{mergeTarget.title}" already exists</p>
-              <p className="text-muted text-sm">
-                Existing: <strong>{formatQuantity(mergeTarget.quantity) || '—'}</strong> · Adding: <strong>{formatQuantity(pendingAdd.qty)}</strong> → Combined: <strong>{formatQuantity(mergeQuantities(mergeTarget.quantity, pendingAdd.qty))}</strong>
-              </p>
-              <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(formatItemLabel(pendingAdd.title, pendingAdd.qty)) }}>Add Separate</button>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleMerge}>Merge Qty</button>
-              </div>
+        <Sheet open onClose={cancelMerge} title={`"${mergeTarget.title}" already exists`}>
+          <div className="sheet-body" style={{ gap: 14 }}>
+            <p className="text-muted text-sm">
+              Existing: <strong>{formatQuantity(mergeTarget.quantity) || '—'}</strong> · Adding: <strong>{formatQuantity(pendingAdd.qty)}</strong> → Combined: <strong>{formatQuantity(mergeQuantities(mergeTarget.quantity, pendingAdd.qty))}</strong>
+            </p>
+            <div className="flex gap-2">
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={async () => { await store.addItem(list.id, pendingAdd.title, pendingAdd.qty, pendingAdd.category); setShowMerge(false); setMergeTarget(null); resetAdd(); flashAddedToast(formatItemLabel(pendingAdd.title, pendingAdd.qty)) }}>Add Separate</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleMerge}>Merge Qty</button>
             </div>
           </div>
-        </>
+        </Sheet>
       )}
 
       {/* Category picker (add flow) */}

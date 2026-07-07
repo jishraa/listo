@@ -1,4 +1,5 @@
 import { Check, Plus, ShoppingBag } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import { useListsStore } from '../../store/useListsStore'
 import { detectCategoryIn } from '../../lib/constants'
 import type { List } from '../../types'
@@ -19,7 +20,6 @@ interface Props {
 
 export default function BeforeYouGoSheet({ open, onClose, list, cats, suggestions }: Props) {
   const store = useListsStore()
-  if (!open) return null
 
   const add = (m: MemoryItem) => {
     const cat = m.category ?? detectCategoryIn(cats, m.name) ?? null
@@ -28,10 +28,7 @@ export default function BeforeYouGoSheet({ open, onClose, list, cats, suggestion
   const addAll = () => suggestions.forEach(add)
 
   return (
-    <>
-      <div className="sheet-overlay" onClick={onClose} />
-      <div className="sheet">
-        <div className="sheet-handle" />
+    <Sheet open={open} onClose={onClose} ariaLabel="Before you go">
         <div style={{ padding: '10px 20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <ShoppingBag size={18} color="var(--accent)" />
@@ -76,7 +73,6 @@ export default function BeforeYouGoSheet({ open, onClose, list, cats, suggestion
             </>
           )}
         </div>
-      </div>
-    </>
+    </Sheet>
   )
 }

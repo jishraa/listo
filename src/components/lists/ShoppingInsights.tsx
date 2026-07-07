@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft, ChevronRight, FileText, Plus, Sparkles, X } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import { useListsStore, visibleLists, archivedLists } from '../../store/useListsStore'
 import { useCategoriesStore } from '../../store/useCategoriesStore'
 import { exportListReport, exportListCsv } from '../../lib/report'
@@ -77,7 +78,8 @@ export default function ShoppingInsights({ list, items, members, displayName, on
     return [...seen.values()].filter(n => n > 1).length
   }, [items])
 
-  const uncat = items.filter(i => !i.category).length
+  // Orphaned ids (category since deleted) are uncategorized for scoring too.
+  const uncat = items.filter(i => !i.category || !cats.some(c => c.id === i.category)).length
   const catPct = total > 0 ? Math.round(((total - uncat) / total) * 100) : 0
 
   // ── History across the user's shopping lists ────────────────
@@ -644,10 +646,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
 
       {/* ── Create-list sheet (from prediction) ── */}
       {createOpen && (
-        <>
-          <div className="sheet-overlay" style={{ zIndex: 210 }} onClick={() => !creating && setCreateOpen(false)} />
-          <div className="sheet" style={{ zIndex: 211 }}>
-            <div className="sheet-handle" />
+        <Sheet open onClose={() => { if (!creating) setCreateOpen(false) }} ariaLabel="Create shopping list" zIndex={210}>
             <div className="sheet-body">
               {createdList ? (
                 <div style={{ textAlign: 'center', padding: '8px 0' }}>
@@ -681,16 +680,12 @@ export default function ShoppingInsights({ list, items, members, displayName, on
                 </>
               )}
             </div>
-          </div>
-        </>
+        </Sheet>
       )}
 
       {/* ── Export format sheet ── */}
       {exportOpen && (
-        <>
-          <div className="sheet-overlay" style={{ zIndex: 210 }} onClick={() => !exporting && setExportOpen(false)} />
-          <div className="sheet" style={{ zIndex: 211 }}>
-            <div className="sheet-handle" />
+        <Sheet open onClose={() => { if (!exporting) setExportOpen(false) }} ariaLabel="Export report" zIndex={210}>
             <div className="sheet-body" style={{ gap: 10 }}>
               <p style={{ fontWeight: 700, fontSize: 17, margin: 0 }}>Export Report</p>
               {([
@@ -722,8 +717,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
               </button>
               <button className="btn btn-secondary btn-full" onClick={() => setExportOpen(false)}>Cancel</button>
             </div>
-          </div>
-        </>
+        </Sheet>
       )}
     </div>
   )

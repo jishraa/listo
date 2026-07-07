@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Search, Settings2, X } from 'lucide-react'
+import { Check, Search, Settings2 } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import type { ListCategory } from '../../lib/constants'
 
 interface Props {
@@ -17,8 +18,6 @@ interface Props {
 export default function CategoryPickerSheet({ open, categories, selected, onSelect, onClose }: Props) {
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
-
-  if (!open) return null
 
   const q = query.trim().toLowerCase()
   const filtered = q ? categories.filter(c => c.name.toLowerCase().includes(q)) : categories
@@ -55,26 +54,10 @@ export default function CategoryPickerSheet({ open, categories, selected, onSele
   }
 
   return (
-    <>
-      <div className="sheet-overlay" onClick={close} />
-      <div className="sheet" style={{ maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="sheet-handle" />
-
-        {/* Title */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px 12px' }}>
-          <p style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Select category</p>
-          <button
-            onClick={close}
-            aria-label="Close"
-            style={{ width: 32, height: 32, borderRadius: 99, background: 'var(--bg-input)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}
-          >
-            <X size={16} strokeWidth={2.5} />
-          </button>
-        </div>
-
+    <Sheet open={open} onClose={close} title="Select category">
         {/* Search */}
-        <div style={{ padding: '0 20px 12px', position: 'relative' }}>
-          <Search size={16} color="var(--text-3)" style={{ position: 'absolute', left: 34, top: '50%', transform: 'translateY(-70%)' }} />
+        <div style={{ padding: '12px 20px', position: 'relative', flexShrink: 0 }}>
+          <Search size={16} color="var(--text-3)" style={{ position: 'absolute', left: 34, top: '50%', transform: 'translateY(-50%)' }} />
           <input
             className="input"
             placeholder="Search categories"
@@ -85,7 +68,7 @@ export default function CategoryPickerSheet({ open, categories, selected, onSele
         </div>
 
         {/* List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 20px' }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '2px 8px 8px' }}>
             All categories
           </p>
@@ -111,7 +94,6 @@ export default function CategoryPickerSheet({ open, categories, selected, onSele
             <Settings2 size={15} /> Manage
           </button>
         </div>
-      </div>
-    </>
+    </Sheet>
   )
 }

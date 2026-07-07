@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Check, RefreshCw, ShoppingCart, Sparkles } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import { useListsStore } from '../../store/useListsStore'
 import { detectCategoryIn } from '../../lib/constants'
 import type { List, ListItem } from '../../types'
@@ -14,9 +15,12 @@ import type { MemoryItem } from '../../store/useMemoryStore'
 
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
 
-// If the name ends in a month token (full or 3-letter), return the name with
-// the next month; otherwise null (we never rename anything else).
+// If the name ends in a period token — a month (full or 3-letter) or
+// "Week/Wk N" — return the name advanced to the next period; otherwise null
+// (we never rename anything else).
 function nextPeriodName(name: string): string | null {
+  const weekM = name.match(/^(.*?(?:week|wk)\s*)(\d+)\s*$/i)
+  if (weekM) return `${weekM[1]}${parseInt(weekM[2], 10) + 1}`
   const m = name.match(/^(.*?)([A-Za-z]+)\s*$/)
   if (!m) return null
   const token = m[2].toLowerCase()
@@ -54,8 +58,6 @@ export default function NextTripSheet({ open, onClose, list, items, cats, regula
 
   const suggestedName = useMemo(() => nextPeriodName(list.name), [list.name])
 
-  if (!open) return null
-
   const options: { id: Mode; icon: ReactNode; label: string; hint: string; hide?: boolean }[] = [
     { id: 'keep',     icon: <RefreshCw size={16} />,    label: 'Keep all items',   hint: `Start the same ${items.length} ${items.length === 1 ? 'item' : 'items'} fresh` },
     { id: 'regulars', icon: <Sparkles size={16} />,     label: 'Just my regulars', hint: `Start with your usual ${regulars.length} ${regulars.length === 1 ? 'item' : 'items'}`, hide: regulars.length === 0 },
@@ -80,14 +82,8 @@ export default function NextTripSheet({ open, onClose, list, items, cats, regula
   }
 
   return (
-    <>
-      <div className="sheet-overlay" onClick={onClose} />
-      <div className="sheet">
-        <div className="sheet-handle" />
-        <div style={{ padding: '10px 20px 24px' }}>
-          <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Start next trip</p>
-          <p className="text-sm text-muted" style={{ margin: '0 0 16px' }}>Reset this list for your next run.</p>
-
+    <Sheet open={open} onClose={onClose} title="Start next trip" subtitle="Reset this list for your next run.">
+        <div style={{ padding: '16px 20px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {options.filter(o => !o.hide).map(o => {
               const on = mode === o.id
@@ -147,7 +143,6 @@ export default function NextTripSheet({ open, onClose, list, items, cats, regula
             {busy ? <span className="spinner" /> : 'Start next trip'}
           </button>
         </div>
-      </div>
-    </>
+    </Sheet>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
+import Sheet from '../ui/Sheet'
 import { useListsStore } from '../../store/useListsStore'
 import { analyzeGroup } from '../../lib/duplicates'
 import type { List, ListItem } from '../../types'
@@ -60,16 +61,8 @@ export default function DuplicateReviewSheet({ open, onClose, list, groups, shar
 
   return (
     <>
-      {open && (
-        <>
-          <div className="sheet-overlay" onClick={onClose} />
-          <div className="sheet" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-            <div className="sheet-handle" />
-            <div style={{ padding: '10px 20px 24px' }}>
-              <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Review duplicates</p>
-              <p className="text-sm text-muted" style={{ margin: '0 0 16px' }}>
-                Merge, remove, or keep similar items.
-              </p>
+      <Sheet open={open} onClose={onClose} title="Review duplicates" subtitle="Merge, remove, or keep similar items.">
+            <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px 20px 24px' }}>
               {groups.size === 0 ? (
                 <p className="text-sm text-muted" style={{ textAlign: 'center', padding: '16px 0' }}>
                   No duplicates left 🎉
@@ -157,9 +150,7 @@ export default function DuplicateReviewSheet({ open, onClose, list, groups, shar
                 {changes === 0 ? 'Done' : changes === 1 ? 'Apply Changes' : `Apply ${changes} Changes`}
               </button>
             </div>
-          </div>
-        </>
-      )}
+      </Sheet>
 
       {/* Post-apply confirmation — outlives the sheet itself */}
       {resolved && (
