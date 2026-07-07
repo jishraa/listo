@@ -31,12 +31,12 @@ export function formatQuantity(qty: string | null | undefined): string {
 }
 
 // Humanise technical usernames for display: "anjana1995ks" / "anjana@x.com"
-// → "Anjana". Real display names (with spaces / no digits) pass through.
+// → "Anjana". Only digits/underscores mark a name as technical — hyphens and
+// dots are name-ish, so "Mary-Jane" / "J.Doe" stay whole (just capitalised).
 export function friendlyName(name: string): string {
   const base = name.split('@')[0].trim()
-  if (!/[0-9_.-]/.test(base)) {
-    // Already a human name — just ensure the first letter is capitalised.
-    return base.charAt(0).toUpperCase() + base.slice(1)
+  if (base.includes(' ') || !/[0-9_]/.test(base)) {
+    return base ? base.charAt(0).toUpperCase() + base.slice(1) : name
   }
   const alpha = base.match(/^[a-zA-Z]+/)?.[0] ?? ''
   if (alpha.length < 2) return name
