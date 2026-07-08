@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase } from '../lib/supabase'
+import { storageKeys } from '../lib/storage'
+import * as itemsApi from '../lib/api/items'
 import { useListsStore } from './useListsStore'
-import type { ListItem } from '../types'
 
 // Offline mutation queue (offline-first part C). Item-level writes made with
 // no network are applied optimistically, persisted here, and replayed FIFO
@@ -45,21 +45,19 @@ interface SyncState {
 
 async function processOp(op: PendingOp): Promise<'done' | 'retry'> {
   if (op.kind === 'add') {
-    const { data, error } = await supabase
-      .from('list_items')
-      .insert({ list_id: op.listId, title: op.title, quantity: op.quantity, category: op.category, added_by_name: op.addedByName })
-      .select()
-      .single()
+    const { data, error } = await itemsApi.insertItem({
+      list_id: op.listId, title: op.title, quantity: op.quantity,
+      category: op.category, added_by_name: op.addedByName,
+    })
     if (error || !data) return isNetworkError(error?.message) ? 'retry' : 'done'
-    const real = data as ListItem
     // Swap the temp row for the server row and repoint any queued ops at it.
     const lists = useListsStore.getState()
     useListsStore.setState({
-      items: { ...lists.items, [op.listId]: (lists.items[op.listId] ?? []).map(i => i.id === op.tempId ? real : i) },
+      items: { ...lists.items, [op.listId]: (lists.items[op.listId] ?? []).map(i => i.id === op.tempId ? data : i) },
     })
     useSyncStore.setState({
       queue: useSyncStore.getState().queue.map(q =>
-        q.kind !== 'add' && q.itemId === op.tempId ? { ...q, itemId: real.id } : q),
+        q.kind !== 'add' && q.itemId === op.tempId ? { ...q, itemId: data.id } : q),
     })
     return 'done'
   }
@@ -67,10 +65,10 @@ async function processOp(op: PendingOp): Promise<'done' | 'retry'> {
   // nothing on the server to touch.
   if (isTempId(op.itemId)) return 'done'
   if (op.kind === 'update') {
-    const { error } = await supabase.from('list_items').update(op.patch).eq('id', op.itemId)
+    const { error } = await itemsApi.updateItem(op.itemId, op.patch)
     return error && isNetworkError(error.message) ? 'retry' : 'done'
   }
-  const { error } = await supabase.from('list_items').delete().eq('id', op.itemId)
+  const { error } = await itemsApi.deleteItemById(op.itemId)
   return error && isNetworkError(error.message) ? 'retry' : 'done'
 }
 
@@ -102,6 +100,6 @@ export const useSyncStore = create<SyncState>()(persist((set, get) => ({
     }
   },
 }), {
-  name: 'listo-sync-queue',
+  name: storageKeys.syncQueue,
   partialize: (s) => ({ queue: s.queue }),
 }))

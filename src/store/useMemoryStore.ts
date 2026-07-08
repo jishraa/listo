@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import * as historyApi from '../lib/api/history'
 
 // List Memory: a per-user record of what they add, so lists get faster to
 // build. Populated by store.addItem (fire-and-forget) and read back for
@@ -57,24 +57,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   load: async (userId) => {
     if (get().userId === userId && get().loaded) return
     set({ userId })
-    const { data, error } = await supabase
-      .from('item_history')
-      .select('name_key, display_name, category, last_quantity, count')
-      .eq('user_id', userId)
-      .order('count', { ascending: false })
-      .order('last_used', { ascending: false })
-      .limit(200)
-    if (error || !data) { set({ loaded: true }); return }
-    set({
-      loaded: true,
-      history: data.map(r => ({
-        nameKey: r.name_key as string,
-        name: r.display_name as string,
-        category: (r.category as string | null) ?? null,
-        lastQuantity: (r.last_quantity as string | null) ?? null,
-        count: r.count as number,
-      })),
-    })
+    const history = await historyApi.fetchHistory(userId)
+    if (history === null) { set({ loaded: true }); return }
+    set({ loaded: true, history })
   },
 
   record: (name, category, quantity) => {
@@ -90,9 +75,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
       : { nameKey: key, name: name.trim(), category: category || null, lastQuantity: quantity || null, count: 1 }
     set({ history: [updated, ...prev.filter(h => h.nameKey !== key)].sort((a, b) => b.count - a.count) })
     // Fire-and-forget — history is best-effort and must never block an add.
-    supabase.rpc('record_item_use', {
-      p_name: name.trim(), p_category: category ?? '', p_quantity: quantity ?? '',
-    }).then(() => {})
+    historyApi.recordItemUse(name.trim(), category, quantity)
   },
 
   reset: () => set({ history: [], loaded: false, userId: '' }),

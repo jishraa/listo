@@ -1,11 +1,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { supabase } from '../lib/supabase'
+import { storageKeys } from '../lib/storage'
+import * as listsApi from '../lib/api/lists'
+import * as itemsApi from '../lib/api/items'
+import * as membersApi from '../lib/api/members'
+import * as invitesApi from '../lib/api/invites'
 import type { List, ListItem, ListMember, InvitePreview } from '../types'
 // Deferred circular import (sync store also imports this one) — both only
 // touch each other inside functions, never at module top level.
 import { useSyncStore, newOpId, newTempId, isTempId, isNetworkError } from './useSyncStore'
 import { useMemoryStore } from './useMemoryStore'
+
+// The store owns STATE: optimistic updates, rollback, the offline queue
+// hand-off, and realtime reconciliation. All Supabase IO lives in lib/api —
+// never call supabase from here or from components.
 
 interface ListsState {
   lists: List[]
@@ -68,47 +76,13 @@ export const visibleLists  = (lists: List[]) => lists.filter(l => !l.is_template
 export const templateLists = (lists: List[]) => lists.filter(l => !!l.is_template)
 export const archivedLists = (lists: List[]) => lists.filter(l => !l.is_template && !!l.archived_at)
 
-// Copies a list's items to a new list (fresh, uncompleted).
-async function copyItems(fromItems: { title: string; quantity: string | null; category: string | null; sort_order: number }[], toListId: string, displayName: string) {
-  if (fromItems.length === 0) return
-  await Promise.all(fromItems.map(item =>
-    supabase.from('list_items').insert({
-      list_id: toListId, title: item.title, quantity: item.quantity,
-      category: item.category, sort_order: item.sort_order, added_by_name: displayName,
-    })
-  ))
-}
-
-// Fetch a user's owned + shared lists, merged and sorted most-recent-first.
-// Returns null on any query error so callers can decide how to surface it.
-async function fetchAllLists(userId: string): Promise<List[] | null> {
-  const [ownRes, memberRes] = await Promise.all([
-    supabase.from('lists').select('*').eq('owner_id', userId),
-    supabase.from('list_members').select('list_id').eq('user_id', userId).neq('role', 'owner'),
-  ])
-  if (ownRes.error || memberRes.error) return null
-
-  let shared: List[] = []
-  const memberIds = (memberRes.data ?? []).map(r => r.list_id)
-  if (memberIds.length > 0) {
-    const { data, error } = await supabase.from('lists').select('*').in('id', memberIds)
-    if (error) return null
-    shared = (data ?? []) as List[]
-  }
-  return [...(ownRes.data ?? []) as List[], ...shared]
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-}
-
 function bumpUpdatedAt(listId: string, get: Get, set: Set) {
   const now = new Date().toISOString()
   const list = get().lists.find(l => l.id === listId)
   const prev = list?.updated_at
   set({ lists: get().lists.map(l => l.id === listId ? { ...l, updated_at: now } : l) })
-  // Via RPC so collaborators (who can't UPDATE lists directly since v9) still
-  // re-sort a shared list when they change items. touch_list only bumps the
-  // timestamp and only for members.
-  supabase.rpc('touch_list', { p_list_id: listId }).then(({ error }) => {
-    if (error) set({ lists: get().lists.map(l => l.id === listId ? { ...l, updated_at: prev ?? now } : l) })
+  listsApi.touchList(listId).then(ok => {
+    if (!ok) set({ lists: get().lists.map(l => l.id === listId ? { ...l, updated_at: prev ?? now } : l) })
   })
 }
 
@@ -138,7 +112,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const hasCache = get().userId === userId && get().lists.length > 0
     set({ userId, displayName, loading: !hasCache, loadError: false, ...(hasCache ? { initialized: true } : {}) })
     try {
-      const all = await fetchAllLists(userId)
+      const all = await listsApi.fetchAllLists(userId)
       if (all === null) { set({ loading: false, loadError: !hasCache }); return }
       set({ lists: all, loading: false, initialized: true })
     } catch {
@@ -152,7 +126,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (!userId) return
     set({ loading: true })
     try {
-      const all = await fetchAllLists(userId)
+      const all = await listsApi.fetchAllLists(userId)
       if (all === null) { set({ loading: false, loadError: true }); return }
       set({ lists: all, loading: false, initialized: true })
     } catch {
@@ -162,18 +136,11 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
 
   createList: async ({ name, type, emoji, items }) => {
     const { userId, displayName } = get()
-    const { data, error } = await supabase
-      .from('lists')
-      .insert({ name, type, emoji, owner_id: userId })
-      .select()
-      .single()
-    if (error || !data) { set({ lastError: "Couldn't create list — try again" }); return null }
-    const list = data as List
-    await supabase.from('list_members').insert({
-      list_id: list.id, user_id: userId, role: 'owner', display_name: displayName,
-    })
+    const list = await listsApi.insertList({ name, type, emoji, owner_id: userId })
+    if (!list) { set({ lastError: "Couldn't create list — try again" }); return null }
+    await listsApi.insertOwnerMembership(list.id, userId, displayName)
     if (items?.length) {
-      await copyItems(
+      await listsApi.copyItems(
         items.map((t, i) => ({ title: t.title, quantity: null, category: t.category ?? null, sort_order: i })),
         list.id, displayName,
       )
@@ -188,13 +155,13 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     if (!trimmed) return
     const prev = get().lists
     set({ lists: prev.map(l => l.id === listId ? { ...l, name: trimmed } : l) })
-    const { error } = await supabase.from('lists').update({ name: trimmed }).eq('id', listId)
-    if (error) set({ lists: prev, lastError: "Couldn't rename — try again" })
+    const ok = await listsApi.updateList(listId, { name: trimmed })
+    if (!ok) set({ lists: prev, lastError: "Couldn't rename — try again" })
   },
 
   deleteList: async (listId) => {
-    const { error } = await supabase.from('lists').delete().eq('id', listId)
-    if (error) { set({ lastError: "Couldn't delete list — try again" }); return }
+    const ok = await listsApi.deleteList(listId)
+    if (!ok) { set({ lastError: "Couldn't delete list — try again" }); return }
     set({
       lists: get().lists.filter(l => l.id !== listId),
       items: Object.fromEntries(Object.entries(get().items).filter(([k]) => k !== listId)),
@@ -206,15 +173,10 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { userId, displayName } = get()
     const orig = get().lists.find(l => l.id === listId)
     if (!orig) return
-    const { data } = await supabase
-      .from('lists')
-      .insert({ name: `${orig.name} (copy)`, type: orig.type, emoji: orig.emoji, owner_id: userId })
-      .select()
-      .single()
-    if (!data) return
-    const newList = data as List
-    await supabase.from('list_members').insert({ list_id: newList.id, user_id: userId, role: 'owner', display_name: displayName })
-    await copyItems(get().items[listId] ?? [], newList.id, displayName)
+    const newList = await listsApi.insertList({ name: `${orig.name} (copy)`, type: orig.type, emoji: orig.emoji, owner_id: userId })
+    if (!newList) return
+    await listsApi.insertOwnerMembership(newList.id, userId, displayName)
+    await listsApi.copyItems(get().items[listId] ?? [], newList.id, displayName)
     set({ lists: [newList, ...get().lists] })
   },
 
@@ -222,30 +184,20 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { userId, displayName } = get()
     const orig = get().lists.find(l => l.id === listId)
     if (!orig) return
-    const { data, error } = await supabase
-      .from('lists')
-      .insert({ name: orig.name, type: orig.type, emoji: orig.emoji, owner_id: userId, is_template: true })
-      .select()
-      .single()
-    if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
-    const tpl = data as List
-    await supabase.from('list_members').insert({ list_id: tpl.id, user_id: userId, role: 'owner', display_name: displayName })
-    await copyItems(get().items[listId] ?? [], tpl.id, displayName)
+    const tpl = await listsApi.insertList({ name: orig.name, type: orig.type, emoji: orig.emoji, owner_id: userId, is_template: true })
+    if (!tpl) { set({ lastError: "Couldn't save template — try again" }); return }
+    await listsApi.insertOwnerMembership(tpl.id, userId, displayName)
+    await listsApi.copyItems(get().items[listId] ?? [], tpl.id, displayName)
     set({ lists: [tpl, ...get().lists] })
   },
 
   // Template from arbitrary items (e.g. Insights "Suggested for You").
   createTemplate: async (name, emoji, tplItems) => {
     const { userId, displayName } = get()
-    const { data, error } = await supabase
-      .from('lists')
-      .insert({ name, type: 'shopping', emoji, owner_id: userId, is_template: true })
-      .select()
-      .single()
-    if (error || !data) { set({ lastError: "Couldn't save template — try again" }); return }
-    const tpl = data as List
-    await supabase.from('list_members').insert({ list_id: tpl.id, user_id: userId, role: 'owner', display_name: displayName })
-    await copyItems(tplItems.map((t, i) => ({ title: t.title, quantity: null, category: t.category, sort_order: i })), tpl.id, displayName)
+    const tpl = await listsApi.insertList({ name, type: 'shopping', emoji, owner_id: userId, is_template: true })
+    if (!tpl) { set({ lastError: "Couldn't save template — try again" }); return }
+    await listsApi.insertOwnerMembership(tpl.id, userId, displayName)
+    await listsApi.copyItems(tplItems.map((t, i) => ({ title: t.title, quantity: null, category: t.category, sort_order: i })), tpl.id, displayName)
     set({ lists: [tpl, ...get().lists] })
   },
 
@@ -253,16 +205,11 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { userId, displayName } = get()
     const tpl = get().lists.find(l => l.id === templateId)
     if (!tpl) return null
-    const { data, error } = await supabase
-      .from('lists')
-      .insert({ name: tpl.name, type: tpl.type, emoji: tpl.emoji, owner_id: userId })
-      .select()
-      .single()
-    if (error || !data) { set({ lastError: "Couldn't create list — try again" }); return null }
-    const list = data as List
-    await supabase.from('list_members').insert({ list_id: list.id, user_id: userId, role: 'owner', display_name: displayName })
+    const list = await listsApi.insertList({ name: tpl.name, type: tpl.type, emoji: tpl.emoji, owner_id: userId })
+    if (!list) { set({ lastError: "Couldn't create list — try again" }); return null }
+    await listsApi.insertOwnerMembership(list.id, userId, displayName)
     if (!get().items[templateId]) await get().loadItems(templateId)
-    await copyItems(get().items[templateId] ?? [], list.id, displayName)
+    await listsApi.copyItems(get().items[templateId] ?? [], list.id, displayName)
     set({ lists: [list, ...get().lists] })
     return list
   },
@@ -271,21 +218,15 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const prev = get().lists
     const archived_at = archived ? new Date().toISOString() : null
     set({ lists: prev.map(l => l.id === listId ? { ...l, archived_at } : l) })
-    const { error } = await supabase.from('lists').update({ archived_at }).eq('id', listId)
-    if (error) set({ lists: prev, lastError: archived ? "Couldn't archive — try again" : "Couldn't restore — try again" })
+    const ok = await listsApi.updateList(listId, { archived_at })
+    if (!ok) set({ lists: prev, lastError: archived ? "Couldn't archive — try again" : "Couldn't restore — try again" })
   },
 
   leaveList: async (listId) => {
     const { userId } = get()
-    // Requires the "members can leave" delete policy (migration v9);
-    // .select() makes RLS silently deleting 0 rows detectable.
-    const { data, error } = await supabase
-      .from('list_members')
-      .delete()
-      .eq('list_id', listId)
-      .eq('user_id', userId)
-      .select('id')
-    if (error || (data ?? []).length === 0) {
+    // Requires the "members can leave" delete policy (migration v9).
+    const ok = await membersApi.leaveList(listId, userId)
+    if (!ok) {
       set({ lastError: "Couldn't leave the list — try again" })
       return
     }
@@ -297,18 +238,22 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
   },
 
   loadItems: async (listId) => {
-    const { data, error } = await supabase.from('list_items').select('*').eq('list_id', listId).order('created_at')
+    const items = await itemsApi.fetchItems(listId)
     // Offline / transient failure: keep the cached items rather than wiping.
-    if (error) return
-    set({ items: { ...get().items, [listId]: (data ?? []) as ListItem[] } })
+    if (items === null) return
+    // A fetch that was in flight when offline adds happened must never
+    // clobber them: carry over local temp rows the server doesn't know yet
+    // (the sync engine swaps them for real rows on replay).
+    const temps = (get().items[listId] ?? []).filter(i => isTempId(i.id))
+    set({ items: { ...get().items, [listId]: [...items, ...temps] } })
   },
 
   loadMembers: async (listId) => {
-    const { data, error } = await supabase.from('list_members').select('*').eq('list_id', listId)
-    // Don't overwrite existing members with [] on error (e.g. transient RLS
-    // failure) — keep whatever we last had so shared indicators don't blink out.
-    if (error) { if (import.meta.env.DEV) console.warn('loadMembers failed', listId, error.message); return }
-    set({ members: { ...get().members, [listId]: (data ?? []) as ListMember[] } })
+    const members = await membersApi.fetchMembers(listId)
+    // Don't overwrite existing members with [] on error — keep whatever we
+    // last had so shared indicators don't blink out.
+    if (members === null) return
+    set({ members: { ...get().members, [listId]: members } })
   },
 
   addItem: async (listId, title, quantity, category) => {
@@ -332,19 +277,17 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
       })
     }
     if (!useSyncStore.getState().online) { addOffline(); return }
-    const { data, error } = await supabase
-      .from('list_items')
-      .insert({ list_id: listId, title, quantity: quantity || null, category, added_by_name: displayName })
-      .select()
-      .single()
+    const { data, error } = await itemsApi.insertItem({
+      list_id: listId, title, quantity: quantity || null, category, added_by_name: displayName,
+    })
     if (error || !data) {
       if (isNetworkError(error?.message)) { addOffline(); return }
       set({ lastError: "Couldn't add item — try again" })
       return
     }
     const current = get().items[listId] ?? []
-    if (!current.find(i => i.id === (data as ListItem).id))
-      set({ items: { ...get().items, [listId]: [...current, data as ListItem] } })
+    if (!current.find(i => i.id === data.id))
+      set({ items: { ...get().items, [listId]: [...current, data] } })
     bumpUpdatedAt(listId, get, set)
   },
 
@@ -362,14 +305,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
       useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId: item.id, patch })
       return
     }
-    let { error } = await supabase.from('list_items').update(patch).eq('id', item.id)
-    // Migration-v4 not applied yet: retry without the timestamp column
-    // (PGRST204 = unknown column) so toggling keeps working.
-    if (error?.code === 'PGRST204') {
-      ({ error } = await supabase.from('list_items')
-        .update({ completed: patch.completed, completed_by_name: patch.completed_by_name })
-        .eq('id', item.id))
-    }
+    const { error } = await itemsApi.updateItem(item.id, patch)
     if (error) {
       if (isNetworkError(error.message)) {
         useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId: item.id, patch })
@@ -387,7 +323,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
       useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId, patch })
       return
     }
-    const { error } = await supabase.from('list_items').update(patch).eq('id', itemId)
+    const { error } = await itemsApi.updateItem(itemId, patch)
     if (error) {
       if (isNetworkError(error.message)) {
         useSyncStore.getState().enqueue({ kind: 'update', opId: newOpId(), listId, itemId, patch })
@@ -407,7 +343,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
       useSyncStore.getState().enqueue({ kind: 'delete', opId: newOpId(), listId, itemId })
       return
     }
-    const { error } = await supabase.from('list_items').delete().eq('id', itemId)
+    const { error } = await itemsApi.deleteItemById(itemId)
     if (error) {
       if (isNetworkError(error.message)) {
         useSyncStore.getState().enqueue({ kind: 'delete', opId: newOpId(), listId, itemId })
@@ -429,12 +365,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
         sync.enqueue({ kind: 'update', opId: newOpId(), listId, itemId: i.id, patch }))
       return
     }
-    let { error } = await supabase.from('list_items')
-      .update({ completed: false, completed_by_name: null, completed_at: null }).eq('list_id', listId)
-    if (error?.code === 'PGRST204') {
-      ({ error } = await supabase.from('list_items')
-        .update({ completed: false, completed_by_name: null }).eq('list_id', listId))
-    }
+    const { error } = await itemsApi.uncheckAllItems(listId)
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't save — try again" })
     else bumpUpdatedAt(listId, get, set)
   },
@@ -453,8 +384,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
       real.forEach(i => sync.enqueue({ kind: 'delete', opId: newOpId(), listId, itemId: i.id }))
       return
     }
-    const { error } = await supabase.from('list_items')
-      .delete().eq('list_id', listId).eq('completed', true)
+    const { error } = await itemsApi.deleteCompletedItems(listId)
     if (error) {
       if (isNetworkError(error.message)) {
         real.forEach(i => sync.enqueue({ kind: 'delete', opId: newOpId(), listId, itemId: i.id }))
@@ -468,7 +398,7 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
   clearItems: async (listId) => {
     const prev = get().items[listId] ?? []
     set({ items: { ...get().items, [listId]: [] } })
-    const { error } = await supabase.from('list_items').delete().eq('list_id', listId)
+    const { error } = await itemsApi.deleteAllItems(listId)
     if (error) set({ items: { ...get().items, [listId]: prev }, lastError: "Couldn't clear items — try again" })
     else bumpUpdatedAt(listId, get, set)
   },
@@ -476,15 +406,15 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
   removeMember: async (listId, memberId) => {
     const prev = get().members[listId] ?? []
     set({ members: { ...get().members, [listId]: prev.filter(m => m.id !== memberId) } })
-    const { error } = await supabase.rpc('remove_list_member', { p_list_id: listId, p_member_id: memberId })
-    if (error) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't remove member" })
+    const ok = await membersApi.removeMember(listId, memberId)
+    if (!ok) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't remove member" })
   },
 
   setMemberRole: async (listId, memberId, role) => {
     const prev = get().members[listId] ?? []
     set({ members: { ...get().members, [listId]: prev.map(m => m.id === memberId ? { ...m, role } : m) } })
-    const { error } = await supabase.rpc('set_member_role', { p_member_id: memberId, p_role: role })
-    if (error) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't change access" })
+    const ok = await membersApi.setMemberRole(memberId, role)
+    if (!ok) set({ members: { ...get().members, [listId]: prev }, lastError: "Couldn't change access" })
   },
 
   myRole: (listId) => {
@@ -498,79 +428,51 @@ export const useListsStore = create<ListsState>()(persist((set, get) => ({
     const { displayName } = get()
     const clean = code.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
     if (!/^[a-z0-9]{6,12}$/.test(clean)) return { success: false, message: 'Invalid invite code' }
-    const { data, error } = await supabase.rpc('redeem_list_invite', { p_code: clean, p_display_name: displayName })
-    if (error) {
-      if (error.message?.includes('own_list'))       return { success: false, message: 'You already own this list' }
-      if (error.message?.includes('already_member')) return { success: false, message: 'Already joined' }
-      if (error.message?.includes('expired_code'))   return { success: false, message: 'This invite link has expired' }
+    const { list, errorMessage } = await invitesApi.redeemInvite(clean, displayName)
+    if (errorMessage) {
+      if (errorMessage.includes('own_list'))       return { success: false, message: 'You already own this list' }
+      if (errorMessage.includes('already_member')) return { success: false, message: 'Already joined' }
+      if (errorMessage.includes('expired_code'))   return { success: false, message: 'This invite link has expired' }
       return { success: false, message: 'Invalid invite code' }
     }
-    const list = (Array.isArray(data) ? data[0] : data) as List | null
     if (!list) return { success: false, message: 'Invalid invite code' }
     if (get().lists.some(l => l.id === list.id)) return { success: true, message: `Already joined "${list.name}"`, list }
     set({ lists: [list, ...get().lists] })
     return { success: true, message: `Joined "${list.name}"`, list }
   },
 
-  regenerateInvite: async (listId, role = 'collaborator') => {
-    // The invite secret lives on the owner-only list_invites table; minting is
-    // done by a SECURITY DEFINER RPC that verifies ownership and returns the code.
-    const { data, error } = await supabase.rpc('rotate_invite', { p_list_id: listId, p_role: role })
-    if (error || !data) return null
-    return data as string
-  },
+  regenerateInvite: async (listId, role = 'collaborator') => invitesApi.rotateInvite(listId, role),
 
-  getInvite: async (listId) => {
-    const { data, error } = await supabase
-      .from('list_invites').select('code, role').eq('list_id', listId).maybeSingle()
-    if (error || !data) return null
-    return { code: data.code as string, role: data.role as 'collaborator' | 'viewer' }
-  },
+  getInvite: async (listId) => invitesApi.getInvite(listId),
 
-  resolveListIdByCode: async (code) => {
-    const { data, error } = await supabase.rpc('member_list_id_for_code', { p_code: code })
-    if (error) return null
-    return (data as string | null) ?? null
-  },
+  resolveListIdByCode: async (code) => invitesApi.resolveListIdByCode(code),
 
-  getInvitePreview: async (code) => {
-    const { data, error } = await supabase.rpc('invite_preview', { p_code: code })
-    const row = Array.isArray(data) ? data[0] : data
-    if (error || !row) return null
-    return {
-      listId: row.list_id, name: row.name, emoji: row.emoji, type: row.type,
-      ownerName: row.owner_name, memberCount: row.member_count,
-    } as InvitePreview
-  },
+  getInvitePreview: async (code) => invitesApi.fetchInvitePreview(code),
 
   subscribeToList: (listId) => {
-    let hasSubscribed = false
-    const channel = supabase
-      .channel(`list_items_${listId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'list_items', filter: `list_id=eq.${listId}` }, payload => {
+    return itemsApi.subscribeToItems(listId, {
+      onInsert: (item) => {
         const current = get().items[listId] ?? []
-        if (payload.eventType === 'INSERT') {
-          if (!current.find(i => i.id === (payload.new as ListItem).id))
-            set({ items: { ...get().items, [listId]: [...current, payload.new as ListItem] } })
-        } else if (payload.eventType === 'UPDATE') {
-          set({ items: { ...get().items, [listId]: current.map(i => i.id === (payload.new as ListItem).id ? payload.new as ListItem : i) } })
-        } else if (payload.eventType === 'DELETE') {
-          set({ items: { ...get().items, [listId]: current.filter(i => i.id !== (payload.old as ListItem).id) } })
-        }
-      })
-      .subscribe(status => {
-        if (status === 'SUBSCRIBED') {
-          if (hasSubscribed) { get().loadItems(listId); get().loadMembers(listId) }
-          hasSubscribed = true
-        }
-      })
-    return () => { supabase.removeChannel(channel) }
+        if (!current.find(i => i.id === item.id))
+          set({ items: { ...get().items, [listId]: [...current, item] } })
+      },
+      onUpdate: (item) => {
+        const current = get().items[listId] ?? []
+        set({ items: { ...get().items, [listId]: current.map(i => i.id === item.id ? item : i) } })
+      },
+      onDelete: (id) => {
+        const current = get().items[listId] ?? []
+        set({ items: { ...get().items, [listId]: current.filter(i => i.id !== id) } })
+      },
+      // Channel recovered after a drop — data may have been missed meanwhile.
+      onResubscribe: () => { get().loadItems(listId); get().loadMembers(listId) },
+    })
   },
 }), {
   // Offline-first cache: lists/items/members render instantly on cold start
   // and stay readable with no network. Only data is persisted — transient
   // flags and functions are rebuilt each session.
-  name: 'listo-lists-cache',
+  name: storageKeys.listsCache,
   partialize: (s) => ({
     lists: s.lists, items: s.items, members: s.members,
     userId: s.userId, displayName: s.displayName,
