@@ -1,9 +1,19 @@
 import { test, expect } from '@playwright/test'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 // Visual regression (QE framework §6) — Playwright snapshots, both themes,
-// mobile + desktop. Baselines are platform-specific (font rendering), so this
-// suite runs locally only until linux baselines are generated for CI.
-test.skip(!!process.env.CI, 'visual baselines are local (darwin) for now')
+// mobile + desktop. Baselines are platform-specific (font rendering): the
+// suite gates on CI automatically once linux baselines are committed
+// (generate them with the "Update visual baselines" workflow), and
+// UPDATE_VISUAL=1 forces a run for that workflow's --update-snapshots pass.
+const linuxBaselines = existsSync(
+  fileURLToPath(new URL('./visual.spec.ts-snapshots/landing-dark-desktop-linux.png', import.meta.url))
+)
+test.skip(
+  !!process.env.CI && !linuxBaselines && !process.env.UPDATE_VISUAL,
+  'no linux baselines yet — run the "Update visual baselines" workflow'
+)
 
 const SHOTS: { name: string; path: string }[] = [
   { name: 'landing', path: '/' },

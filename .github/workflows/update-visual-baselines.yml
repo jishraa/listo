@@ -1,0 +1,52 @@
+# Regenerates the visual-regression baselines on ubuntu (screenshots are
+# platform-specific) and opens a PR with the result. Run manually whenever a
+# deliberate visual change lands; merging the PR makes visual.spec.ts start
+# gating in CI.
+name: Update visual baselines
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Regenerate baselines
+        run: npx playwright test visual --update-snapshots
+        env:
+          UPDATE_VISUAL: '1'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Open PR with updated baselines
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- tests/e2e/visual.spec.ts-snapshots && \
+             [ -z "$(git status --porcelain tests/e2e/visual.spec.ts-snapshots)" ]; then
+            echo "Baselines unchanged — nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B visual-baselines-linux
+          git add tests/e2e/visual.spec.ts-snapshots
+          git commit -m "test(visual): regenerate linux baselines"
+          git push -f origin visual-baselines-linux
+          gh pr create --fill --head visual-baselines-linux 2>/dev/null || echo "PR already open — branch updated."

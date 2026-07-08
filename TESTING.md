@@ -52,10 +52,18 @@ stay ≤300 KB gzip (currently ~158 KB). Lazy chunks are reported, not gated.
   rename → delete → sign out. Self-cleaning; skips when unconfigured.
 - `a11y.spec.ts` — axe-core in a real browser: zero critical/serious
   violations on public screens, both themes (includes color-contrast).
+- `offline.spec.ts` — offline-first: network cut → optimistic adds + status
+  pill → reconnect → queue replay → server-side persistence verified.
+- `sharing.spec.ts` — collaboration with two browser contexts: owner shares
+  the invite link (clipboard), the second account (`E2E_EMAIL_2`/
+  `E2E_PASSWORD_2`) joins through it, adds an item, the owner sees it in
+  realtime, owner deletes for everyone.
 - `responsive.spec.ts` — no horizontal overflow at 320–768px.
 - `visual.spec.ts` — screenshot baselines (light/dark × mobile/desktop).
-  Platform-specific, so **local-only for now** (auto-skips on CI);
-  regenerate intentionally with `npm run test:visual:update`.
+  Platform-specific: darwin baselines are committed; on CI the suite
+  auto-enables once linux baselines exist — generate them with the
+  **"Update visual baselines"** workflow (`workflow_dispatch`), which opens
+  a PR. Regenerate locally with `npm run test:visual:update`.
 
 Commands: `npm run test:e2e` (headless) / `npm run test:e2e:ui` (debug UI).
 
@@ -67,6 +75,9 @@ Commands: `npm run test:e2e` (headless) / `npm run test:e2e:ui` (debug UI).
 2. **e2e** (after quality) — Playwright chromium against the built app,
    using the `VITE_SUPABASE_*` and `E2E_*` repo secrets; uploads the HTML
    report as an artifact on failure.
+3. **perf** (after quality) — Lighthouse via `lhci autorun`
+   (`lighthouserc.json`): performance ≥90 (CI-noise headroom; local scores
+   are 98–99), accessibility ≥95, best-practices ≥90 on `/` and `/login`.
 
 ## Conventions
 
@@ -81,11 +92,8 @@ Commands: `npm run test:e2e` (headless) / `npm run test:e2e:ui` (debug UI).
 
 ## Roadmap (not yet implemented)
 
-- **Visual regression in CI** — generate linux baselines (docker or a
-  one-off CI update run) so `visual.spec.ts` stops skipping on CI; or move
-  to Percy/Chromatic if a review UI is wanted.
-- **More E2E journeys** — sharing/invite redemption (needs a second test
-  account), Shop Mode, offline queue replay (network interception),
-  PWA install prompt + SW update toast.
-- **Performance** — Lighthouse CI against the deployed preview (LCP/CLS/INP,
-  score ≥95 gate).
+- **Merge the linux-baselines PR** (from the "Update visual baselines"
+  workflow) so `visual.spec.ts` gates in CI; or move to Percy/Chromatic if
+  a review UI is wanted.
+- **More E2E journeys** — Shop Mode, guest join path, PWA install prompt +
+  SW update toast.
