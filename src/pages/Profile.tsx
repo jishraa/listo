@@ -4,7 +4,7 @@ import { ChevronRight, Gift, HelpCircle, LogOut, Settings2, Tag, User, Users } f
 import { useAuthStore } from '../store/useAuthStore'
 import { useThemeStore } from '../store/useThemeStore'
 import { useCategoriesStore } from '../store/useCategoriesStore'
-import Sheet from '../components/ui/Sheet'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { openYft } from '../lib/yft'
 import { Section, Row } from './profile/common'
 import { APP_VERSION } from '../lib/version'
@@ -152,42 +152,31 @@ export default function Profile() {
         </div>
 
       {/* Guest → account confirmation: make the trade-off explicit */}
-      <Sheet open={confirmUpgrade} onClose={() => setConfirmUpgrade(false)} title="Create your account">
-        <div className="sheet-body">
-          <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: 1.55 }}>
-            Your guest session on this device will end. Lists you joined as a guest
-            won't carry over — you can rejoin them anytime with their invite links.
-          </p>
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmUpgrade(false)}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex: 1 }}
-              onClick={async () => { await signOut(); navigate('/login?mode=register') }}>
-              Continue
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={confirmUpgrade}
+        onClose={() => setConfirmUpgrade(false)}
+        title="Create your account"
+        confirmLabel="Continue"
+        danger={false}
+        onConfirm={async () => { await signOut(); navigate('/login?mode=register') }}
+      >
+        Your guest session on this device will end. Lists you joined as a guest
+        won't carry over — you can rejoin them anytime with their invite links.
+      </ConfirmSheet>
 
       {/* Sign out confirmation */}
-      <Sheet open={confirmSignOut} onClose={() => setConfirmSignOut(false)}>
-        <div className="sheet-body" style={{ textAlign: 'center' }}>
-          <LogOut size={30} color="#ef4444" style={{ margin: '4px auto 10px' }} />
-          <p style={{ fontWeight: 700, fontSize: 17 }}>
-            {isGuest ? 'Leave guest session?' : 'Sign out?'}
-          </p>
-          <p className="text-muted text-sm mt-2">
-            {isGuest
-              ? 'Your guest session will be cleared on this device.'
-              : "You'll need to sign in again to access your lists."}
-          </p>
-          <div className="flex gap-2 mt-4">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmSignOut(false)}>Cancel</button>
-            <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleSignOut}>
-              {isGuest ? 'Leave' : 'Sign Out'}
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={confirmSignOut}
+        onClose={() => setConfirmSignOut(false)}
+        icon={<LogOut size={30} color="#ef4444" />}
+        title={isGuest ? 'Leave guest session?' : 'Sign out?'}
+        confirmLabel={isGuest ? 'Leave' : 'Sign Out'}
+        onConfirm={handleSignOut}
+      >
+        {isGuest
+          ? 'Your guest session will be cleared on this device.'
+          : "You'll need to sign in again to access your lists."}
+      </ConfirmSheet>
       </div>
     </div>
   )

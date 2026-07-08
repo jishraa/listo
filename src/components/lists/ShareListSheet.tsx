@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Copy, Eye, MessageCircle, MoreHorizontal, Pencil, RefreshCw, Shuffle } from 'lucide-react'
 import Sheet from '../ui/Sheet'
+import Avatar from '../ui/Avatar'
+import IconButton from '../ui/IconButton'
 import { useListsStore } from '../../store/useListsStore'
 import type { List, ListMember } from '../../types'
 
@@ -66,8 +68,6 @@ function MemberRow({
     await removeMember(listId, member.id)
   }
 
-  const avatarHue = (member.display_name.charCodeAt(0) * 47) % 360
-
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
       {canRemove && (
@@ -101,15 +101,7 @@ function MemberRow({
           transition: dragging ? 'none' : 'transform 0.2s var(--ease)',
         }}
       >
-        <div style={{
-          width: 38, height: 38, borderRadius: 99, flexShrink: 0,
-          background: `hsl(${avatarHue}deg, 45%, 38%)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-            {member.display_name.charAt(0).toUpperCase()}
-          </span>
-        </div>
+        <Avatar name={member.display_name} size={38} />
         <div style={{ flex: 1 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
             {member.display_name}{isCurrentUser ? ' (you)' : ''}
@@ -318,18 +310,14 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
               🔗 {generating ? 'preparing link…' : 'invite link'}
             </span>
           </p>
-          <button
+          <IconButton
+            label="Try another message"
+            size={38}
             onClick={() => setDraftIdx(i => (i + 1) % MESSAGE_DRAFTS.length)}
-            aria-label="Try another message"
-            style={{
-              flexShrink: 0, width: 38, height: 38, borderRadius: 11,
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'var(--text-2)',
-            }}
+            style={{ borderRadius: 11, background: 'var(--bg-card)', border: '1px solid var(--border)' }}
           >
             <Shuffle size={14} strokeWidth={2.2} />
-          </button>
+          </IconButton>
         </div>
 
         {/* Action buttons */}
