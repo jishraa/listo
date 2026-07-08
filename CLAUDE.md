@@ -25,6 +25,8 @@ npm run open:ios / open:android
 
 ## Architecture
 
+Layer rules (IO only in `lib/api/`, sheets via `components/ui/Sheet`, storage via `lib/storage.ts`, feature folders) live in `ARCHITECTURE.md` — read it before structural changes.
+
 ### Routes (`src/App.tsx`)
 
 | Path | Page | Notes |
