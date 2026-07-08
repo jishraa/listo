@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check, Users } from 'lucide-react'
+import { Plus, Share2, Search, X, Pin, Trash2, LogOut, Archive, ArchiveRestore, ArrowUpDown, Check } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore, visibleLists, templateLists, archivedLists } from '../store/useListsStore'
 import CreateListSheet from '../components/lists/CreateListSheet'
@@ -13,7 +13,9 @@ import InstallBanner from '../components/InstallBanner'
 import PullIndicator from '../components/ui/PullIndicator'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import { formatRelativeTime, friendlyName } from '../lib/utils'
+import { friendlyName } from '../lib/utils'
+import ListCard from '../features/lists/ListCard'
+import EmptyLists from '../features/lists/EmptyLists'
 import { storageKeys, readJSON, writeJSON } from '../lib/storage'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
@@ -39,103 +41,6 @@ const SORTS: { id: Sort; label: string }[] = [
 ]
 
 const SORT_KEY = storageKeys.listsSort
-
-// Compact first-run starter shortcuts. Each opens the Create List sheet
-// prefilled (name + type + icon), all still editable before creating.
-const STARTERS: { label: string; name: string; type: ListType; emoji: string }[] = [
-  { label: 'Shopping',       name: 'Shopping',         type: 'shopping', emoji: '🛒' },
-  { label: 'Travel',         name: 'Travel Checklist', type: 'personal', emoji: '✈️' },
-  { label: 'Personal Tasks', name: 'Personal Tasks',   type: 'tasks',    emoji: '✅' },
-]
-
-// Minimal Listo-style empty-list mark: a stacked checklist with one green
-// check (Create → Organize → Complete). Decorative — kept quieter than the
-// heading (spec §3). Colour/size come from the .empty-illustration class.
-function EmptyListsIcon() {
-  return (
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true" focusable="false" className="empty-illustration">
-      <rect x="14" y="9" width="32" height="42" rx="9" fill="none" stroke="currentColor" strokeWidth="2.4" opacity="0.45" />
-      {/* row 1 — completed, green accent */}
-      <rect x="20" y="17" width="8" height="8" rx="2.6" fill="var(--accent)" />
-      <path d="M22 21l1.7 1.7 3-3.2" stroke="#04120a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="31" y="19.4" width="10" height="2.6" rx="1.3" fill="currentColor" opacity="0.5" />
-      {/* row 2 */}
-      <rect x="20" y="29" width="8" height="8" rx="2.6" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.5" />
-      <rect x="31" y="31.4" width="10" height="2.6" rx="1.3" fill="currentColor" opacity="0.4" />
-      {/* row 3 — shorter */}
-      <rect x="20" y="41" width="8" height="8" rx="2.6" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
-      <rect x="31" y="43.4" width="6.5" height="2.6" rx="1.3" fill="currentColor" opacity="0.3" />
-    </svg>
-  )
-}
-
-function ListCard({ list, isPinned, onOpen, items, collab }: {
-  list: List; isPinned: boolean; items: { completed: boolean }[]
-  // Consolidated collaborator label (names or "N members"); undefined = personal
-  collab?: string
-  onOpen: () => void
-}) {
-  const total = items.length
-  const done = items.filter(i => i.completed).length
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  const allDone = total > 0 && done === total
-  const left = total - done
-  // Actionable status, no fractions (spec §4): users shouldn't have to
-  // calculate what's remaining. Untouched lists just state their size.
-  const status =
-    total === 0 ? 'Empty'
-    : allDone ? '✓ Done'
-    : done === 0 ? `${total} ${total === 1 ? 'item' : 'items'}`
-    : `${left} ${left === 1 ? 'item' : 'items'} left`
-
-  const typeBgClass = { personal: 'type-bg-personal', tasks: 'type-bg-tasks', shopping: 'type-bg-shopping' }[list.type]
-
-  return (
-    <div className="card card-press" style={{ padding: '16px', cursor: 'pointer' }} onClick={onOpen}>
-      <div className="flex items-center gap-3">
-        <div className={typeBgClass} style={{
-          width: 46, height: 46, borderRadius: 13,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0,
-        }}>
-          {list.emoji}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* 1 — List name, with the done/total count pinned right */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2" style={{ minWidth: 0 }}>
-              {isPinned && <Pin size={11} color="var(--accent)" fill="var(--accent)" style={{ flexShrink: 0 }} />}
-              <span style={{ fontWeight: 600, fontSize: 17 }} className="truncate">{list.name}</span>
-            </div>
-            <span style={{
-              flexShrink: 0, fontSize: 12.5, fontWeight: allDone ? 700 : 600,
-              color: allDone ? '#00e087' : 'var(--text-3)',
-            }}>
-              {status}
-            </span>
-          </div>
-          {/* 2 — Collaboration · updated time, one non-wrapping line */}
-          <div className="flex items-center" style={{ gap: 5, marginTop: 4, minWidth: 0 }}>
-            {collab && <Users size={12} color="var(--text-3)" style={{ flexShrink: 0 }} />}
-            <span style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {collab ? `${collab} · ${formatRelativeTime(list.updated_at)}` : `Updated ${formatRelativeTime(list.updated_at)}`}
-            </span>
-          </div>
-          {/* 3 — Progress, inset to the content column; only rendered once
-              progress has started — no empty bars at 0% (spec §progress) */}
-          {done > 0 && (
-            <div className="progress-bar" style={{ marginTop: 9, height: 7 }}>
-              <div className="progress-fill" style={{
-                width: `${pct}%`,
-                background: allDone ? '#00e087' : 'var(--accent)',
-              }} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function Lists() {
   const { user, isGuest } = useAuthStore()
   const store = useListsStore()
@@ -425,43 +330,13 @@ export default function Lists() {
               <button className="btn btn-primary mt-4" onClick={() => store.refreshLists()}>Retry</button>
             </div>
           ) : !hasLists ? (
-            <div className="empty-state empty-state--full">
-              <EmptyListsIcon />
-              {isGuest ? (
-                <>
-                  <h3>No shared lists yet</h3>
-                  <p>Lists people invite you to will appear here. Create a free account to make your own.</p>
-                  <button className="btn btn-primary mt-4" onClick={() => navigate('/profile')}>Create Account</button>
-                </>
-              ) : (
-                <>
-                  <h3>No lists yet</h3>
-                  <p>Create your first list or explore a template.</p>
-                  <div className="empty-cta-row">
-                    <button className="btn btn-primary" onClick={() => { setCreateInitial(undefined); setCreateStep('custom'); setCreateOpen(true) }}>
-                      <Plus size={18} /> Create List
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => { setCreateInitial(undefined); setCreateStep('templates'); setCreateOpen(true) }}>
-                      Browse Templates
-                    </button>
-                  </div>
-                  <div className="empty-starters">
-                    <span className="empty-starters-label">Start with</span>
-                    <div>
-                      {STARTERS.map(s => (
-                        <button
-                          key={s.label}
-                          className="starter-link"
-                          onClick={() => { setCreateInitial({ name: s.name, type: s.type, emoji: s.emoji }); setCreateStep('custom'); setCreateOpen(true) }}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            <EmptyLists
+              isGuest={isGuest}
+              onCreateBlank={() => { setCreateInitial(undefined); setCreateStep('custom'); setCreateOpen(true) }}
+              onBrowseTemplates={() => { setCreateInitial(undefined); setCreateStep('templates'); setCreateOpen(true) }}
+              onStarter={s => { setCreateInitial({ name: s.name, type: s.type, emoji: s.emoji }); setCreateStep('custom'); setCreateOpen(true) }}
+              onCreateAccount={() => navigate('/profile')}
+            />
           ) : (
             <div className="flex-col gap-3">
               {filter === 'active' && (
