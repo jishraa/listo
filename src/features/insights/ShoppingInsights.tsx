@@ -1,21 +1,25 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ChevronLeft, ChevronRight, FileText, Plus, Sparkles, X } from 'lucide-react'
-import Sheet from '../ui/Sheet'
+import Sheet from '../../components/ui/Sheet'
+import Avatar from '../../components/ui/Avatar'
 import { useListsStore, visibleLists, archivedLists } from '../../store/useListsStore'
 import { useCategoriesStore } from '../../store/useCategoriesStore'
 import { exportListReport, exportListCsv } from '../../lib/report'
 import { openYft } from '../../lib/yft'
 import { friendlyName } from '../../lib/utils'
 import type { List, ListItem, ListMember } from '../../types'
+// All number-crunching lives in analytics.ts (pure, unit-tested); this file
+// is presentation + the create/export flows.
+import {
+  scoreLabel, duplicateTitleCount, forgottenCount, computeHealth, computeBehaviour,
+  computeCatStats, varietyInsight, computeTrends, computeCandidates, memberActivity,
+} from './analytics'
 
 // Shopping Insights (redesign spec): answers four questions — how did I do,
 // what are my habits, what can I improve, what should I do next. Every
 // section either explains something or offers an action; sections with
 // insufficient data stay hidden rather than rendering empty analytics.
-
-const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s)
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const sectionLabel: React.CSSProperties = {
   fontSize: 11, fontWeight: 700, color: 'var(--text-2)',
@@ -24,14 +28,6 @@ const sectionLabel: React.CSSProperties = {
 const card: React.CSSProperties = {
   background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: 14, padding: '14px 16px',
-}
-
-function scoreLabel(score: number): { label: string; sub: string } {
-  if (score >= 90) return { label: 'Excellent Planner', sub: 'Your shopping game is on point.' }
-  if (score >= 75) return { label: 'Good Planner', sub: "You're shopping efficiently." }
-  if (score >= 60) return { label: 'Fair', sub: 'A few tweaks will go a long way.' }
-  if (score >= 40) return { label: 'Getting Started', sub: 'Keep completing lists to improve.' }
-  return { label: 'Needs Improvement', sub: "Let's tidy up this list." }
 }
 
 interface Props {
@@ -69,15 +65,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
   const pending = total - done
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
 
-  const dupeCount = useMemo(() => {
-    const seen = new Map<string, number>()
-    items.forEach(i => {
-      const k = i.title.trim().toLowerCase()
-      seen.set(k, (seen.get(k) ?? 0) + 1)
-    })
-    return [...seen.values()].filter(n => n > 1).length
-  }, [items])
-
+  const dupeCount = useMemo(() => duplicateTitleCount(items), [items])
   // Orphaned ids (category since deleted) are uncategorized for scoring too.
   const uncat = items.filter(i => !i.category || !cats.some(c => c.id === i.category)).length
   const catPct = total > 0 ? Math.round(((total - uncat) / total) * 100) : 0
@@ -91,116 +79,31 @@ export default function ShoppingInsights({ list, items, members, displayName, on
     () => shoppingLists.filter(l => l.id !== list.id && (store.items[l.id]?.length ?? 0) > 0),
     [shoppingLists, list.id, store.items],
   )
+  const forgotten = useMemo(() => forgottenCount(
+    archivedLists(store.lists).filter(l => l.type === 'shopping').map(l => l.id), store.items,
+  ), [store.lists, store.items])
 
-  // Forgotten = items left pending in archived shopping lists — bought lists
-  // that ended with items never checked off.
-  const forgotten = useMemo(() =>
-    archivedLists(store.lists)
-      .filter(l => l.type === 'shopping')
-      .reduce((n, l) => n + (store.items[l.id] ?? []).filter(i => !i.completed).length, 0),
-  [store.lists, store.items])
-
-  // ── Shopping Health score ───────────────────────────────────
-  const score = Math.min(100, Math.round(pct * 0.55 + catPct * 0.25 + (dupeCount === 0 ? 10 : 0) + (forgotten === 0 ? 10 : 0)))
+  // ── Derived analytics (pure, tested in analytics.test.ts) ───
+  const { score, potential, checklist } = computeHealth({ pct, catPct, dupeCount, forgotten, pending, uncat })
   const { label: scoreTitle, sub: scoreSub } = scoreLabel(score)
-  const potential = Math.min(100 - score,
-    (pending > 0 ? Math.round(0.55 * (100 - pct)) : 0)
-    + (uncat > 0 ? Math.round(0.25 * (100 - catPct)) : 0)
-    + (dupeCount > 0 ? 10 : 0))
 
-  const checklist: { ok: boolean; text: string }[] = [
-    pct >= 80 ? { ok: true, text: `High completion rate (${pct}%)` } : { ok: false, text: `Completion at ${pct}%` },
-    dupeCount === 0 ? { ok: true, text: 'No duplicate items' } : { ok: false, text: `${dupeCount} duplicate ${dupeCount === 1 ? 'item' : 'items'}` },
-    catPct >= 80 ? { ok: true, text: 'Most items are categorized' } : { ok: false, text: `${uncat} ${uncat === 1 ? 'item' : 'items'} uncategorized` },
-    pending > 0 ? { ok: false, text: `${pending} ${pending === 1 ? 'item' : 'items'} still pending` } : { ok: true, text: 'All items completed' },
-  ]
-
-  // ── Behaviour ───────────────────────────────────────────────
-  const behaviour = useMemo(() => {
-    const dayCounts = new Array(7).fill(0) as number[]
-    let listCount = 0
-    let itemSum = 0
-    for (const l of shoppingLists) {
-      const its = store.items[l.id] ?? []
-      if (its.length === 0) continue
-      listCount++
-      itemSum += its.length
-      for (const i of its) {
-        const at = i.completed_at ?? (i.completed ? i.created_at : null)
-        if (at) dayCounts[new Date(at).getDay()]++
-      }
-    }
-    const max = Math.max(...dayCounts)
-    return {
-      day: max > 0 ? WEEKDAYS[dayCounts.indexOf(max)] : null,
-      avg: listCount > 0 ? Math.round(itemSum / listCount) : 0,
-      listCount,
-    }
-  }, [shoppingLists, store.items])
-
-  // ── Category analysis ───────────────────────────────────────
-  const catStats = useMemo(() => {
-    const rows = cats.map(c => {
-      const catItems = items.filter(i => i.category === c.id)
-      return { ...c, total: catItems.length, done: catItems.filter(i => i.completed).length }
-    }).filter(c => c.total > 0)
-    return rows.sort((a, b) => b.total - a.total)
-  }, [cats, items])
+  const behaviour = useMemo(
+    () => computeBehaviour(shoppingLists.map(l => l.id), store.items),
+    [shoppingLists, store.items],
+  )
+  const catStats = useMemo(() => computeCatStats(cats, items), [cats, items])
   const visibleCatStats = showAllCats ? catStats : catStats.slice(0, 5)
-
-  // Variety — only shown when it says something meaningful
-  const variety = useMemo(() => {
-    if (catStats.length < 3 || total < 8) return null
-    const top = catStats[0]
-    const share = Math.round((top.total / total) * 100)
-    if (share > 50) return { text: `${top.emoji} ${top.name} makes up ${share}% of your list.`, sub: 'One category dominates — worth double-checking the rest.' }
-    if (share >= 25) return { text: `${top.emoji} ${top.name} makes up ${share}% of your list.`, sub: 'Your categories are well balanced.' }
-    return null
-  }, [catStats, total])
-
-  // ── Trends vs previous lists ────────────────────────────────
-  const trends = useMemo(() => {
-    if (otherLists.length === 0 || catStats.length === 0) return []
-    const avgShare = new Map<string, number>()
-    for (const c of catStats) {
-      let sum = 0
-      for (const l of otherLists) {
-        const its = store.items[l.id] ?? []
-        sum += (its.filter(i => i.category === c.id).length / its.length) * 100
-      }
-      avgShare.set(c.id, sum / otherLists.length)
-    }
-    return catStats.map(c => {
-      const thisShare = (c.total / total) * 100
-      const diff = Math.round(thisShare - (avgShare.get(c.id) ?? 0))
-      return { id: c.id, name: c.name, color: c.color, diff: Math.abs(diff) < 3 ? 0 : diff }
-    })
-  }, [otherLists, catStats, store.items, total])
-
-  // ── Prediction from purchase frequency ──────────────────────
-  const { candidates, confidence } = useMemo(() => {
-    const freq = new Map<string, { title: string; category: string | null; count: number }>()
-    for (const l of shoppingLists) {
-      for (const i of store.items[l.id] ?? []) {
-        const k = i.title.trim().toLowerCase()
-        if (!k) continue
-        const e = freq.get(k)
-        if (e) { e.count++; if (!e.category && i.category) e.category = i.category }
-        else freq.set(k, { title: cap(i.title.trim()), category: i.category, count: 1 })
-      }
-    }
-    const pendingHere = new Set(items.filter(i => !i.completed).map(i => i.title.trim().toLowerCase()))
-    const cands = [...freq.entries()]
-      .filter(([k, v]) => v.count >= 2 && !pendingHere.has(k))
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 12)
-      .map(([k, v]) => ({ key: k, ...v }))
-    const uniq = freq.size
-    const repeated = [...freq.values()].filter(v => v.count >= 2).length
-    const conf = uniq > 0 ? Math.min(95, Math.max(20, Math.round((repeated / uniq) * 100))) : 0
-    return { candidates: cands, confidence: conf }
-  }, [shoppingLists, store.items, items])
+  const variety = useMemo(() => varietyInsight(catStats, total), [catStats, total])
+  const trends = useMemo(
+    () => computeTrends(otherLists.map(l => l.id), store.items, catStats, total),
+    [otherLists, catStats, store.items, total],
+  )
+  const { candidates, confidence } = useMemo(
+    () => computeCandidates(shoppingLists.map(l => l.id), store.items, items),
+    [shoppingLists, store.items, items],
+  )
   const selectedCands = candidates.filter(c => !deselected.has(c.key))
+  const memberStats = useMemo(() => memberActivity(items, members.length), [items, members.length])
 
   // ── Suggested template ──────────────────────────────────────
   const tplItems = candidates.slice(0, 10)
@@ -215,11 +118,11 @@ export default function ShoppingInsights({ list, items, members, displayName, on
     if (creating || selectedCands.length === 0) return
     setCreating(true)
     const name = createName.trim() || 'Next Shopping List'
-    const created = await store.createList({ name, type: 'shopping', emoji: '🛒' })
-    if (created) {
-      for (const c of selectedCands) await store.addItem(created.id, c.title, '', c.category)
-      setCreatedList(created)
-    }
+    const created = await store.createList({
+      name, type: 'shopping', emoji: '🛒',
+      items: selectedCands.map(c => ({ title: c.title, category: c.category ?? undefined })),
+    })
+    if (created) setCreatedList(created)
     setCreating(false)
   }
 
@@ -241,21 +144,6 @@ export default function ShoppingInsights({ list, items, members, displayName, on
     return recs.slice(0, 3)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uncat, dupeCount, hasTemplateSuggestion, candidates.length, selectedCands.length])
-
-  // ── Member activity (shared lists only) ─────────────────────
-  const memberStats = useMemo(() => {
-    if (members.length < 2) return null
-    const added: Record<string, number> = {}
-    const completed: Record<string, number> = {}
-    items.forEach(i => {
-      if (i.added_by_name) added[i.added_by_name] = (added[i.added_by_name] || 0) + 1
-      if (i.completed && i.completed_by_name) completed[i.completed_by_name] = (completed[i.completed_by_name] || 0) + 1
-    })
-    const topAdder = Object.entries(added).sort((a, b) => b[1] - a[1])[0]
-    const topCompleter = Object.entries(completed).sort((a, b) => b[1] - a[1])[0]
-    if (!topAdder && !topCompleter) return null
-    return { topAdder, topCompleter }
-  }, [members.length, items])
 
   async function handleExport() {
     if (exporting) return
@@ -578,13 +466,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {memberStats.topAdder && (
                     <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
-                      <div style={{
-                        width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                        background: `hsl(${(memberStats.topAdder[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{memberStats.topAdder[0][0]?.toUpperCase()}</span>
-                      </div>
+                      <Avatar name={memberStats.topAdder[0]} size={30} saturation={55} lightness={45} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person(memberStats.topAdder[0])}</p>
                         <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Added {memberStats.topAdder[1]} item{memberStats.topAdder[1] !== 1 ? 's' : ''}</p>
@@ -594,13 +476,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
                   )}
                   {memberStats.topCompleter && memberStats.topCompleter[0] !== memberStats.topAdder?.[0] && (
                     <div style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px' }}>
-                      <div style={{
-                        width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                        background: `hsl(${(memberStats.topCompleter[0].charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{memberStats.topCompleter[0][0]?.toUpperCase()}</span>
-                      </div>
+                      <Avatar name={memberStats.topCompleter[0]} size={30} saturation={55} lightness={45} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{person(memberStats.topCompleter[0])}</p>
                         <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Checked off {memberStats.topCompleter[1]} item{memberStats.topCompleter[1] !== 1 ? 's' : ''}</p>
