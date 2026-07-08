@@ -82,7 +82,7 @@ export default function NextTripSheet({ open, onClose, list, items, cats, regula
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Start next trip" subtitle="Reset this list for your next run.">
+    <Sheet open={open} onClose={onClose} title="Start new list" subtitle="Reset this list for your next run.">
         <div style={{ padding: '16px 20px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {options.filter(o => !o.hide).map(o => {
@@ -140,7 +140,7 @@ export default function NextTripSheet({ open, onClose, list, items, cats, regula
           )}
 
           <button className="btn btn-primary btn-full" style={{ marginTop: 18 }} disabled={busy} onClick={start}>
-            {busy ? <span className="spinner" /> : 'Start next trip'}
+            {busy ? <span className="spinner" /> : 'Start new list'}
           </button>
         </div>
     </Sheet>

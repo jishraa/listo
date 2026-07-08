@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Share2, Sparkles } from 'lucide-react'
+import { Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { openYft } from '../../lib/yft'
 import { formatCompletedAt } from './helpers'
 import type { List } from '../../types'
@@ -15,18 +15,17 @@ interface CompletionCardProps {
   tripSummary: TripSummary
   completionTime: string | null
   canEdit: boolean
-  isOwner: boolean
   onViewInsights: () => void
   onAddMore: () => void
   onNextTrip: () => void
-  onShare: () => void
 }
 
 // Celebration card shown when every item is complete: trip summary, next
 // steps (spec §9), and the YFT companion nudge for shopping lists.
+// No Share action here — sharing lives in List Options (no duplicates).
 export default function CompletionCard({
-  list, tripSummary, completionTime, canEdit, isOwner,
-  onViewInsights, onAddMore, onNextTrip, onShare,
+  list, tripSummary, completionTime, canEdit,
+  onViewInsights, onAddMore, onNextTrip,
 }: CompletionCardProps) {
   const isShopping = list.type === 'shopping'
   return (
@@ -68,10 +67,7 @@ export default function CompletionCard({
           className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>}
         {canEdit && <button onClick={onNextTrip}
           className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-          <RefreshCw size={13} /> Start next trip
-        </button>}
-        {isOwner && <button onClick={onShare} className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-          <Share2 size={13} /> Share
+          <RefreshCw size={13} /> Start new list
         </button>}
       </div>
       {/* Companion nudge — shopping done → record the expense in YFT */}

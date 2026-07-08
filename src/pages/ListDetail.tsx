@@ -584,11 +584,9 @@ export default function ListDetail() {
                   tripSummary={tripSummary}
                   completionTime={completionTime}
                   canEdit={canEdit}
-                  isOwner={isOwner}
                   onViewInsights={() => setInsightsOpen(true)}
                   onAddMore={() => setShowAdd(true)}
                   onNextTrip={() => setNextTripOpen(true)}
-                  onShare={() => setShareOpen(true)}
                 />
               )}
 
