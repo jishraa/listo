@@ -3,6 +3,7 @@ import { Sparkles, ChevronRight, Plus } from 'lucide-react'
 import Sheet from '../ui/Sheet'
 import type { List, ListType } from '../../types'
 import { TEMPLATES, LIST_TYPE_ICONS, suggestListMeta } from '../../lib/constants'
+import { getDefaultListType } from '../../lib/storage'
 import { useListsStore, templateLists } from '../../store/useListsStore'
 
 const TYPE_LABELS: Record<ListType, string> = {
@@ -17,13 +18,6 @@ const ICON_LABELS: Record<string, string> = {
   '🏠': 'Home', '✈️': 'Travel', '⭐': 'Star', '📅': 'Calendar', '📝': 'Notes',
   '✅': 'Checklist', '💼': 'Briefcase', '🎯': 'Target', '🔧': 'Tools',
   '🛒': 'Shopping cart', '🧺': 'Basket', '🛍️': 'Shopping bags', '🍎': 'Food', '🏪': 'Store',
-}
-
-// User preference set in Profile → Preferences → Default List Type
-export const DEFAULT_TYPE_KEY = 'listo-default-list-type'
-export function getDefaultListType(): ListType {
-  const t = localStorage.getItem(DEFAULT_TYPE_KEY)
-  return t === 'tasks' || t === 'shopping' ? t : 'personal'
 }
 
 interface Props {
