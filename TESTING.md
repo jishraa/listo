@@ -3,6 +3,24 @@
 Every layer must pass before deployment. `npm run deploy` refuses to ship
 unless the full local gate passes; CI runs the same gate on every push/PR.
 
+## Environments
+
+| | Production | Staging |
+|---|---|---|
+| Web | listo.grk766.workers.dev | listo-staging.grk766.workers.dev |
+| Supabase | `listo` project | `Listo Staging` project (separate account) |
+| Deploy | `npm run deploy` (gated) | `npm run deploy:staging` |
+| Env source | `.env` | `.env.staging` (gitignored) |
+
+**All test suites target STAGING** — E2E (local + CI), Lighthouse, and future
+load tests never touch production data. CI uses the `STAGING_SUPABASE_*`
+secrets; locally, `.env.staging` wins over `.env` for Playwright.
+
+**Migration workflow:** apply new `supabase-migration-vN.sql` files to
+STAGING first → E2E green → then production. Staging is the schema rehearsal.
+(Free-tier note: the staging project pauses after ~1 week idle; the first CI
+run after a pause fails until it's restored from the Supabase dashboard.)
+
 ## Commands
 
 | Command | What |

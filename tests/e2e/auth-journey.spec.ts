@@ -19,14 +19,14 @@ test.describe('authenticated journey', () => {
     await page.locator('#auth-email').fill(EMAIL!)
     await page.locator('#auth-password').fill(PASSWORD!)
     await page.getByRole('button', { name: 'Sign In', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Create list' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Create list', exact: true })).toBeVisible({ timeout: 15_000 })
 
     // ── Create a blank shopping list ──
-    await page.getByRole('button', { name: 'Create list' }).click()
-    await page.getByRole('button', { name: 'Create Blank List' }).click()
+    await page.getByRole('button', { name: 'Create list', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Create Blank List' }).click()
     await page.locator('#new-list-name').fill(listName)
-    await page.getByRole('button', { name: 'Shopping', exact: true }).click()
-    await page.getByRole('button', { name: 'Create List', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Shopping', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Create List', exact: true }).click()
 
     // ── Open it and add items (smart parsing) ──
     await page.getByText(listName).click()

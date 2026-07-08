@@ -5,5 +5,18 @@
     "directory": "./dist",
     // SPA fallback: serve index.html for unknown paths (/list/:id, /join/:code…).
     "not_found_handling": "single-page-application"
+  },
+  "env": {
+    // Staging: separate worker (listo-staging.<subdomain>.workers.dev) serving
+    // a build pointed at the Listo Staging Supabase project. Deploy with
+    // `npm run deploy:staging`. Assets config must be repeated — wrangler
+    // environments don't inherit bindings.
+    "staging": {
+      "name": "listo-staging",
+      "assets": {
+        "directory": "./dist",
+        "not_found_handling": "single-page-application"
+      }
+    }
   }
 }

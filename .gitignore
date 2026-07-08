@@ -31,3 +31,5 @@ test-results/
 playwright-report/
 coverage/
 .lighthouseci/
+.env.staging
+staging-setup-combined.sql

@@ -9,16 +9,16 @@ export async function signIn(page: Page) {
   await page.locator('#auth-email').fill(EMAIL!)
   await page.locator('#auth-password').fill(PASSWORD!)
   await page.getByRole('button', { name: 'Sign In', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Create list' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Create list', exact: true })).toBeVisible({ timeout: 15_000 })
 }
 
 // Create a blank list of the given type and land on the Lists page.
 export async function createList(page: Page, name: string, type: 'Personal' | 'Tasks' | 'Shopping' = 'Shopping') {
-  await page.getByRole('button', { name: 'Create list' }).click()
-  await page.getByRole('button', { name: 'Create Blank List' }).click()
+  await page.getByRole('button', { name: 'Create list', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Create Blank List' }).click()
   await page.locator('#new-list-name').fill(name)
-  await page.getByRole('button', { name: type, exact: true }).click()
-  await page.getByRole('button', { name: 'Create List', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: type, exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Create List', exact: true }).click()
   await expect(page.getByText(name)).toBeVisible()
 }
 
