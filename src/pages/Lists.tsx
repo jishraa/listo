@@ -8,11 +8,13 @@ import ShareListSheet from '../components/lists/ShareListSheet'
 import { SwipeCard } from '../components/lists/SwipeCard'
 import type { SwipeAction } from '../components/lists/SwipeCard'
 import Sheet from '../components/ui/Sheet'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import InstallBanner from '../components/InstallBanner'
 import PullIndicator from '../components/ui/PullIndicator'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { formatRelativeTime, friendlyName } from '../lib/utils'
+import { storageKeys, readJSON, writeJSON } from '../lib/storage'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import type { ListType, List } from '../types'
 
@@ -36,7 +38,7 @@ const SORTS: { id: Sort; label: string }[] = [
   { id: 'progress',     label: 'Lowest Progress' },
 ]
 
-const SORT_KEY = 'listo-lists-sort'
+const SORT_KEY = storageKeys.listsSort
 
 // Compact first-run starter shortcuts. Each opens the Create List sheet
 // prefilled (name + type + icon), all still editable before creating.
@@ -175,17 +177,14 @@ export default function Lists() {
 
   useEffect(() => {
     if (!user?.id) return
-    try {
-      const pins = JSON.parse(localStorage.getItem(`listo-pins-${user.id}`) ?? '[]') as string[]
-      setPinnedIds(new Set(pins))
-    } catch { /* ignore */ }
+    setPinnedIds(new Set(readJSON<string[]>(storageKeys.pins(user.id), [])))
   }, [user?.id])
 
   const togglePin = (listId: string) => {
     const next = new Set(pinnedIds)
     next.has(listId) ? next.delete(listId) : next.add(listId)
     setPinnedIds(next)
-    localStorage.setItem(`listo-pins-${user?.id}`, JSON.stringify([...next]))
+    if (user?.id) writeJSON(storageKeys.pins(user.id), [...next])
   }
 
   const handleCreate = async (name: string, type: ListType, emoji: string, templateItems?: { title: string; category?: string }[]) => {
@@ -583,17 +582,16 @@ export default function Lists() {
       </Sheet>
 
       {deleteTarget && (
-        <Sheet open onClose={() => setDeleteTarget(null)} ariaLabel="Delete list">
-          <div className="sheet-body" style={{ textAlign: 'center' }}>
-            <Trash2 size={32} color="#dc2626" style={{ margin: '0 auto 12px' }} />
-            <p style={{ fontWeight: 700, fontSize: 17 }}>Delete "{deleteTarget.name}"?</p>
-            <p className="text-muted text-sm mt-2">All items will be permanently deleted.</p>
-            <div className="flex gap-2 mt-4">
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleDelete}>Delete</button>
-            </div>
-          </div>
-        </Sheet>
+        <ConfirmSheet
+          open
+          onClose={() => setDeleteTarget(null)}
+          icon={<Trash2 size={32} color="#dc2626" />}
+          title={`Delete "${deleteTarget.name}"?`}
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+        >
+          All items will be permanently deleted.
+        </ConfirmSheet>
       )}
     </>
   )

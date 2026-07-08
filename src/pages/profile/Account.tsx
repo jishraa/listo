@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { KeyRound, Link2, Mail, Trash2, User } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
 import Sheet from '../../components/ui/Sheet'
+import ConfirmSheet from '../../components/ui/ConfirmSheet'
 import { SubPage, Section, Row } from './common'
 
 export default function AccountPage() {
@@ -174,35 +175,27 @@ export default function AccountPage() {
           </button>
         </div>
       </Sheet>
-      <Sheet open={sheet === 'delete'} onClose={() => { if (!delBusy) setSheet(null) }} title="Delete Account">
-        <div className="sheet-body">
-          <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: 1.55 }}>
-            This permanently deletes your account, every list you own, and your
-            memberships in shared lists. This can't be undone.
-          </p>
-          {delError && <div className="error-msg" role="alert">{delError}</div>}
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} disabled={delBusy} onClick={() => setSheet(null)}>Cancel</button>
-            <button
-              className="btn btn-danger"
-              style={{ flex: 1 }}
-              disabled={delBusy}
-              onClick={async () => {
-                setDelBusy(true); setDelError('')
-                const err = await deleteAccount()
-                if (err) {
-                  setDelBusy(false)
-                  setDelError("Couldn't delete your account. Please try again.")
-                  return
-                }
-                navigate('/login', { replace: true })
-              }}
-            >
-              {delBusy ? <span className="spinner" /> : 'Delete Account'}
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={sheet === 'delete'}
+        onClose={() => setSheet(null)}
+        title="Delete your account?"
+        confirmLabel="Delete Account"
+        busy={delBusy}
+        error={delError || null}
+        onConfirm={async () => {
+          setDelBusy(true); setDelError('')
+          const err = await deleteAccount()
+          if (err) {
+            setDelBusy(false)
+            setDelError("Couldn't delete your account. Please try again.")
+            return
+          }
+          navigate('/login', { replace: true })
+        }}
+      >
+        This permanently deletes your account, every list you own, and your
+        memberships in shared lists. This can't be undone.
+      </ConfirmSheet>
     </SubPage>
   )
 }

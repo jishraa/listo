@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, ShoppingCart, X } from 'lucide-react'
+import IconButton from '../ui/IconButton'
 import { useListsStore } from '../../store/useListsStore'
 import { formatQuantity } from '../../lib/utils'
 import type { List, ListItem } from '../../types'
@@ -125,13 +126,9 @@ export default function ShopMode({ open, onClose, list, items, cats }: Props) {
               {pending.length} {pending.length === 1 ? 'item' : 'items'} left · {doneCount} in cart
             </p>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close Shop Mode"
-            style={{ width: 40, height: 40, borderRadius: 99, background: 'var(--bg-input)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)', flexShrink: 0 }}
-          >
+          <IconButton label="Close Shop Mode" size={40} onClick={onClose}>
             <X size={18} strokeWidth={2.5} />
-          </button>
+          </IconButton>
         </div>
         {/* Progress — aligned to the 16px content margins */}
         <div

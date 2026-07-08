@@ -7,12 +7,15 @@ import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { parseItemInput, detectCategoryIn } from '../lib/constants'
 import { friendlyName, formatRelativeTime, capitalize, formatQuantity } from '../lib/utils'
+import { storageKeys, readJSON, writeJSON } from '../lib/storage'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../store/useMemoryStore'
 import { pendingDuplicateGroups } from '../lib/duplicates'
 import { exportListReport } from '../lib/report'
 import { openYft } from '../lib/yft'
 import Sheet from '../components/ui/Sheet'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
+import Avatar from '../components/ui/Avatar'
 import { SwipeRow } from '../components/lists/SwipeRow'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
@@ -47,11 +50,7 @@ type ViewPrefs = { categories: boolean; addedBy: boolean; autoExpand: boolean; r
 const DEFAULT_VIEW_PREFS: ViewPrefs = { categories: true, addedBy: true, autoExpand: false, remember: true }
 function readViewPrefs(id: string | undefined): ViewPrefs {
   if (!id) return DEFAULT_VIEW_PREFS
-  try {
-    const raw = localStorage.getItem(`listo-view-${id}`)
-    if (raw) return { ...DEFAULT_VIEW_PREFS, ...JSON.parse(raw) }
-  } catch { /* ignore */ }
-  return DEFAULT_VIEW_PREFS
+  return { ...DEFAULT_VIEW_PREFS, ...readJSON<Partial<ViewPrefs>>(storageKeys.viewPrefs(id), {}) }
 }
 
 function formatCompletedAt(iso: string): string {
@@ -73,7 +72,7 @@ const beforeYouGoAutoShown = new Set<string>()
 // list so "Keep both" permanently dismisses that warning.
 function readKeptDupes(id: string | undefined): string[] {
   if (!id) return []
-  try { return JSON.parse(localStorage.getItem(`listo-kept-dupes-${id}`) || '[]') as string[] } catch { return [] }
+  return readJSON<string[]>(storageKeys.keptDupes(id), [])
 }
 
 export default function ListDetail() {
@@ -131,8 +130,8 @@ export default function ListDetail() {
     setViewPrefs(prev => {
       const next = { ...prev, ...patch }
       if (id) {
-        if (next.remember) localStorage.setItem(`listo-view-${id}`, JSON.stringify(next))
-        else localStorage.removeItem(`listo-view-${id}`)
+        if (next.remember) writeJSON(storageKeys.viewPrefs(id), next)
+        else localStorage.removeItem(storageKeys.viewPrefs(id))
       }
       if ('autoExpand' in patch) setShowCompleted(next.autoExpand)
       return next
@@ -143,11 +142,11 @@ export default function ListDetail() {
   const [dupeReviewOpen,   setDupeReviewOpen]   = useState(false)
   const [undoItem,         setUndoItem]         = useState<ListItem | null>(null)
   const [completionTime,   setCompletionTime]   = useState<string | null>(() =>
-    id ? localStorage.getItem(`listo-completed-${id}`) : null
+    id ? localStorage.getItem(storageKeys.completedAt(id)) : null
   )
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (!id) return 'date'
-    const s = localStorage.getItem(`listo-sort-${id}`)
+    const s = localStorage.getItem(storageKeys.listSort(id))
     return (s === 'alpha' || s === 'category') ? s : 'date'
   })
   const renameRef = useRef<HTMLInputElement>(null)
@@ -168,7 +167,7 @@ export default function ListDetail() {
     return unsub
   }, [id])
 
-  useEffect(() => { if (id) localStorage.setItem(`listo-sort-${id}`, sortMode) }, [id, sortMode])
+  useEffect(() => { if (id) localStorage.setItem(storageKeys.listSort(id), sortMode) }, [id, sortMode])
 
   const isAllComplete = items.length > 0 && items.every(i => i.completed)
   useEffect(() => {
@@ -177,11 +176,11 @@ export default function ListDetail() {
       if (!completionTime) {
         const t = new Date().toISOString()
         setCompletionTime(t)
-        localStorage.setItem(`listo-completed-${id}`, t)
+        localStorage.setItem(storageKeys.completedAt(id), t)
       }
     } else if (completionTime) {
       setCompletionTime(null)
-      localStorage.removeItem(`listo-completed-${id}`)
+      localStorage.removeItem(storageKeys.completedAt(id))
     }
   }, [id, isAllComplete])
 
@@ -263,7 +262,7 @@ export default function ListDetail() {
   const keepDupe = useCallback((key: string) => {
     setKeptDupes(prev => {
       const next = new Set(prev).add(key)
-      if (id) localStorage.setItem(`listo-kept-dupes-${id}`, JSON.stringify([...next]))
+      if (id) writeJSON(storageKeys.keptDupes(id), [...next])
       return next
     })
   }, [id])
@@ -688,15 +687,14 @@ export default function ListDetail() {
         {members.length > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 16px 0' }}>
             {members.slice(0, 5).map((m, i) => (
-              <div key={m.id} style={{
-                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                background: `hsl(${(m.display_name.charCodeAt(0) * 47) % 360}deg, 55%, 45%)`,
-                border: '2px solid var(--bg-card)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginLeft: i > 0 ? -6 : 0, position: 'relative', zIndex: 5 - i,
-              }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{m.display_name[0]?.toUpperCase()}</span>
-              </div>
+              <Avatar
+                key={m.id}
+                name={m.display_name}
+                size={22}
+                saturation={55}
+                lightness={45}
+                style={{ border: '2px solid var(--bg-card)', marginLeft: i > 0 ? -6 : 0, position: 'relative', zIndex: 5 - i }}
+              />
             ))}
             <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {[...members]
@@ -1184,40 +1182,26 @@ export default function ListDetail() {
       </Sheet>
 
       {/* ── Clear Completed confirm ── */}
-      <Sheet open={confirmClearDone} onClose={() => setConfirmClearDone(false)} ariaLabel="Clear completed items">
-        <div className="sheet-body" style={{ gap: 12 }}>
-          <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-            Delete {doneCount} completed {doneCount === 1 ? 'item' : 'items'}?
-          </p>
-          <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
-            They'll be removed from the list for everyone. This can't be undone.
-          </p>
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmClearDone(false)}>Cancel</button>
-            <button className="btn btn-danger" style={{ flex: 1 }}
-              onClick={async () => { setConfirmClearDone(false); await store.deleteCompleted(list.id) }}>
-              Delete
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={confirmClearDone}
+        onClose={() => setConfirmClearDone(false)}
+        title={`Delete ${doneCount} completed ${doneCount === 1 ? 'item' : 'items'}?`}
+        confirmLabel="Delete"
+        onConfirm={async () => { setConfirmClearDone(false); await store.deleteCompleted(list.id) }}
+      >
+        They'll be removed from the list for everyone. This can't be undone.
+      </ConfirmSheet>
 
       {/* ── Delete confirm ── */}
-      <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} ariaLabel="Delete list">
-        <div className="sheet-body" style={{ gap: 12 }}>
-          <p style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Delete this list?</p>
-          <p className="text-muted text-sm" style={{ lineHeight: 1.5 }}>
-            "<strong>{list.name}</strong>" and all its items will be removed for everyone with access. This can't be undone.
-          </p>
-          <div className="flex gap-2">
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Cancel</button>
-            <button className="btn btn-danger" style={{ flex: 1 }}
-              onClick={async () => { setConfirmDelete(false); await store.deleteList(list.id); navigate('/') }}>
-              Delete List
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title="Delete this list?"
+        confirmLabel="Delete List"
+        onConfirm={async () => { setConfirmDelete(false); await store.deleteList(list.id); navigate('/') }}
+      >
+        "<strong>{list.name}</strong>" and all its items will be removed for everyone with access. This can't be undone.
+      </ConfirmSheet>
 
       {/* ── Insights (full screen, redesign spec) ── */}
       {insightsOpen && (
