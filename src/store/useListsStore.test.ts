@@ -4,6 +4,9 @@ import type { ListItem } from '../types'
 // Mock the entire repository layer — these tests exercise the store's
 // optimistic updates, rollback, and offline-queue hand-off in isolation.
 vi.mock('../lib/api/lists')
+// The api automocks still evaluate the real modules to discover exports,
+// which would import supabase.ts (throws without env vars, e.g. in CI).
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/api/items')
 vi.mock('../lib/api/members')
 vi.mock('../lib/api/invites')
