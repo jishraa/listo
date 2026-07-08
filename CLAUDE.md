@@ -11,7 +11,8 @@ Deployed as a Cloudflare Worker serving static assets only (`wrangler.jsonc`, SP
 ## Development Commands
 
 ```bash
-npm run dev        # Vite dev server
+npm run dev        # Vite dev server — points at the STAGING database (safe default)
+npm run dev:prod   # dev server against the production database (rare; real-data repros only)
 npm run verify     # full quality gate: lint → tests+coverage → build → bundle budget (see TESTING.md)
 npm run build      # tsc -b && vite build
 npm run lint       # oxlint (not eslint)

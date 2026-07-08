@@ -13,7 +13,8 @@ unless the full local gate passes; CI runs the same gate on every push/PR.
 | Env source | `.env` | `.env.staging` (gitignored) |
 
 **All test suites target STAGING** — E2E (local + CI), Lighthouse, and future
-load tests never touch production data. CI uses the `STAGING_SUPABASE_*`
+load tests never touch production data. **Local dev too**: `npm run dev` uses
+staging by default; `npm run dev:prod` exists for real-data reproductions. CI uses the `STAGING_SUPABASE_*`
 secrets; locally, `.env.staging` wins over `.env` for Playwright.
 
 **Migration workflow:** apply new `supabase-migration-vN.sql` files to
