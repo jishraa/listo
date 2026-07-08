@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ListItem } from '../types'
 
+// Factory-mock supabase so automocking the api layer never evaluates it
+// (supabase.ts throws without env vars, e.g. in CI).
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/api/lists')
 vi.mock('../lib/api/items')
 vi.mock('../lib/api/members')
