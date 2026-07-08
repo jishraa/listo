@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowUpDown, Eye, Sparkles, Check, Copy, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, RefreshCw, Share2, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, X, ListChecks, ClipboardList, ChevronDown, Undo2 } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, ChevronLeft, Copy, Eye, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, Share2, ShoppingBag, ShoppingCart, Sparkles, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
 import { parseItemInput, detectCategoryIn } from '../lib/constants'
-import { friendlyName, formatRelativeTime, capitalize, formatQuantity } from '../lib/utils'
-import { storageKeys, readJSON, writeJSON } from '../lib/storage'
+import { friendlyName, formatRelativeTime, capitalize } from '../lib/utils'
+import { storageKeys, writeJSON } from '../lib/storage'
 import { useCategoriesStore } from '../store/useCategoriesStore'
 import { useMemoryStore, regularsOf, forgottenRegulars, memoryKey } from '../store/useMemoryStore'
 import { pendingDuplicateGroups } from '../lib/duplicates'
 import { exportListReport } from '../lib/report'
-import { openYft } from '../lib/yft'
-import Sheet from '../components/ui/Sheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import Avatar from '../components/ui/Avatar'
-import { SwipeRow } from '../components/lists/SwipeRow'
+import PullIndicator from '../components/ui/PullIndicator'
 import ShareListSheet from '../components/lists/ShareListSheet'
 import CategoryPickerSheet from '../components/lists/CategoryPickerSheet'
 import ShoppingInsights from '../components/lists/ShoppingInsights'
@@ -27,53 +24,22 @@ import ShopMode from '../components/lists/ShopMode'
 import NextTripSheet from '../components/lists/NextTripSheet'
 import { useEnsureData } from '../hooks/useEnsureData'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import PullIndicator from '../components/ui/PullIndicator'
-
-type SortMode = 'date' | 'alpha' | 'category'
-
-// Category filter pill — 36px, non-truncating; soft green tint when active so
-// the strongest Listo green stays reserved for CTAs/progress (spec §1.1–1.2).
-function pillStyle(active: boolean): CSSProperties {
-  return {
-    flexShrink: 0, height: 36, padding: '0 14px', borderRadius: 18, cursor: 'pointer',
-    whiteSpace: 'nowrap', border: 'none',
-    background: active ? 'var(--accent-soft)' : 'var(--bg-input)',
-    color: active ? 'var(--accent-text)' : 'var(--text-2)',
-    fontSize: 13, fontWeight: active ? 700 : 500,
-    transition: 'background 160ms ease, color 160ms ease',
-  }
-}
-
-// Per-list view preferences (spec §4.2) — persisted under listo-view-<id>
-// only while "remember" is on; otherwise they last for the session.
-type ViewPrefs = { categories: boolean; addedBy: boolean; autoExpand: boolean; remember: boolean }
-const DEFAULT_VIEW_PREFS: ViewPrefs = { categories: true, addedBy: true, autoExpand: false, remember: true }
-function readViewPrefs(id: string | undefined): ViewPrefs {
-  if (!id) return DEFAULT_VIEW_PREFS
-  return { ...DEFAULT_VIEW_PREFS, ...readJSON<Partial<ViewPrefs>>(storageKeys.viewPrefs(id), {}) }
-}
-
-function formatCompletedAt(iso: string): string {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  const now = new Date()
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  if (d.toDateString() === now.toDateString()) return `today at ${time}`
-  const yest = new Date(now); yest.setDate(now.getDate() - 1)
-  if (d.toDateString() === yest.toDateString()) return `yesterday at ${time}`
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at ${time}`
-}
-
-// Lists that have already shown the auto "Before you go" nudge this session —
-// so completing a list prompts once, never repeatedly.
-const beforeYouGoAutoShown = new Set<string>()
-
-// Duplicate groups the user chose to keep (by normalized name), persisted per
-// list so "Keep both" permanently dismisses that warning.
-function readKeptDupes(id: string | undefined): string[] {
-  if (!id) return []
-  return readJSON<string[]>(storageKeys.keptDupes(id), [])
-}
+// Feature module: presentation lives in features/list-detail, this page
+// orchestrates state, data, and which pieces are visible.
+import {
+  type SortMode, type ViewPrefs,
+  pillStyle, sectionLabel, readViewPrefs, readKeptDupes, beforeYouGoAutoShown,
+} from '../features/list-detail/helpers'
+import ItemRow from '../features/list-detail/ItemRow'
+import ItemEditRow from '../features/list-detail/ItemEditRow'
+import CompletionCard from '../features/list-detail/CompletionCard'
+import EmptyItems from '../features/list-detail/EmptyItems'
+import SmartBanners from '../features/list-detail/SmartBanners'
+import ListOptionsMenu, { type MenuGroupSpec } from '../features/list-detail/ListOptionsMenu'
+import CompletedItemSheet from '../features/list-detail/CompletedItemSheet'
+import SortSheet from '../features/list-detail/SortSheet'
+import CustomizeViewSheet from '../features/list-detail/CustomizeViewSheet'
+import RenameSheet from '../features/list-detail/RenameSheet'
 
 export default function ListDetail() {
   const { id } = useParams<{ id: string }>()
@@ -100,13 +66,12 @@ export default function ListDetail() {
   // ── Add sheet (extracted to AddItemSheet) ───────────────────
   const [showAdd, setShowAdd] = useState(false)
 
-  // ── Edit state ───────────────────────────────────────────────
+  // ── Edit state — shared with the category picker and the completed-item
+  //    action sheet, so it lives here rather than in ItemEditRow ───────────
   const [editingId,    setEditingId]    = useState<string | null>(null)
   const [editTitle,    setEditTitle]    = useState('')
   const [editQty,      setEditQty]      = useState('')
   const [editCategory, setEditCategory] = useState<string | null>(null)
-  const [qtyEditId,    setQtyEditId]    = useState<string | null>(null)
-  const [qtyDraft,     setQtyDraft]     = useState('')
   const editTitleRef = useRef<HTMLInputElement>(null)
 
   // ── UI state ────────────────────────────────────────────────
@@ -115,7 +80,6 @@ export default function ListDetail() {
   const [insightsOpen,     setInsightsOpen]     = useState(false)
   const [shareOpen,        setShareOpen]        = useState(false)
   const [renaming,         setRenaming]         = useState(false)
-  const [renameValue,      setRenameValue]      = useState('')
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [confirmClearDone, setConfirmClearDone] = useState(false)
   const [showCompleted,    setShowCompleted]    = useState(() => readViewPrefs(id).autoExpand)
@@ -149,7 +113,6 @@ export default function ListDetail() {
     const s = localStorage.getItem(storageKeys.listSort(id))
     return (s === 'alpha' || s === 'category') ? s : 'date'
   })
-  const renameRef = useRef<HTMLInputElement>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Manual refresh alongside realtime — covers dropped subscriptions and
@@ -384,238 +347,58 @@ export default function ListDetail() {
     )
   }
 
-  // ── Render item row ─────────────────────────────────────────
+  // ── Render item row (edit-in-place or display) ──────────────
   const renderItem = (item: ListItem) => {
-    const isEditing = editingId === item.id
-    const cat = item.category ? catById.get(item.category) : null
-    // The single remaining pending item gets a subtle highlight (spec §1)
-    const isFinalItem = lastItemLeft && !item.completed
-
-    if (isEditing) return (
-      <div key={item.id} style={{
-        padding: '12px 16px', background: 'var(--bg-input)',
-        borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10,
-      }}>
-        <div className="flex gap-2">
-          <input
-            ref={editTitleRef}
-            value={editTitle}
-            onChange={e => setEditTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') commitEdit(item); if (e.key === 'Escape') cancelEdit() }}
-            maxLength={200}
-            style={{
-              flex: 1, height: 40, borderRadius: 8, padding: '0 12px',
-              background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-              color: 'var(--text)', fontSize: 15, outline: 'none',
-            }}
-          />
-          {list.type === 'shopping' && (
-            <input
-              value={editQty}
-              onChange={e => setEditQty(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commitEdit(item); if (e.key === 'Escape') cancelEdit() }}
-              placeholder="Qty"
-              maxLength={20}
-              style={{
-                width: 56, height: 40, borderRadius: 8, padding: '0 8px',
-                background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-                color: 'var(--text)', fontSize: 15, outline: 'none', textAlign: 'center',
-              }}
-            />
-          )}
-        </div>
-        <div className="flex items-center justify-between">
-          {cats.length > 0 ? (
-            <button
-              onClick={() => setEditPickerOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 100, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: editCategory && catById.get(editCategory) ? `${catById.get(editCategory)!.color}1f` : 'var(--bg-input)',
-                color: editCategory ? 'var(--text)' : 'var(--text-3)',
-                border: 'none',
-              }}>
-              {editCategory && catById.get(editCategory)
-                ? <>{catById.get(editCategory)!.emoji} {catById.get(editCategory)!.name}</>
-                : '＋ Category'}
-            </button>
-          ) : <div />}
-          <div className="flex gap-2" style={{ marginLeft: 8, flexShrink: 0 }}>
-            {/* Delete here too — swipe is touch-only, this keeps removal
-                reachable with a mouse or keyboard (undo toast still applies) */}
-            <button onClick={() => { cancelEdit(); handleDelete(item) }}
-              aria-label={`Delete ${item.title}`}
-              style={{ width: 36, height: 36, borderRadius: '50%', background: 'transparent', border: '1px solid rgba(239,68,68,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
-              <Trash2 size={14} strokeWidth={2} />
-            </button>
-            <button onClick={cancelEdit} aria-label="Cancel editing"
-              style={{ width: 36, height: 36, borderRadius: '50%', background: 'transparent', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-2)' }}>
-              <X size={14} strokeWidth={2.2} />
-            </button>
-            <button onClick={() => commitEdit(item)} aria-label="Save changes"
-              style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff' }}>
-              <Check size={14} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-
+    if (editingId === item.id) {
+      const editCat = editCategory ? catById.get(editCategory) ?? null : null
+      return (
+        <ItemEditRow
+          key={item.id}
+          listType={list.type}
+          hasCategories={cats.length > 0}
+          category={editCat}
+          title={editTitle}
+          qty={editQty}
+          onTitleChange={setEditTitle}
+          onQtyChange={setEditQty}
+          onOpenCategoryPicker={() => setEditPickerOpen(true)}
+          onCommit={() => commitEdit(item)}
+          onCancel={cancelEdit}
+          onDelete={() => { cancelEdit(); handleDelete(item) }}
+          titleRef={editTitleRef}
+        />
+      )
+    }
     return (
-      <SwipeRow key={item.id} onDelete={() => handleDelete(item)} disabled={!canEdit}>
-        {isFinalItem && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px 0',
-            background: 'var(--accent-dim)', fontSize: 11, fontWeight: 700,
-            color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em',
-          }}>
-            🛒 Last item
-          </div>
-        )}
-        <div className="flex items-center gap-3" style={{ padding: '11px 14px', background: isFinalItem ? 'var(--accent-dim)' : 'var(--bg-card)' }}>
-          {/* Checkbox — 44px touch target around the 22px control (spec §17) */}
-          <button
-            onClick={() => { if (canEdit) store.toggleItem(list.id, item) }}
-            disabled={!canEdit}
-            aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-            style={{
-              flexShrink: 0, width: 40, height: 40, margin: -9,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: canEdit ? 'pointer' : 'default',
-            }}
-          >
-            <span style={{
-              width: 22, height: 22, borderRadius: '50%',
-              border: `2px solid ${item.completed ? 'var(--accent)' : 'var(--border-2)'}`,
-              background: item.completed ? 'var(--accent)' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 180ms ease',
-            }}>
-              {item.completed && <Check size={12} strokeWidth={3} style={{ color: '#fff' }} />}
-            </span>
-          </button>
-
-          {/* Title area — pending: tap to edit; completed: tap for actions
-              (Add Again / Move to Pending / Edit / Delete). */}
-          <div
-            onClick={() => {
-              if (!canEdit) return
-              if (item.completed) setCompletedAction(item)
-              else { cancelEdit(); startEdit(item) }
-            }}
-            style={{ flex: 1, minWidth: 0, cursor: canEdit ? 'pointer' : 'default' }}
-          >
-            <div className="flex items-center gap-2">
-              <span style={{
-                fontSize: 17, fontWeight: 600,
-                // Completed items are secondary, not disabled — keep them readable.
-                color: item.completed ? 'var(--text-2)' : 'var(--text)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                transition: 'color 200ms ease',
-              }}>{item.title}</span>
-              {dupeIds.has(item.id) && !isEditing && (
-                <span style={{
-                  flexShrink: 0, fontSize: 10, fontWeight: 600,
-                  color: '#d97706', background: 'rgba(217,119,6,0.12)',
-                  borderRadius: 99, padding: '2px 6px',
-                }}>Dup</span>
-              )}
-            </div>
-            {(() => {
-              // Metadata row respects the per-list view prefs (spec §4.2).
-              // "Category · Member" — friendly names, "You" for own items.
-              const showCat = cat && viewPrefs.categories
-              const person = (n: string) => n === displayName ? 'You' : friendlyName(n)
-              // No "✓" here — the green check already signals completion (spec).
-              const rawWho = !viewPrefs.addedBy ? null : item.completed
-                ? (item.completed_by_name ? person(item.completed_by_name) : null)
-                : (members.length > 1 && item.added_by_name ? person(item.added_by_name) : null)
-              const who = rawWho && showCat ? `· ${rawWho}` : rawWho
-              if (!showCat && !who) return null
-              return (
-                <div className="flex items-center" style={{ gap: 6, marginTop: 3 }}>
-                  {showCat && (
-                    <span style={{
-                      flexShrink: 0, fontSize: 11, fontWeight: 600, lineHeight: 1,
-                      padding: '3px 7px', borderRadius: 6,
-                      background: item.completed ? 'var(--bg-input)' : `${cat!.color}1f`,
-                      color: 'var(--text-2)',
-                    }}>{cat!.name}</span>
-                  )}
-                  {who && (
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
-                  )}
-                </div>
-              )
-            })()}
-          </div>
-
-          {/* Qty chip (shopping only) — shown only when a meaningful quantity
-              exists (no "—" placeholder, no ×1); qty is set via the item text
-              ("Milk 2") or the edit flow */}
-          {list.type === 'shopping' && !item.completed && (item.quantity || qtyEditId === item.id) && (
-            qtyEditId === item.id ? (
-              <input
-                autoFocus
-                value={qtyDraft}
-                onChange={e => setQtyDraft(e.target.value)}
-                onKeyDown={async e => {
-                  if (e.key === 'Enter' || e.key === 'Escape') {
-                    if (e.key === 'Enter') await store.updateItem(list.id, item.id, { title: item.title, quantity: qtyDraft.trim() || null, category: item.category })
-                    setQtyEditId(null)
-                  }
-                }}
-                onBlur={async () => {
-                  await store.updateItem(list.id, item.id, { title: item.title, quantity: qtyDraft.trim() || null, category: item.category })
-                  setQtyEditId(null)
-                }}
-                placeholder="Qty"
-                maxLength={20}
-                style={{
-                  flexShrink: 0, width: 58, height: 28, borderRadius: 99, padding: '0 8px',
-                  textAlign: 'center', background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-                  color: 'var(--text)', fontSize: 14, fontWeight: 600, outline: 'none',
-                }}
-              />
-            ) : (
-              <button
-                onClick={e => { e.stopPropagation(); if (canEdit) { setQtyDraft(item.quantity ?? ''); setQtyEditId(item.id) } }}
-                disabled={!canEdit}
-                aria-label={`Quantity ${formatQuantity(item.quantity)}`}
-                style={{
-                  flexShrink: 0, padding: '3px 9px', borderRadius: 99,
-                  background: 'var(--bg-input)', border: '1px solid var(--border)',
-                  fontSize: 12, fontWeight: 600, cursor: canEdit ? 'pointer' : 'default',
-                  color: 'var(--text-2)',
-                }}
-              >{formatQuantity(item.quantity)}</button>
-            )
-          )}
-          {list.type === 'shopping' && item.completed && item.quantity && (
-            <span aria-label={`Quantity ${formatQuantity(item.quantity)}`} style={{
-              flexShrink: 0, padding: '3px 9px', borderRadius: 99,
-              background: 'var(--bg-input)', border: '1px solid var(--border)',
-              fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
-            }}>{formatQuantity(item.quantity)}</span>
-          )}
-        </div>
-      </SwipeRow>
+      <ItemRow
+        key={item.id}
+        item={item}
+        listType={list.type}
+        canEdit={canEdit}
+        isFinalItem={lastItemLeft && !item.completed}
+        isDup={dupeIds.has(item.id)}
+        cat={item.category ? catById.get(item.category) ?? null : null}
+        showCategory={viewPrefs.categories}
+        showAddedBy={viewPrefs.addedBy}
+        isSharedList={members.length > 1}
+        displayName={displayName}
+        onToggle={() => store.toggleItem(list.id, item)}
+        onOpen={() => {
+          if (item.completed) setCompletedAction(item)
+          else { cancelEdit(); startEdit(item) }
+        }}
+        onDelete={() => handleDelete(item)}
+        onSaveQty={qty => store.updateItem(list.id, item.id, { title: item.title, quantity: qty, category: item.category })}
+      />
     )
-  }
-
-  // ── Sheet styles ────────────────────────────────────────────
-  const sectionLabel: CSSProperties = {
-    fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-    color: 'var(--text-3)', textTransform: 'uppercase',
   }
 
   // ── List Options menu, grouped + context-aware (spec §6–§20) ──
   // Actions only appear when relevant to the list's type and state, so the
   // sheet stays short. Empty groups are dropped when rendering.
-  type MenuRow = { icon: ReactNode; label: string; onClick: () => void; right?: string; danger?: boolean }
   const sortHint = sortMode === 'alpha' ? 'A → Z' : sortMode === 'category' ? 'Category' : 'Date added'
   const closeMenu = () => setMenuOpen(false)
-  const menuGroups: { label: string; rows: MenuRow[] }[] = [
+  const menuGroups: MenuGroupSpec[] = [
     { label: 'View & Tools', rows: [
       { icon: <ArrowUpDown size={16} />, label: 'Sort', right: sortHint, onClick: () => { closeMenu(); setSortMenuOpen(true) } },
       ...(list.type === 'shopping' ? [{ icon: <Sparkles size={16} />, label: 'Insights', onClick: () => { closeMenu(); setInsightsOpen(true) } }] : []),
@@ -625,7 +408,7 @@ export default function ListDetail() {
       { icon: <SlidersHorizontal size={16} />, label: 'Customize List View', onClick: () => { closeMenu(); setCustomizeOpen(true) } },
     ]},
     { label: 'Manage List', rows: [
-      { icon: <Pencil size={16} />, label: 'Rename', onClick: () => { setRenameValue(list.name); closeMenu(); setRenaming(true); setTimeout(() => renameRef.current?.focus(), 80) } },
+      { icon: <Pencil size={16} />, label: 'Rename', onClick: () => { closeMenu(); setRenaming(true) } },
       ...(isOwner ? [{ icon: <Copy size={16} />, label: 'Duplicate', onClick: async () => { closeMenu(); await store.duplicateList(list.id) } }] : []),
       ...(isOwner ? [{ icon: <LayoutTemplate size={16} />, label: 'Save as Template', onClick: async () => { closeMenu(); await store.saveAsTemplate(list.id) } }] : []),
       ...(isOwner ? [{ icon: <Share2 size={16} />, label: 'Share', onClick: () => { closeMenu(); setShareOpen(true) } }] : []),
@@ -751,39 +534,16 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Smart banner (spec §4/§16) — one at a time, only when actionable.
-            Viewers can't act on duplicates/categories, so no banner for them. */}
-        {!canEdit ? null : dupeGroups.size > 0 ? (
-          <div style={{ padding: '0 16px 8px' }}>
-            <button
-              onClick={() => setDupeReviewOpen(true)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
-                borderRadius: 10, background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.28)',
-                cursor: 'pointer', textAlign: 'left',
-              }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#d97706' }}>
-                ⚠ {dupeGroups.size} duplicate {dupeGroups.size === 1 ? 'item' : 'items'} found
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#d97706', flexShrink: 0 }}>Review →</span>
-            </button>
-          </div>
-        ) : uncategorizedPending.length > 0 && list.type === 'shopping' ? (
-          <div style={{ padding: '0 16px 8px' }}>
-            <button
-              onClick={() => { cancelEdit(); startEdit(uncategorizedPending[0]) }}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
-                borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)',
-                cursor: 'pointer', textAlign: 'left',
-              }}>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>
-                ⚠ {uncategorizedPending.length} uncategorized {uncategorizedPending.length === 1 ? 'item' : 'items'}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>Categorize →</span>
-            </button>
-          </div>
-        ) : null}
+        {/* Smart banner — viewers can't act on duplicates/categories */}
+        {canEdit && (
+          <SmartBanners
+            isShopping={list.type === 'shopping'}
+            dupeCount={dupeGroups.size}
+            uncatCount={uncategorizedPending.length}
+            onReviewDupes={() => setDupeReviewOpen(true)}
+            onCategorize={() => { cancelEdit(); startEdit(uncategorizedPending[0]) }}
+          />
+        )}
 
         {/* Error banner */}
         {store.lastError && (
@@ -809,120 +569,27 @@ export default function ListDetail() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <>
-              {/* Compact, focused empty state — no large bordered card (spec §1) */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10, padding: '48px 24px 8px' }}>
-                <div aria-hidden style={{
-                  width: 64, height: 64, borderRadius: 18, background: 'var(--accent-dim)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)',
-                }}>
-                  {list.type === 'shopping'
-                    ? <ShoppingCart size={30} strokeWidth={1.8} />
-                    : list.type === 'tasks'
-                      ? <ListChecks size={30} strokeWidth={1.8} />
-                      : <ClipboardList size={30} strokeWidth={1.8} />}
-                </div>
-                <p style={{ fontWeight: 700, fontSize: 17 }}>{canEdit ? 'Ready to start?' : 'Nothing here yet'}</p>
-                <p className="text-muted text-sm" style={{ maxWidth: 264 }}>
-                  {!canEdit ? 'Items added by the group will show up here.'
-                    : list.type === 'shopping' ? 'Add your first grocery item.' : list.type === 'tasks' ? 'Add your first task.' : 'Add your first item.'}
-                </p>
-                {canEdit && (
-                  <button className="btn btn-primary" style={{ marginTop: 6, minHeight: 46 }} onClick={() => setShowAdd(true)}>
-                    <Plus size={18} /> Add Item
-                  </button>
-                )}
-              </div>
-
-              {/* List Memory: one-tap add the user's regulars to a fresh list */}
-              {canEdit && regulars.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  <p style={sectionLabel}>Your regulars</p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                    {regulars.map(m => (
-                      <button
-                        key={m.nameKey}
-                        onClick={() => addRegular(m)}
-                        style={{
-                          height: 34, padding: '0 13px', borderRadius: 17, cursor: 'pointer',
-                          background: 'var(--bg-input)', border: '1px solid var(--border)',
-                          fontSize: 13, fontWeight: 500, color: 'var(--text-2)', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        + {m.name}{m.lastQuantity ? ` ${m.lastQuantity}` : ''}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
+            <EmptyItems
+              listType={list.type}
+              canEdit={canEdit}
+              regulars={regulars}
+              onAddItem={() => setShowAdd(true)}
+              onAddRegular={addRegular}
+            />
           ) : (
             <>
-              {/* Celebration card */}
               {isAllComplete && (
-                <div style={{
-                  borderRadius: 14, padding: '18px 16px',
-                  background: 'linear-gradient(135deg, rgba(22,163,74,0.12) 0%, rgba(22,163,74,0.06) 100%)',
-                  border: '1px solid rgba(22,163,74,0.3)',
-                }}>
-                  <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>
-                    {list.type === 'shopping' ? 'Shopping complete! 🎉' : 'All done! 🎉'}
-                  </p>
-                  {/* Trip summary — what this run covered */}
-                  <p className="text-sm" style={{ color: 'var(--text-2)', margin: '0 0 2px' }}>
-                    {list.type === 'shopping'
-                      ? <>You picked up <strong>{tripSummary.count} {tripSummary.count === 1 ? 'item' : 'items'}</strong>{tripSummary.aisles > 1 ? <> across <strong>{tripSummary.aisles} aisles</strong></> : null}.</>
-                      : <>You completed <strong>{tripSummary.count} {tripSummary.count === 1 ? 'item' : 'items'}</strong>.</>}
-                  </p>
-                  {completionTime && <p className="text-sm text-muted" style={{ margin: '0 0 12px' }}>Completed {formatCompletedAt(completionTime)}</p>}
-                  {/* Category breakdown chips (shopping) */}
-                  {list.type === 'shopping' && tripSummary.chips.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 14px' }}>
-                      {tripSummary.chips.slice(0, 6).map(({ cat, n }) => (
-                        <span key={cat.id} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
-                          background: `${cat.color}1f`, padding: '3px 9px', borderRadius: 99,
-                        }}>
-                          {cat.emoji} {cat.name} · {n}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {/* Primary next step (spec §9): review what you bought */}
-                  <button onClick={() => setInsightsOpen(true)} className="btn btn-primary btn-full" style={{ marginBottom: 8 }}>
-                    <Sparkles size={15} /> View Insights
-                  </button>
-                  <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                    {canEdit && <button onClick={() => setShowAdd(true)}
-                      className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>}
-                    {canEdit && <button onClick={() => setNextTripOpen(true)}
-                      className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-                      <RefreshCw size={13} /> Start next trip
-                    </button>}
-                    {isOwner && <button onClick={() => setShareOpen(true)} className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-                      <Share2 size={13} /> Share
-                    </button>}
-                  </div>
-                  {/* Companion nudge — shopping done → record the expense in YFT */}
-                  {list.type === 'shopping' && (
-                    <button
-                      onClick={() => openYft('/tracker/monthly')}
-                      style={{
-                        width: '100%', marginTop: 12, display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-                        background: 'var(--bg-input)', border: '1px solid var(--border)',
-                      }}>
-                      <img src="/yft.png" alt="YFT" style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)' }}>
-                        Record today's shopping expense?
-                      </span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
-                        Track in YFT →
-                      </span>
-                    </button>
-                  )}
-                </div>
+                <CompletionCard
+                  list={list}
+                  tripSummary={tripSummary}
+                  completionTime={completionTime}
+                  canEdit={canEdit}
+                  isOwner={isOwner}
+                  onViewInsights={() => setInsightsOpen(true)}
+                  onAddMore={() => setShowAdd(true)}
+                  onNextTrip={() => setNextTripOpen(true)}
+                  onShare={() => setShareOpen(true)}
+                />
               )}
 
               {/* Pending */}
@@ -992,7 +659,7 @@ export default function ListDetail() {
         </button>
       )}
 
-      {/* ── Add Item Sheet (extracted) ── */}
+      {/* ── Sheets & overlays ── */}
       <AddItemSheet
         open={showAdd}
         onClose={() => setShowAdd(false)}
@@ -1001,48 +668,14 @@ export default function ListDetail() {
         cats={cats}
       />
 
-      {/* ── Completed item actions (Add Again / Move to Pending / Edit / Delete) ── */}
-      {completedAction && (
-        <Sheet
-          open
-          onClose={() => setCompletedAction(null)}
-          title={`${completedAction.title}${completedAction.quantity ? ` · ${formatQuantity(completedAction.quantity)}` : ''}`}
-        >
-            <div className="ld-menu">
-              <div className="ld-menu-group">
-                {/* Add Again — legitimate repeat purchase: a fresh pending item,
-                    never routed through the active-duplicate merge warning. */}
-                <button className="ld-menu-row" onClick={async () => {
-                  const it = completedAction; setCompletedAction(null)
-                  await store.addItem(list.id, it.title, it.quantity ?? '', it.category)
-                }}>
-                  <span className="ld-row-icon"><Plus size={16} /></span>
-                  <span className="ld-row-label">Add Again</span>
-                </button>
-                <button className="ld-menu-row" onClick={() => {
-                  const it = completedAction; setCompletedAction(null); store.toggleItem(list.id, it)
-                }}>
-                  <span className="ld-row-icon"><Undo2 size={16} /></span>
-                  <span className="ld-row-label">Move to Pending</span>
-                </button>
-                <button className="ld-menu-row" onClick={() => {
-                  const it = completedAction; setCompletedAction(null); cancelEdit(); startEdit(it); setTimeout(() => editTitleRef.current?.focus(), 80)
-                }}>
-                  <span className="ld-row-icon"><Pencil size={16} /></span>
-                  <span className="ld-row-label">Edit</span>
-                </button>
-              </div>
-              <div className="ld-menu-group">
-                <button className="ld-menu-row danger" onClick={() => {
-                  const it = completedAction; setCompletedAction(null); handleDelete(it)
-                }}>
-                  <span className="ld-row-icon"><Trash2 size={16} /></span>
-                  <span className="ld-row-label">Delete</span>
-                </button>
-              </div>
-            </div>
-        </Sheet>
-      )}
+      <CompletedItemSheet
+        item={completedAction}
+        onClose={() => setCompletedAction(null)}
+        onAddAgain={it => store.addItem(list.id, it.title, it.quantity ?? '', it.category)}
+        onMoveToPending={it => store.toggleItem(list.id, it)}
+        onEdit={it => { cancelEdit(); startEdit(it); setTimeout(() => editTitleRef.current?.focus(), 80) }}
+        onDelete={handleDelete}
+      />
 
       <BeforeYouGoSheet
         open={beforeYouGoOpen}
@@ -1069,117 +702,28 @@ export default function ListDetail() {
         regulars={regulars}
       />
 
-      {/* ── List Options menu (titled, grouped, context-aware) ── */}
-      <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="List Options">
-        <div className="ld-menu">
-          {menuGroups.filter(g => g.rows.length > 0).map(g => (
-            <div key={g.label} className="ld-menu-group">
-              <p className="ld-menu-label">{g.label}</p>
-              {g.rows.map((r, i) => (
-                <button
-                  key={i}
-                  className={`ld-menu-row${r.danger ? ' danger' : ''}`}
-                  onClick={r.onClick}
-                >
-                  <span className="ld-row-icon">{r.icon}</span>
-                  <span className="ld-row-label">{r.label}</span>
-                  {r.right && <span className="ld-row-right">{r.right}</span>}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      </Sheet>
+      <ListOptionsMenu open={menuOpen} onClose={closeMenu} groups={menuGroups} />
 
-      {/* ── Customize List View (spec §4.2) ── */}
-      <Sheet
+      <CustomizeViewSheet
         open={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
-        title="Customize List View"
-        subtitle="Choose what shows on each item."
-      >
-        <div className="sheet-body">
-          <div>
-              {([
-                { key: 'categories', title: 'Categories', desc: 'Show item categories' },
-                { key: 'addedBy', title: 'Added By', desc: 'Show who added each item' },
-                { key: 'autoExpand', title: 'Completed Items', desc: 'Automatically expand completed items' },
-                { key: 'remember', title: 'Remember for this list', desc: 'Save these choices for next time' },
-              ] as const).map(row => {
-                const on = viewPrefs[row.key]
-                return (
-                  <div key={row.key} className="flex items-center justify-between" style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
-                      <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{row.title}</p>
-                      <p style={{ fontSize: 12.5, color: 'var(--text-3)', margin: '2px 0 0' }}>{row.desc}</p>
-                    </div>
-                    <button
-                      role="switch" aria-checked={on} aria-label={row.title}
-                      onClick={() => updateViewPref({ [row.key]: !on })}
-                      style={{
-                        flexShrink: 0, width: 46, height: 28, borderRadius: 99, border: 'none', cursor: 'pointer',
-                        background: on ? 'var(--accent)' : 'var(--bg-input)',
-                        position: 'relative', transition: 'background 180ms ease',
-                      }}>
-                      <span style={{
-                        position: 'absolute', top: 3, left: on ? 21 : 3,
-                        width: 22, height: 22, borderRadius: '50%', background: '#fff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'left 180ms var(--ease)',
-                      }} />
-                    </button>
-                  </div>
-                )
-              })}
-          </div>
-          <button className="btn btn-primary btn-full" onClick={() => setCustomizeOpen(false)}>Done</button>
-        </div>
-      </Sheet>
+        prefs={viewPrefs}
+        onChange={updateViewPref}
+      />
 
-      {/* ── Sort sheet ── */}
-      <Sheet open={sortMenuOpen} onClose={() => setSortMenuOpen(false)} title="Sort by">
-        <div style={{ padding: '4px 0 8px' }}>
-          {([
-            { key: 'date', label: 'Date added', hint: 'Newest first' },
-            { key: 'alpha', label: 'Alphabetical', hint: 'A → Z' },
-            { key: 'category', label: 'Category', hint: 'Grouped' },
-          ] as { key: SortMode; label: string; hint: string }[]).map(opt => {
-            const active = sortMode === opt.key
-            return (
-              <button key={opt.key} onClick={() => { setSortMode(opt.key); setSortMenuOpen(false) }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-                <span style={{ fontSize: 15, fontWeight: active ? 700 : 500, color: active ? 'var(--accent)' : 'var(--text)', flex: 1 }}>{opt.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{opt.hint}</span>
-                {active && <Check size={16} strokeWidth={2.5} color="var(--accent)" />}
-              </button>
-            )
-          })}
-        </div>
-      </Sheet>
+      <SortSheet
+        open={sortMenuOpen}
+        sortMode={sortMode}
+        onSelect={mode => { setSortMode(mode); setSortMenuOpen(false) }}
+        onClose={() => setSortMenuOpen(false)}
+      />
 
-      {/* ── Rename sheet ── */}
-      <Sheet open={renaming} onClose={() => setRenaming(false)} title="Rename list">
-        <div className="sheet-body">
-              <input
-                ref={renameRef}
-                value={renameValue}
-                onChange={e => setRenameValue(e.target.value)}
-                onKeyDown={async e => {
-                  if (e.key === 'Enter') { const n = renameValue.trim(); if (n && n !== list.name) await store.renameList(list.id, n); setRenaming(false) }
-                  if (e.key === 'Escape') setRenaming(false)
-                }}
-                maxLength={100}
-                style={{ width: '100%', height: 48, borderRadius: 10, padding: '0 14px', background: 'var(--bg-input)', border: '1.5px solid var(--accent)', color: 'var(--text)', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
-              />
-              <div className="flex gap-2">
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setRenaming(false)}>Cancel</button>
-                <button className="btn btn-primary" style={{ flex: 1, opacity: !renameValue.trim() || renameValue.trim() === list.name ? 0.4 : 1 }}
-                  disabled={!renameValue.trim() || renameValue.trim() === list.name}
-                  onClick={async () => { const n = renameValue.trim(); if (n && n !== list.name) await store.renameList(list.id, n); setRenaming(false) }}>
-                  Save
-                </button>
-              </div>
-        </div>
-      </Sheet>
+      <RenameSheet
+        open={renaming}
+        currentName={list.name}
+        onClose={() => setRenaming(false)}
+        onRename={name => store.renameList(list.id, name)}
+      />
 
       {/* ── Clear Completed confirm ── */}
       <ConfirmSheet
