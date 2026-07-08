@@ -64,7 +64,7 @@ test.describe('authenticated journey', () => {
     // ── Delete the list (confirmed) ──
     await page.getByRole('button', { name: 'List options' }).click()
     await page.getByRole('button', { name: 'Delete List', exact: true }).click()
-    await page.getByRole('dialog', { name: 'Delete list' }).getByRole('button', { name: 'Delete List' }).click()
+    await page.getByRole('dialog', { name: 'Delete this list?' }).getByRole('button', { name: 'Delete List' }).click()
     await expect(page).toHaveURL('/')
     await expect(page.getByText(renamed)).not.toBeVisible()
 
