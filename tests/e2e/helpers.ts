@@ -26,6 +26,6 @@ export async function createList(page: Page, name: string, type: 'Personal' | 'T
 export async function deleteOpenList(page: Page) {
   await page.getByRole('button', { name: 'List options' }).click()
   await page.getByRole('button', { name: 'Delete List', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Delete list' }).getByRole('button', { name: 'Delete List' }).click()
+  await page.getByRole('dialog', { name: 'Delete this list?' }).getByRole('button', { name: 'Delete List' }).click()
   await expect(page).toHaveURL('/')
 }
