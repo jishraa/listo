@@ -337,6 +337,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
               disabled={disabled}
+              aria-label="Share via WhatsApp"
               onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')}
               style={{ ...btnBase, background: 'rgba(37,211,102,0.16)', border: '1px solid rgba(37,211,102,0.28)', color: '#25D366' }}
             >
@@ -348,6 +349,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
               disabled={disabled}
+              aria-label="Share via Messages"
               // Custom-scheme links must navigate — window.open is unreliable
               // for sms: in standalone PWAs (same as the upi:// handling).
               onClick={() => { window.location.href = `sms:?body=${encodeURIComponent(shareText)}` }}
@@ -361,6 +363,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
               disabled={disabled}
+              aria-label="Copy invite link"
               onClick={handleCopy}
               style={{
                 ...btnBase,
@@ -380,6 +383,7 @@ export default function ShareListSheet({ list, members, onClose }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <button
                 disabled={disabled}
+                aria-label="More sharing options"
                 onClick={() => { if (!disabled) navigator.share({ title: `Join "${list.name}" on Listo`, text: message, url: shareUrl }).catch(() => {}) }}
                 style={{ ...btnBase, background: 'var(--bg-input)', color: 'var(--text)' }}
               >
