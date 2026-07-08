@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { supabase } from '../lib/supabase'
+import * as categoriesApi from '../lib/api/categories'
 import { LIST_CATEGORIES } from '../lib/constants'
 import type { ListCategory } from '../lib/constants'
 import type { ListType } from '../types'
@@ -28,15 +28,6 @@ export function makeCategoryId(name: string): string {
   return `${slug || 'cat'}-${Math.random().toString(36).slice(2, 6)}`
 }
 
-async function persist(userId: string, categories: CategoryMap): Promise<string | null> {
-  const { error } = await supabase
-    .from('user_categories')
-    .upsert({ user_id: userId, categories, updated_at: new Date().toISOString() })
-  if (!error) return null
-  // Table missing (migration v6 not applied) — keep working locally
-  if (error.code === '42P01') return "Changes saved for this session only — category sync isn't set up yet."
-  return "Couldn't save categories — try again."
-}
 
 export const useCategoriesStore = create<CategoriesState>((set, get) => ({
   categories: cloneDefaults(),
@@ -49,19 +40,12 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
   init: async (userId) => {
     if (get().userId === userId && get().loaded) return
     set({ userId })
-    try {
-      const { data, error } = await supabase
-        .from('user_categories')
-        .select('categories')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (!error && data?.categories) {
-        // Merge with defaults so newly shipped list types still get categories
-        const stored = data.categories as Partial<CategoryMap>
-        set({ categories: { ...cloneDefaults(), ...stored }, loaded: true })
-        return
-      }
-    } catch { /* fall through to defaults */ }
+    const stored = await categoriesApi.fetchUserCategories(userId)
+    if (stored) {
+      // Merge with defaults so newly shipped list types still get categories
+      set({ categories: { ...cloneDefaults(), ...stored }, loaded: true })
+      return
+    }
     set({ categories: cloneDefaults(), loaded: true })
   },
 
@@ -72,7 +56,7 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
     const nextList = exists ? list.map(c => c.id === cat.id ? cat : c) : [...list, cat]
     const next = { ...prev, [type]: nextList }
     set({ categories: next })
-    const err = await persist(get().userId, next)
+    const err = await categoriesApi.upsertUserCategories(get().userId, next)
     if (err) set({ lastError: err })
   },
 
@@ -80,7 +64,7 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
     const prev = get().categories
     const next = { ...prev, [type]: prev[type].filter(c => c.id !== id) }
     set({ categories: next })
-    const err = await persist(get().userId, next)
+    const err = await categoriesApi.upsertUserCategories(get().userId, next)
     if (err) set({ lastError: err })
   },
 }))
