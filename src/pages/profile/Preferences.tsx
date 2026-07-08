@@ -5,7 +5,7 @@ import { useThemeStore } from '../../store/useThemeStore'
 import type { ThemePref } from '../../store/useThemeStore'
 import { useListsStore, visibleLists } from '../../store/useListsStore'
 import { useSyncStore } from '../../store/useSyncStore'
-import { DEFAULT_TYPE_KEY, getDefaultListType } from '../../components/lists/CreateListSheet'
+import { storageKeys, getDefaultListType } from '../../lib/storage'
 import { formatRelativeTime } from '../../lib/utils'
 import { SubPage, Section, Row, useEnsureData } from './common'
 import type { ListType } from '../../types'
@@ -46,7 +46,7 @@ export default function PreferencesPage() {
 
   const pickDefaultType = (t: ListType) => {
     setDefaultType(t)
-    localStorage.setItem(DEFAULT_TYPE_KEY, t)
+    localStorage.setItem(storageKeys.defaultListType, t)
   }
 
   return (

@@ -2,7 +2,9 @@ import { create } from 'zustand'
 
 export type ThemePref = 'light' | 'dark' | 'system'
 
-const KEY = 'listo-theme'
+import { storageKeys } from '../lib/storage'
+
+const KEY = storageKeys.theme
 
 function load(): ThemePref {
   const v = localStorage.getItem(KEY)

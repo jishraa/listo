@@ -14,7 +14,9 @@ export interface InstallPrompt {
   dismiss: () => void
 }
 
-const DISMISSED_KEY = 'listo-install-dismissed'
+import { storageKeys } from '../lib/storage'
+
+const DISMISSED_KEY = storageKeys.installDismissed
 
 function isRunningStandalone() {
   return (

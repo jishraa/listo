@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
+import { storageKeys } from '../lib/storage'
 import { useListsStore } from './useListsStore'
 import { useSyncStore } from './useSyncStore'
 import { useCategoriesStore } from './useCategoriesStore'
@@ -68,7 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     bindNativeDeepLink()
     const { data: { session } } = await supabase.auth.getSession()
     const isGuest = session?.user?.is_anonymous ?? false
-    const storedName = localStorage.getItem('listo-display-name') ?? ''
+    const storedName = localStorage.getItem(storageKeys.displayName) ?? ''
     set({
       session,
       user: session?.user ?? null,
@@ -79,7 +80,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     supabase.auth.onAuthStateChange((_event, session) => {
       const isGuest = session?.user?.is_anonymous ?? false
-      const storedName = localStorage.getItem('listo-display-name') ?? ''
+      const storedName = localStorage.getItem(storageKeys.displayName) ?? ''
       set({
         session,
         user: session?.user ?? null,
@@ -146,13 +147,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInAsGuest: async (displayName) => {
     const { error } = await supabase.auth.signInAnonymously()
     if (error) return error.message
-    localStorage.setItem('listo-display-name', displayName)
+    localStorage.setItem(storageKeys.displayName, displayName)
     set({ displayName, isGuest: true })
     return null
   },
 
   signOut: async () => {
-    localStorage.removeItem('listo-display-name')
+    localStorage.removeItem(storageKeys.displayName)
     // Wipe the offline cache + queued writes so the next account never sees
     // (or replays) this one's data.
     useListsStore.setState({ lists: [], items: {}, members: {}, userId: '', displayName: '', initialized: false })
@@ -178,7 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setDisplayName: (name) => {
-    localStorage.setItem('listo-display-name', name)
+    localStorage.setItem(storageKeys.displayName, name)
     set({ displayName: name })
     const { user, isGuest } = get()
     if (!user) return
