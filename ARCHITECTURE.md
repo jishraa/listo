@@ -45,7 +45,7 @@ hooks/          Cross-page hooks (useEnsureData, usePullToRefresh, useSafeBack).
    known inputs. Components compute nothing they could import.
 7. **Pages stay under ~800 lines.** When a page grows a distinct concern
    (a card, a sheet, a row renderer), it moves to its feature folder.
-8. **Schema changes = a new numbered `supabase-migration-vN.sql`**, applied
+8. **Schema changes = a new numbered `supabase/migrations/supabase-migration-vN.sql`**, applied
    manually in the Supabase dashboard. Client code must tolerate the previous
    schema (see the PGRST204 fallbacks in `lib/api/items.ts`).
 

@@ -62,7 +62,7 @@ Bottom sheets must use `components/ui/Sheet.tsx` (dialog semantics, Escape-to-cl
 
 Go through store helpers for Supabase access; don't call Supabase directly from components.
 
-### Supabase (numbered `supabase-migration*.sql` files, currently through v16)
+### Supabase (numbered `supabase/migrations/supabase-migration*.sql` files, currently through v17)
 
 Tables: `lists` (name, type, emoji, owner_id, is_template, archived_at), `list_items` (title, quantity, completed, category, sort_order, added_by_name, completed_by_name, completed_at), `list_members` (list_id, user_id, role owner|collaborator|viewer, display_name), `list_invites` (owner-only invite secret, one per list — v11), `user_categories` (v6), `item_history` (List Memory, v14).
 
@@ -95,5 +95,5 @@ Palette (vision): primary `#16A34A`, accent `#14B8A6`, light bg `#F8FAFC`, dark 
 - `npm run build` (which runs `tsc -b`) must pass before pushing.
 - Linter is **oxlint** — avoid patterns its parser rejects (e.g. IIFEs inside JSX ternaries).
 - After any Capacitor-related change, run `npm run sync` before opening Xcode/Android Studio.
-- Schema changes need a new numbered `supabase-migration-*.sql` file; migrations are applied manually in the Supabase dashboard — **staging project first** (E2E must pass against it), then production. See TESTING.md § Environments.
+- Schema changes need a new numbered `supabase/migrations/supabase-migration-*.sql` file; migrations are applied manually in the Supabase dashboard — **staging project first** (E2E must pass against it), then production. See TESTING.md § Environments.
 - Invite codes are redeemed only via the `redeem_list_invite` RPC (RLS blocks direct reads for non-members).

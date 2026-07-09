@@ -17,7 +17,7 @@ load tests never touch production data. **Local dev too**: `npm run dev` uses
 staging by default; `npm run dev:prod` exists for real-data reproductions. CI uses the `STAGING_SUPABASE_*`
 secrets; locally, `.env.staging` wins over `.env` for Playwright.
 
-**Migration workflow:** apply new `supabase-migration-vN.sql` files to
+**Migration workflow:** apply new `supabase/migrations/supabase-migration-vN.sql` files to
 STAGING first → E2E green → then production. Staging is the schema rehearsal.
 (Free-tier note: the staging project pauses after ~1 week idle; the first CI
 run after a pause fails until it's restored from the Supabase dashboard.)

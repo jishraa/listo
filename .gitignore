@@ -32,4 +32,4 @@ playwright-report/
 coverage/
 .lighthouseci/
 .env.staging
-staging-setup-combined.sql
+supabase/staging-setup-combined.sql
