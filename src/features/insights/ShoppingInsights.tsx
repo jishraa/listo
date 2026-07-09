@@ -164,7 +164,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
       background: 'var(--bg)', display: 'flex', flexDirection: 'column',
-      animation: 'slide-up 0.3s var(--ease)',
+      animation: 'takeover-in 0.3s var(--ease)',
     }}>
       {/* Sticky header — content scrolls below it, never behind it */}
       <div style={{

@@ -62,6 +62,9 @@ html, body, #root {
 
 button {
   font-family: inherit; cursor: pointer; border: none; background: none;
+  /* Never fall back to the UA's black button text — bare buttons (e.g. the
+     tappable profile card) must inherit the theme's text color. */
+  color: inherit;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -761,6 +764,13 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 @keyframes slide-up {
   from { transform: translateX(-50%) translateY(100%); }
   to   { transform: translateX(-50%) translateY(0); }
+}
+
+/* Full-screen takeovers (Insights) — slide-up WITHOUT the sheet's
+   translateX(-50%) centering, which shifts a full-width panel sideways. */
+@keyframes takeover-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }
 
 @keyframes slide-down {
