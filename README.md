@@ -68,6 +68,7 @@ supabase/
 ## Documentation
 
 - [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — end-user guide to every feature in the app
+- [`docs/TECHNICAL.md`](docs/TECHNICAL.md) — detailed technical reference with architecture diagrams
 - [`CLAUDE.md`](CLAUDE.md) — architecture overview, routes, stores, Supabase schema
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — layer rules and data flow
 - [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — how the major features work under the hood
