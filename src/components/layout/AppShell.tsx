@@ -73,23 +73,13 @@ export default function AppShell() {
             <span>{label}</span>
           </button>
         ))}
-        {/* Guests can't create lists — keep the slot for layout, hide the FAB */}
+        {/* Center FAB occupies the middle slot. Guests can't create lists —
+            swap in an equal-width spacer so the two tabs stay evenly spread. */}
         {isGuest ? (
-          <div style={{ width: 52, flexShrink: 0 }} aria-hidden />
+          <div className="nav-fab-slot" aria-hidden />
         ) : (
-          <button
-            onClick={() => setCreateOpen(true)}
-            aria-label="Create list"
-            style={{
-              width: 52, height: 52, borderRadius: '50%',
-              background: 'var(--accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: 'none', cursor: 'pointer', flexShrink: 0,
-              marginTop: -14,
-              boxShadow: '0 0 20px rgba(22,163,74,0.45)',
-            }}
-          >
-            <Plus size={24} color="#04080f" strokeWidth={2.5} />
+          <button className="nav-fab" onClick={() => setCreateOpen(true)} aria-label="Create list">
+            <Plus size={26} color="#04080f" strokeWidth={2.5} />
           </button>
         )}
         {TABS.slice(1).map(({ path, label, Icon }) => (
