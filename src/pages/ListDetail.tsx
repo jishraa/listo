@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowUpDown, ChevronDown, ChevronLeft, Copy, Eye, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, Share2, ShoppingBag, ShoppingCart, Sparkles, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { ArrowUpDown, Check, ChevronDown, ChevronLeft, Copy, Eye, FileText, LayoutTemplate, MoreVertical, Pencil, Plus, Share2, ShoppingBag, ShoppingCart, Sparkles, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useListsStore } from '../store/useListsStore'
 import type { ListItem } from '../types'
@@ -33,6 +33,7 @@ import {
 import ItemRow from '../features/list-detail/ItemRow'
 import ItemEditRow from '../features/list-detail/ItemEditRow'
 import CompletionCard from '../features/list-detail/CompletionCard'
+import CompletionTip from '../features/list-detail/CompletionTip'
 import EmptyItems from '../features/list-detail/EmptyItems'
 import SmartBanners from '../features/list-detail/SmartBanners'
 import ListOptionsMenu, { type MenuGroupSpec } from '../features/list-detail/ListOptionsMenu'
@@ -276,10 +277,10 @@ export default function ListDetail() {
   const pct = items.length > 0 ? (doneCount / items.length) * 100 : 0
   // Only the final pending item gets special treatment (spec §1)
   const lastItemLeft = itemsLeft === 1 && items.length > 1
-  // Contextual progress copy (spec §6)
+  // Contextual progress copy (spec §6). The fully-complete case is handled by
+  // the CompletionCard, so this line never needs a 100% message.
   const progressMsg =
-    pct >= 100 ? (list?.type === 'shopping' ? 'Shopping complete 🎉' : 'All done 🎉')
-    : lastItemLeft ? 'Only one item left 🎉'
+    lastItemLeft ? 'Only one item left 🎉'
     : pct >= 75 ? 'Almost done'
     : pct >= 50 ? 'Halfway there'
     : pct > 0   ? 'Good start!'
@@ -452,7 +453,7 @@ export default function ListDetail() {
               "items left" info (spec §1.3), shown for personal and shared alike */}
           {items.length > 0 && (
             <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '1px 0 0' }}>
-              {isAllComplete ? 'All done' : `${itemsLeft} ${itemsLeft === 1 ? 'item' : 'items'} left`}
+              {isAllComplete ? (list.type === 'shopping' ? 'Shopping Complete' : 'All Done') : `${itemsLeft} ${itemsLeft === 1 ? 'item' : 'items'} left`}
             </p>
           )}
         </div>
@@ -495,24 +496,33 @@ export default function ListDetail() {
         )}
 
         {/* Compact contextual progress (spec §1–2): one line + 4px bar,
-            bar hidden until something is completed */}
+            bar hidden until something is completed. On completion the text row
+            is dropped (the CompletionCard is the single completion message, so
+            the line would duplicate it), but the bar stays and celebrates. */}
         {items.length > 0 && (
           <div style={{ padding: '10px 16px 20px' }}>
-            <div className="flex items-center justify-between" style={{ marginBottom: doneCount > 0 ? 6 : 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: isAllComplete ? 'var(--accent)' : 'var(--text-2)' }}>
-                {progressMsg}
-              </span>
-              {/* Only the % here — "N items left" already lives in the header
-                  (spec §1.3, no repetition) */}
-              {!isAllComplete && doneCount > 0 && (
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
-                  {Math.round(pct)}%
+            {!isAllComplete && (
+              <div className="flex items-center justify-between" style={{ marginBottom: doneCount > 0 ? 6 : 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
+                  {progressMsg}
                 </span>
-              )}
-            </div>
+                {/* Only the % here — "N items left" already lives in the header
+                    (spec §1.3, no repetition) */}
+                {doneCount > 0 && (
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+                    {Math.round(pct)}%
+                  </span>
+                )}
+              </div>
+            )}
             {doneCount > 0 && (
-              <div className="progress-bar" style={{ height: 4 }}>
+              <div className={`progress-bar${isAllComplete ? ' is-complete' : ''}`} style={{ height: 4 }}>
                 <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--accent)', transition: 'width 250ms var(--ease)' }} />
+                {isAllComplete && (
+                  <span className="progress-check" aria-hidden>
+                    <Check size={11} strokeWidth={3.5} color="#04080f" />
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -616,7 +626,7 @@ export default function ListDetail() {
                     aria-expanded={showCompleted}
                     onClick={() => setShowCompleted(v => !v)}
                   >
-                    <span style={sectionLabel}>Completed ({completed.length})</span>
+                    <span style={sectionLabel}>Completed Items ({completed.length})</span>
                     <ChevronDown
                       size={18}
                       style={{ color: 'var(--text-3)', transition: 'transform 200ms var(--ease)', transform: showCompleted ? 'rotate(180deg)' : 'none' }}
@@ -634,6 +644,10 @@ export default function ListDetail() {
                   )}
                 </>
               )}
+
+              {/* Keep a finished list from reading as an empty screen: one
+                  contextual tip anchors the space below the completion card. */}
+              {isAllComplete && <CompletionTip list={list} />}
             </>
           )}
         </div>

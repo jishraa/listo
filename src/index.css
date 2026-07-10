@@ -168,18 +168,26 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  margin: 4px 0;
+  border-radius: 12px;
   /* Inactive items stay legible (AA) without competing with the green active
      tab (empty-state spec §10). */
   color: rgba(221, 238, 255, 0.55);
   font-size: 11px;
   font-weight: 500;
-  transition: color 0.2s;
+  background: transparent;
+  transition: color 0.2s, background-color 0.25s var(--ease);
   letter-spacing: 0.02em;
 }
 
-.nav-item.active { color: var(--accent); text-shadow: 0 0 10px rgba(22,163,74,0.5); }
+/* Soft accent pill behind the active tab — fades/settles in on switch, matching
+   the filter-chip active language. */
+.nav-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-shadow: 0 0 10px rgba(22,163,74,0.5);
+}
 .nav-item svg { stroke-width: 1.8; }
 
 /* ── Cards ───────────────────────────────────────────────────── */
@@ -624,12 +632,50 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
 
 /* ── Progress bar ────────────────────────────────────────────── */
 .progress-bar {
+  position: relative;
   height: 4px;
   border-radius: 99px;
   background: rgba(255, 255, 255, 0.11);
   overflow: hidden;
 }
 .progress-fill { transition: width 250ms var(--ease); }
+
+/* Completion celebration (subtle): brighter success-green fill with a warmer
+   glow, plus a small checkmark badge that pops in at the end once the bar
+   fills. No confetti — just enough to mark "done". */
+.progress-bar.is-complete {
+  overflow: visible;
+  animation: progress-glow 1.6s var(--ease) 1;
+}
+.progress-bar.is-complete .progress-fill {
+  background: linear-gradient(90deg, var(--accent), #22C55E) !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.7);
+}
+.progress-check {
+  position: absolute;
+  top: 50%;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #22C55E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.75);
+  transform: translateY(-50%) scale(0);
+  animation: progress-check-pop 0.34s var(--ease) 0.22s forwards;
+}
+@keyframes progress-check-pop {
+  0%   { transform: translateY(-50%) scale(0); }
+  60%  { transform: translateY(-50%) scale(1.18); }
+  100% { transform: translateY(-50%) scale(1); }
+}
+@keyframes progress-glow {
+  0%   { filter: drop-shadow(0 0 2px rgba(34, 197, 94, 0.4)); }
+  45%  { filter: drop-shadow(0 0 7px rgba(34, 197, 94, 0.85)); }
+  100% { filter: drop-shadow(0 0 3px rgba(34, 197, 94, 0.5)); }
+}
 
 /* Card press feedback (lists spec §15) */
 .card-press { transition: transform 120ms ease; }
@@ -689,7 +735,7 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   justify-content: center;
   width: 100%;
   max-width: 340px;
-  margin-top: 22px;
+  margin-top: 30px;
 }
 .empty-cta-row .btn { flex: 1 1 150px; min-height: 46px; }
 

@@ -53,7 +53,7 @@ export default function CompletionCard({
               fontSize: 12, fontWeight: 600, color: 'var(--text-2)',
               background: `${cat.color}1f`, padding: '3px 9px', borderRadius: 99,
             }}>
-              {cat.emoji} {cat.name} · {n}
+              {cat.emoji} {cat.name} ({n})
             </span>
           ))}
         </div>
@@ -67,7 +67,7 @@ export default function CompletionCard({
           className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}><Plus size={14} /> Add more</button>}
         {canEdit && <button onClick={onNextTrip}
           className="btn btn-sm" style={{ background: 'transparent', border: '1px solid rgba(22,163,74,0.4)', color: 'var(--accent)' }}>
-          <RefreshCw size={13} /> Start new list
+          <RefreshCw size={13} /> Create New List
         </button>}
       </div>
       {/* Companion nudge — shopping done → record the expense in YFT */}
@@ -81,7 +81,7 @@ export default function CompletionCard({
           }}>
           <img src="/yft.png" alt="YFT" style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0 }} />
           <span style={{ flex: 1, fontSize: 13, color: 'var(--text-2)' }}>
-            Record today's shopping expense?
+            Finished shopping? Track today's spending.
           </span>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>
             Track in YFT →

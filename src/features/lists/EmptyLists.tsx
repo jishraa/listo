@@ -16,7 +16,7 @@ const STARTERS: Starter[] = [
 // heading (spec §3). Colour/size come from the .empty-illustration class.
 function EmptyListsIcon() {
   return (
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" aria-hidden="true" focusable="false" className="empty-illustration">
+    <svg width="68" height="68" viewBox="0 0 60 60" fill="none" aria-hidden="true" focusable="false" className="empty-illustration">
       <rect x="14" y="9" width="32" height="42" rx="9" fill="none" stroke="currentColor" strokeWidth="2.4" opacity="0.45" />
       {/* row 1 — completed, green accent */}
       <rect x="20" y="17" width="8" height="8" rx="2.6" fill="var(--accent)" />

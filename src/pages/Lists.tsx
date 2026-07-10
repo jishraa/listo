@@ -146,15 +146,43 @@ export default function Lists() {
     return (store.items[l.id] ?? []).some(i => i.category && categoryNames.get(i.category)?.includes(q))
   }
 
-  const activeCount = visible.filter(l => !isAllDone(l.id)).length
-  const sharedCount = visible.filter(l => l.owner_id !== user?.id).length
-  const headerSummary = `${activeCount} active${sharedCount > 0 ? ` · ${sharedCount} shared` : ''}`
+  // Per-tab counts (pre-search) drive both the context-aware subtitle and the
+  // disabling of Sort/Search on an empty tab.
+  const baseCount: Record<Filter, number> = {
+    active:    visible.filter(l => !isAllDone(l.id)).length,
+    shared:    visible.filter(l => l.owner_id !== user?.id).length,
+    completed: visible.filter(l => isAllDone(l.id)).length,
+    archived:  archived.length,
+  }
+  const listWord = (n: number) => (n === 1 ? 'List' : 'Lists')
+  // Subtitle reflects the CURRENT tab so it always matches what's on screen —
+  // the Active tab also surfaces its completed count (that section shows here).
+  // Zero counts are dropped rather than shown as "0 …"; if nothing's left the
+  // subtitle is empty and hidden entirely.
+  const activeSummary = [
+    baseCount.active > 0 ? `${baseCount.active} Active` : '',
+    baseCount.completed > 0 ? `${baseCount.completed} Completed` : '',
+  ].filter(Boolean).join(' · ')
+  const headerSummary =
+    filter === 'active'
+      ? activeSummary
+      : filter === 'shared'
+      ? (baseCount.shared > 0 ? `${baseCount.shared} Shared ${listWord(baseCount.shared)}` : '')
+      : filter === 'completed'
+      ? (baseCount.completed > 0 ? `${baseCount.completed} Completed ${listWord(baseCount.completed)}` : '')
+      : (baseCount.archived > 0 ? `${baseCount.archived} Archived ${listWord(baseCount.archived)}` : '')
 
   const activeAll    = applySort(visible.filter(l => !isAllDone(l.id) && matches(l)))
   const completedAll = applySort(visible.filter(l => isAllDone(l.id) && matches(l)))
   const sharedAll    = applySort(visible.filter(l => l.owner_id !== user?.id && matches(l)))
   const archivedAll  = applySort(archived.filter(matches))
   const templatesFiltered = templates.filter(matches)
+
+  // Sort/Search only do something when the current tab has data, so they're
+  // disabled on an empty tab (no dead affordances). Search stays enabled while
+  // open so its own button can still close it.
+  const viewCount = baseCount[filter]
+  const searchDisabled = !searchOpen && viewCount === 0
 
   // Collaborator label for the card's metadata line (spec): one other member
   // shows their friendly name ("Anjana", never "anjana1995ks"); more than one
@@ -237,7 +265,7 @@ export default function Lists() {
         <div style={{ padding: '20px 16px 12px' }} className="lists-header flex items-center justify-between">
           <div>
             <img src="/wordmark.png" alt="Listo" style={{ height: 26, width: 'auto', display: 'block' }} />
-            {hasLists && (
+            {hasLists && headerSummary && (
               <span style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'block' }}>
                 {headerSummary}
               </span>
@@ -249,7 +277,9 @@ export default function Lists() {
               <button
                 className="btn btn-ghost btn-sm"
                 aria-label="Sort lists"
-                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, color: sort !== 'recent' ? 'var(--accent)' : 'var(--text-2)' }}
+                disabled={viewCount === 0}
+                title={viewCount === 0 ? 'Add a list to sort' : 'Sort lists'}
+                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, cursor: viewCount === 0 ? 'not-allowed' : 'pointer', opacity: viewCount === 0 ? 0.4 : 1, color: viewCount === 0 ? 'var(--text-3)' : (sort !== 'recent' ? 'var(--accent)' : 'var(--text-2)') }}
                 onClick={() => setSortOpen(true)}
               >
                 <ArrowUpDown size={18} />
@@ -257,7 +287,9 @@ export default function Lists() {
               <button
                 className="btn btn-ghost btn-sm"
                 aria-label="Search lists"
-                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, color: searchOpen ? 'var(--accent)' : 'var(--text-2)' }}
+                disabled={searchDisabled}
+                title={searchDisabled ? 'Add a list to search' : 'Search lists'}
+                style={{ width: 44, height: 44, padding: 0, borderRadius: 10, cursor: searchDisabled ? 'not-allowed' : 'pointer', opacity: searchDisabled ? 0.4 : 1, color: searchOpen ? 'var(--accent)' : (searchDisabled ? 'var(--text-3)' : 'var(--text-2)') }}
                 onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch('') }}
               >
                 {searchOpen ? <X size={18} /> : <Search size={18} />}
@@ -350,12 +382,12 @@ export default function Lists() {
                     ) : (
                       <div className="empty-state" style={{ padding: '28px 0 12px' }}>
                         <div className="icon">📝</div>
-                        <h3>No active lists</h3>
+                        <h3>Nothing planned yet</h3>
                         {isGuest ? (
                           <p>Lists people invite you to will appear here.</p>
                         ) : (
                           <>
-                            <p>Create a list to start planning, shopping, or organizing tasks.</p>
+                            <p>Create your first shopping list, task list, or travel checklist.</p>
                             <button className="btn btn-primary mt-4" onClick={() => { setCreateStep('custom'); setCreateOpen(true) }}>
                               <Plus size={18} /> Create List
                             </button>
@@ -381,9 +413,9 @@ export default function Lists() {
                   {completedAll.length > 0 && (
                     <>
                       <div className="flex items-center justify-between" style={{ padding: '8px 2px 0' }}>
-                        <span style={sectionLabel}>Completed · {completedAll.length}</span>
+                        <span style={sectionLabel}>Completed ({completedAll.length})</span>
                         <button onClick={() => setShowCompleted(v => !v)} style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)', background: 'none', cursor: 'pointer' }}>
-                          {showCompleted ? 'Hide ↑' : 'Show ↓'}
+                          {showCompleted ? 'Hide ▲' : 'Show ▼'}
                         </button>
                       </div>
                       {showCompleted && completedAll.map(l => <div key={l.id} style={{ opacity: 0.6 }}>{renderCard(l)}</div>)}
