@@ -33,3 +33,6 @@ coverage/
 .lighthouseci/
 .env.staging
 supabase/staging-setup-combined.sql
+
+# Generated Word export of the user guide (rebuild from docs/USER_GUIDE.md)
+docs/*.docx
