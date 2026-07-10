@@ -4,11 +4,11 @@ import { LIST_TYPE_LABELS } from './utils'
 
 const GREEN: [number, number, number] = [22, 163, 74]
 
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'list'
 }
 
-async function deliverFile(blob: Blob, filename: string, mime: string, title: string) {
+export async function deliverFile(blob: Blob, filename: string, mime: string, title: string) {
   const file = new File([blob], filename, { type: mime })
   if (navigator.canShare?.({ files: [file] })) {
     await navigator.share({ files: [file], title }).catch(() => {})

@@ -5,7 +5,8 @@ import Sheet from '../../components/ui/Sheet'
 import Avatar from '../../components/ui/Avatar'
 import { useListsStore, visibleLists, archivedLists } from '../../store/useListsStore'
 import { useCategoriesStore } from '../../store/useCategoriesStore'
-import { exportListReport, exportListCsv } from '../../lib/report'
+import { exportListCsv } from '../../lib/report'
+import { exportInsightsReport, type InsightsReportData } from '../../lib/insightsReport'
 import { openYft } from '../../lib/yft'
 import { friendlyName } from '../../lib/utils'
 import type { List, ListItem, ListMember } from '../../types'
@@ -145,19 +146,41 @@ export default function ShoppingInsights({ list, items, members, displayName, on
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uncat, dupeCount, hasTemplateSuggestion, candidates.length, selectedCands.length])
 
+  const person = (n: string) => (n === displayName ? 'You' : friendlyName(n))
+
+  // Snapshot of everything on the Insights screen, handed to the infographic
+  // PDF generator (analytics stay computed here; the report only draws).
+  function buildReportData(): InsightsReportData {
+    return {
+      score, scoreTitle, scoreSub, potential, checklist,
+      efficiency: { pct, done, total, pending, forgotten, dupeCount },
+      behaviour,
+      categories: catStats.map(c => ({
+        name: c.name, color: c.color, total: c.total, done: c.done,
+        share: total > 0 ? Math.round((c.total / total) * 100) : 0,
+      })),
+      trends: trends.map(t => ({ name: t.name, diff: t.diff })),
+      prediction: candidates.length >= 3 ? { confidence, items: candidates.map(c => c.title) } : null,
+      recommendations: recommendations.map(r => ({ title: r.title, desc: r.desc })),
+      members: memberStats ? {
+        topAdder: memberStats.topAdder ? [person(memberStats.topAdder[0]), memberStats.topAdder[1]] : undefined,
+        topCompleter: memberStats.topCompleter ? [person(memberStats.topCompleter[0]), memberStats.topCompleter[1]] : undefined,
+      } : null,
+      isShopping: list.type === 'shopping',
+    }
+  }
+
   async function handleExport() {
     if (exporting) return
     setExporting(true)
     try {
-      if (exportFormat === 'pdf') await exportListReport(list, items, members)
+      if (exportFormat === 'pdf') await exportInsightsReport(list, buildReportData())
       else await exportListCsv(list, items, members)
     } finally {
       setExporting(false)
       setExportOpen(false)
     }
   }
-
-  const person = (n: string) => (n === displayName ? 'You' : friendlyName(n))
   const insufficient = total === 0
 
   return (
@@ -510,7 +533,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
             <div style={card}>
               <p style={sectionLabel}>Export Report</p>
               <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                Download your shopping summary, items, insights, and recommendations.
+                Get a visual insights report (PDF) or your full item list (CSV).
               </p>
               <button className="btn btn-primary btn-full" onClick={() => setExportOpen(true)}>
                 <FileText size={15} /> Export Report
@@ -565,8 +588,8 @@ export default function ShoppingInsights({ list, items, members, displayName, on
             <div className="sheet-body" style={{ gap: 10 }}>
               <p style={{ fontWeight: 700, fontSize: 17, margin: 0 }}>Export Report</p>
               {([
-                { id: 'pdf' as const, title: 'PDF Report', desc: 'Best for sharing and printing' },
-                { id: 'csv' as const, title: 'Excel Spreadsheet (CSV)', desc: 'Best for detailed analysis' },
+                { id: 'pdf' as const, title: 'Visual Insights Report (PDF)', desc: 'Health, categories, trends & recommendations' },
+                { id: 'csv' as const, title: 'Item List (CSV)', desc: 'Every item — best for detailed analysis' },
               ]).map(o => (
                 <button key={o.id} onClick={() => setExportFormat(o.id)}
                   style={{
