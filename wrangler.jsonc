@@ -1,5 +1,8 @@
 {
   "name": "listo",
+  // Cloudflare account these workers deploy to (jishraatechnologies@gmail.com).
+  // Pinned so a deploy can't accidentally target a different logged-in account.
+  "account_id": "c712bba31ce9b0b7714bea8718f03252",
   "compatibility_date": "2026-07-01",
   "assets": {
     "directory": "./dist",
