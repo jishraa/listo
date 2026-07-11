@@ -132,7 +132,6 @@ a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transpar
   background: rgba(3, 7, 16, 0.96);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -1188,7 +1187,6 @@ html[data-theme="light"] body {
 
 [data-theme="light"] .bottom-nav {
   background: rgba(240, 245, 250, 0.96);
-  border-top-color: rgba(21,128,61,0.10);
 }
 
 [data-theme="light"] .nav-item { color: rgba(10, 22, 40, 0.62); }
