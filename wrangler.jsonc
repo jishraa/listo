@@ -4,6 +4,13 @@
   // Pinned so a deploy can't accidentally target a different logged-in account.
   "account_id": "c712bba31ce9b0b7714bea8718f03252",
   "compatibility_date": "2026-07-01",
+  // Production custom domain — Cloudflare auto-provisions the DNS record + TLS
+  // cert for listo.jishraa.com (zone must be on this same account). Declaring a
+  // route disables the workers.dev URL by default, so prod is served ONLY at
+  // listo.jishraa.com (single canonical URL). Staging keeps its workers.dev URL.
+  "routes": [
+    { "pattern": "listo.jishraa.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     // SPA fallback: serve index.html for unknown paths (/list/:id, /join/:code…).
