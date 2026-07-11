@@ -294,7 +294,8 @@ export default function Categories() {
                   placeholder="＋ add"
                   style={{
                     flex: 1, minWidth: 70, border: 'none', outline: 'none',
-                    background: 'transparent', color: 'var(--text)', fontSize: 14, padding: '4px 2px',
+                    // 16px avoids iOS Safari focus-zoom on this keyword field
+                    background: 'transparent', color: 'var(--text)', fontSize: 16, padding: '4px 2px',
                   }}
                 />
               </div>

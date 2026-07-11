@@ -68,7 +68,10 @@ button {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-input, textarea { font-family: inherit; outline: none; border: none; }
+/* font-size: 16px is a mobile-safe floor — iOS Safari auto-zooms into any
+   focused field below it. Class/inline sizes still override (all should be
+   >= 16px); this only protects fields that forget to set one. */
+input, textarea, select { font-family: inherit; font-size: 16px; outline: none; border: none; }
 a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
 
 /* ── Layout ─────────────────────────────────────────────────── */

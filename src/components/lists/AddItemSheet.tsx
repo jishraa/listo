@@ -223,7 +223,8 @@ export default function AddItemSheet({ open, onClose, list, items, cats }: Props
                     style={{
                       flex: 1, height: 48, borderRadius: 10, padding: '0 14px',
                       background: 'var(--bg-input)', border: '1.5px solid transparent',
-                      color: 'var(--text)', fontSize: 15, outline: 'none',
+                      // 16px keeps iOS Safari from auto-zooming when the field is focused
+                      color: 'var(--text)', fontSize: 16, outline: 'none',
                       transition: 'border-color 0.15s',
                     }}
                     onFocus={e => e.currentTarget.style.borderColor = 'var(--accent)'}

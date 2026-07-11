@@ -41,7 +41,7 @@ export default function ItemEditRow({
           style={{
             flex: 1, height: 40, borderRadius: 8, padding: '0 12px',
             background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-            color: 'var(--text)', fontSize: 15, outline: 'none',
+            color: 'var(--text)', fontSize: 16, outline: 'none',
           }}
         />
         {listType === 'shopping' && (
@@ -54,7 +54,7 @@ export default function ItemEditRow({
             style={{
               width: 56, height: 40, borderRadius: 8, padding: '0 8px',
               background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-              color: 'var(--text)', fontSize: 15, outline: 'none', textAlign: 'center',
+              color: 'var(--text)', fontSize: 16, outline: 'none', textAlign: 'center',
             }}
           />
         )}

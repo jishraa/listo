@@ -141,7 +141,8 @@ export default function ItemRow({
               style={{
                 flexShrink: 0, width: 58, height: 28, borderRadius: 99, padding: '0 8px',
                 textAlign: 'center', background: 'var(--bg-input)', border: '1.5px solid var(--border-2)',
-                color: 'var(--text)', fontSize: 14, fontWeight: 600, outline: 'none',
+                // 16px avoids iOS Safari focus-zoom on this inline quantity field
+                color: 'var(--text)', fontSize: 16, fontWeight: 600, outline: 'none',
               }}
             />
           ) : (

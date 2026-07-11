@@ -32,7 +32,7 @@ export default function RenameSheet({ open, currentName, onClose, onRename }: Re
             if (e.key === 'Escape') onClose()
           }}
           maxLength={100}
-          style={{ width: '100%', height: 48, borderRadius: 10, padding: '0 14px', background: 'var(--bg-input)', border: '1.5px solid var(--accent)', color: 'var(--text)', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
+          style={{ width: '100%', height: 48, borderRadius: 10, padding: '0 14px', background: 'var(--bg-input)', border: '1.5px solid var(--accent)', color: 'var(--text)', fontSize: 16, outline: 'none', boxSizing: 'border-box' }}
         />
         <div className="flex gap-2">
           <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
