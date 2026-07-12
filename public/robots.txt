@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /join/
+
+Sitemap: https://listo.jishraa.com/sitemap.xml

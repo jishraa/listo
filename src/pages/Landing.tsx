@@ -5,6 +5,7 @@ import {
   ListChecks, Tags, ShoppingBag, Plane, LayoutTemplate, Brain,
   Feather, Zap, MonitorSmartphone, Layers,
   ShoppingCart, GraduationCap, Briefcase, Home as HomeIcon, Gift,
+  Users, CalendarDays, UtensilsCrossed, Wallet, TrendingUp,
   Sun, Moon,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
@@ -88,6 +89,9 @@ export default function Landing() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const shotsRef = useRef<HTMLDivElement>(null)
+  const shotsUserDrove = useRef(false)
+  const [activeShot, setActiveShot] = useState(0)
   const { user } = useAuthStore()
   const isAuthed = !!user
   const { pref, setPref } = useThemeStore()
@@ -119,10 +123,76 @@ export default function Landing() {
     return () => { node.style.overflowY = '' }
   }, [menuOpen])
 
+  // Escape closes the mobile menu.
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
   const scrollTo = (id: string) => {
     setMenuOpen(false)
     scrollRef.current?.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  // Carousel: track the centered slide, auto-advance on desktop until the
+  // visitor takes over. Auto-play skips reduced-motion users entirely.
+  const centeredShot = (wrap: HTMLDivElement) => {
+    const mid = wrap.scrollLeft + wrap.clientWidth / 2
+    let best = 0
+    let bestDist = Infinity
+    Array.from(wrap.children).forEach((child, i) => {
+      const el = child as HTMLElement
+      const dist = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid)
+      if (dist < bestDist) { bestDist = dist; best = i }
+    })
+    return best
+  }
+
+  const goToShot = (i: number, manual = true) => {
+    const wrap = shotsRef.current
+    const el = wrap?.children[i] as HTMLElement | undefined
+    if (!wrap || !el) return
+    if (manual) shotsUserDrove.current = true
+    wrap.scrollTo({ left: el.offsetLeft - (wrap.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    const wrap = shotsRef.current
+    if (!wrap) return
+    const onScroll = () => setActiveShot(centeredShot(wrap))
+    const takeOver = () => { shotsUserDrove.current = true }
+    wrap.addEventListener('scroll', onScroll, { passive: true })
+    wrap.addEventListener('pointerdown', takeOver, { passive: true })
+    wrap.addEventListener('wheel', takeOver, { passive: true })
+    wrap.addEventListener('touchstart', takeOver, { passive: true })
+
+    const autoOk =
+      window.matchMedia('(pointer: fine)').matches &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let hovered = false
+    const onEnter = () => { hovered = true }
+    const onLeave = () => { hovered = false }
+    let timer: number | undefined
+    if (autoOk) {
+      wrap.addEventListener('mouseenter', onEnter)
+      wrap.addEventListener('mouseleave', onLeave)
+      timer = window.setInterval(() => {
+        if (shotsUserDrove.current || hovered || document.hidden) return
+        goToShot((centeredShot(wrap) + 1) % wrap.children.length, false)
+      }, 4000)
+    }
+    return () => {
+      wrap.removeEventListener('scroll', onScroll)
+      wrap.removeEventListener('pointerdown', takeOver)
+      wrap.removeEventListener('wheel', takeOver)
+      wrap.removeEventListener('touchstart', takeOver)
+      wrap.removeEventListener('mouseenter', onEnter)
+      wrap.removeEventListener('mouseleave', onLeave)
+      if (timer) window.clearInterval(timer)
+    }
+  }, [])
 
   const openApp = () => navigate('/')
   const getStarted = () => (isAuthed ? navigate('/') : navigate('/login?mode=register'))
@@ -212,8 +282,7 @@ export default function Landing() {
               Every Day.
             </h1>
             <p className="lp-hero-desc">
-              Create smart lists for shopping, tasks, travel, packing, routines, and everything
-              in between. Stay organized with a beautifully simple experience.
+              Organize shopping, tasks, travel, packing, routines, and everything in between.
             </p>
             <div className="lp-hero-cta">
               <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
@@ -224,8 +293,7 @@ export default function Landing() {
               </button>
             </div>
             <button className="lp-scroll-cue" onClick={() => scrollTo('#features')} aria-label="Scroll to features">
-              Scroll
-              <ChevronDown size={18} />
+              <ChevronDown size={20} />
             </button>
           </Reveal>
         </div>
@@ -260,13 +328,23 @@ export default function Landing() {
           </SectionHead>
         </div>
         <Reveal>
-          <div className="lp-shots" role="group" aria-label="App screens">
-            <Shot label="My Lists" cap="Everything in one place"><ScreenLists /></Shot>
-            <Shot label="Shopping" cap="Auto-categorized aisles"><ScreenShopping /></Shot>
-            <Shot label="Travel" cap="Shared packing lists"><ScreenTravel /></Shot>
-            <Shot label="Templates" cap="Reusable in one tap"><ScreenTemplates /></Shot>
-            <Shot label="Insights" cap="Understand your habits"><ScreenInsights /></Shot>
-            <Shot label="Focus Mode" cap="Just what's left"><ScreenFocus /></Shot>
+          <div className="lp-shots" role="group" aria-label="App screens" ref={shotsRef}>
+            {SHOTS.map(s => (
+              <Shot key={s.label} label={s.label} cap={s.cap}><s.Screen /></Shot>
+            ))}
+          </div>
+          <div className="lp-dots" role="group" aria-label="Choose app screen">
+            {SHOTS.map((s, i) => (
+              <button
+                key={s.label}
+                className="lp-dot"
+                aria-label={`Show ${s.label} screen`}
+                aria-current={i === activeShot}
+                onClick={() => goToShot(i)}
+              >
+                <span />
+              </button>
+            ))}
           </div>
         </Reveal>
       </section>
@@ -299,7 +377,7 @@ export default function Landing() {
           </SectionHead>
           <Reveal className="lp-grid lp-grid-3">
             {USE_CASES.map(u => (
-              <div className="lp-card lp-card-lift" key={u.title}>
+              <div className={`lp-card lp-card-lift ${u.desktopOnly ? 'lp-hide-mobile' : ''}`} key={u.title}>
                 <div className="lp-card-row">
                   <div className="lp-card-icon"><u.Icon size={22} /></div>
                   <h3 className="lp-h3">{u.title}</h3>
@@ -315,19 +393,20 @@ export default function Landing() {
       <section className="lp-section lp-center" id="yft">
         <div className="lp-container">
           <SectionHead eyebrow="Listo + YFT" title="Plan with Listo. Track spending with YFT.">
-            Use Listo to organize what you need and YFT to understand how much you spend.
+            Plan what you need in Listo, then see what it actually cost in YFT — two apps, one routine.
           </SectionHead>
           <Reveal>
-            <div className="lp-eco">
-              <div className="lp-eco-card">
-                <span className="name">Listo</span>
-                <span className="desc">What you need</span>
-              </div>
-              <ArrowRight className="lp-eco-arrow" size={22} aria-hidden />
-              <div className="lp-eco-card">
-                <span className="name">YFT</span>
-                <span className="desc">What you spend</span>
-              </div>
+            <div className="lp-flow">
+              {YFT_FLOW.map((s, i) => (
+                <div style={{ display: 'contents' }} key={s.t}>
+                  {i > 0 && <ArrowRight className="lp-flow-arrow" size={20} aria-hidden />}
+                  <div className="lp-flow-step">
+                    <div className="lp-card-icon"><s.Icon size={20} /></div>
+                    <span className="t">{s.t}</span>
+                    <span className="d">{s.d}</span>
+                  </div>
+                </div>
+              ))}
             </div>
             <button className="lp-btn lp-btn-secondary" onClick={() => openYft('/about')}>
               Learn about YFT <span className="lp-btn-arrow"><ArrowRight size={16} /></span>
@@ -365,9 +444,9 @@ export default function Landing() {
               <path d="M20 33l8 8 16-18" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <Eyebrow icon={<Sparkles size={15} />}>Get Started</Eyebrow>
-            <h2 className="lp-h2">Ready to Organize <span className="lp-gradient">Your Life?</span></h2>
+            <h2 className="lp-h2">Ready to Organize <span className="lp-gradient">Everything?</span></h2>
             <p className="lp-lead">
-              Join everyone building simpler, smarter routines with Listo — free, on every device.
+              Start free — your lists sync on every device, online or off.
             </p>
             <div className="lp-cta-actions">
               <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
@@ -400,27 +479,31 @@ export default function Landing() {
               </p>
             </div>
             <div className="lp-footer-col">
-              <h5>Product</h5>
+              <h5>Navigation</h5>
               <button onClick={() => scrollTo('#features')}>Features</button>
               <button onClick={() => scrollTo('#screens')}>App Preview</button>
-              <button onClick={() => scrollTo('#why')}>Why Listo</button>
+              <button onClick={() => scrollTo('#use-cases')}>Use Cases</button>
               <button onClick={() => scrollTo('#faq')}>FAQ</button>
             </div>
             <div className="lp-footer-col">
-              <h5>Products</h5>
-              <button onClick={() => scrollTo('#top')}>Listo</button>
-              <button onClick={() => openYft('')}>YFT</button>
+              <h5>Support</h5>
+              <a href="/profile/support" onClick={(e) => { e.preventDefault(); navigate('/profile/support') }}>Contact</a>
+              <a href="/profile/help" onClick={(e) => { e.preventDefault(); navigate('/profile/help') }}>Help Center</a>
             </div>
             <div className="lp-footer-col">
-              <h5>Resources</h5>
+              <h5>Legal</h5>
               <a href="/privacy" onClick={(e) => { e.preventDefault(); navigate('/privacy') }}>Privacy Policy</a>
               <a href="/terms" onClick={(e) => { e.preventDefault(); navigate('/terms') }}>Terms of Service</a>
-              <a href="/profile/support" onClick={(e) => { e.preventDefault(); navigate('/profile/support') }}>Contact</a>
+            </div>
+            <div className="lp-footer-col">
+              <h5>Apps</h5>
+              <button onClick={() => scrollTo('#top')}>Listo</button>
+              <button onClick={() => openYft('')}>YFT</button>
             </div>
           </div>
           <div className="lp-footer-bottom">
             <span>© {new Date().getFullYear()} Listo · A JishRaa Labs product</span>
-            <span>Organize Everything That Matters.</span>
+            <span>Made in India 🇮🇳</span>
           </div>
         </div>
       </footer>
@@ -659,13 +742,29 @@ function ScreenFocus() {
 
 /* ── Content data ────────────────────────────────────────────── */
 
+const YFT_FLOW = [
+  { Icon: ListChecks, t: 'Plan groceries', d: 'Build the list in Listo' },
+  { Icon: ShoppingCart, t: 'Go shopping', d: 'Check items off as you go' },
+  { Icon: Wallet, t: 'Track spending', d: 'Log what you spent in YFT' },
+  { Icon: TrendingUp, t: 'See insights', d: 'Understand monthly patterns' },
+]
+
+const SHOTS = [
+  { label: 'My Lists', cap: 'Everything in one place', Screen: ScreenLists },
+  { label: 'Shopping', cap: 'Auto-categorized aisles', Screen: ScreenShopping },
+  { label: 'Travel', cap: 'Shared packing lists', Screen: ScreenTravel },
+  { label: 'Templates', cap: 'Reusable in one tap', Screen: ScreenTemplates },
+  { label: 'Insights', cap: 'Understand your habits', Screen: ScreenInsights },
+  { label: 'Focus Mode', cap: "Just what's left", Screen: ScreenFocus },
+]
+
 const FEATURES = [
-  { Icon: ListChecks, title: 'Smart Lists', desc: 'Create unlimited lists for anything. Type naturally — "Milk 2L" becomes an item with the right quantity.' },
-  { Icon: Tags, title: 'Task Categories', desc: 'Automatic categorization keeps work, personal, and household tasks neatly organized.' },
-  { Icon: ShoppingBag, title: 'Shopping Lists', desc: 'Duplicate detection, aisle grouping, and progress tracking — never forget an item again.' },
-  { Icon: Plane, title: 'Travel Planning', desc: 'Packing checklists made easy. Share them and watch progress update in real time.' },
-  { Icon: LayoutTemplate, title: 'Templates', desc: 'Turn any list into a reusable template and start your next one in a single tap.' },
-  { Icon: Brain, title: 'Smart Suggestions', desc: 'Listo learns your regulars and flags what you might be forgetting before you head out.' },
+  { Icon: ListChecks, title: 'Smart Lists', desc: 'Skip the forms — type "Milk 2L" and the item, quantity, and unit fill themselves in.' },
+  { Icon: Tags, title: 'Task Categories', desc: 'Shopping, work, and personal items sort themselves into categories, so you never file anything by hand.' },
+  { Icon: ShoppingBag, title: 'Shopping Lists', desc: 'Never buy the same thing twice — duplicates get caught, aisles stay grouped, and you always see what’s left.' },
+  { Icon: Plane, title: 'Travel Planning', desc: 'Pack with confidence. Share the checklist and watch it get done together in real time.' },
+  { Icon: LayoutTemplate, title: 'Templates', desc: 'Set up once, reuse forever — start your weekly shop or packing list in one tap.' },
+  { Icon: Brain, title: 'Smart Suggestions', desc: 'Listo learns your regulars and reminds you what you might be forgetting before you head out.' },
 ]
 
 const WHY = [
@@ -675,19 +774,25 @@ const WHY = [
   { Icon: Layers, title: 'Smart Organization', desc: 'Categories, progress, and duplicate detection keep everything neatly organized.' },
 ]
 
-const USE_CASES = [
+const USE_CASES: { Icon: typeof Gift; title: string; desc: string; desktopOnly?: boolean }[] = [
   { Icon: ShoppingCart, title: 'Shopping', desc: 'Plan purchases, avoid duplicates, and breeze through the store.' },
   { Icon: Plane, title: 'Travel', desc: 'Keep packing, bookings, and plans organized in one place.' },
+  { Icon: Users, title: 'Family', desc: 'One shared list for the household — everyone sees what’s needed and what’s done.' },
+  { Icon: UtensilsCrossed, title: 'Meal Planning', desc: 'Plan the week’s meals and turn them into a shopping list in minutes.' },
+  { Icon: CalendarDays, title: 'Events', desc: 'Coordinate everything a birthday, party, or gathering needs to happen.' },
   { Icon: GraduationCap, title: 'Study', desc: 'Track assignments, readings, and revision — one topic at a time.' },
   { Icon: Briefcase, title: 'Work', desc: 'Track tasks and collaborate on shared responsibilities.' },
   { Icon: HomeIcon, title: 'Home', desc: 'Share chores and household responsibilities with the family.' },
-  { Icon: Gift, title: 'Gift Planning', desc: 'Plan presents for every occasion — without spoiling the surprise.' },
+  // Rounds out the 3×3 desktop grid; hidden on mobile to keep the column short.
+  { Icon: Gift, title: 'Gift Planning', desc: 'Plan presents for every occasion — without spoiling the surprise.', desktopOnly: true },
 ]
 
 const FAQ = [
   { q: 'Is Listo free?', a: 'Yes — Listo is free to use. Create an account and start organizing in seconds.' },
-  { q: 'Can I sync across devices?', a: 'Yes. Sign in on any device and your lists stay in sync in real time. You can also install Listo on your phone or desktop for a native app feel.' },
+  { q: 'Which devices are supported?', a: 'Any modern browser, and you can install Listo as an app on iOS, Android, and desktop. Sign in anywhere and your lists stay in sync in real time.' },
   { q: 'Does it work offline?', a: 'Yes. Changes you make offline are saved on your device and sync automatically the moment you’re back online.' },
-  { q: 'Can I share lists?', a: 'Yes. Share a private invite link and collaborate in real time — everyone sees updates instantly, and you control who can edit.' },
+  { q: 'Can I collaborate with family?', a: 'Yes. Share a private invite link and everyone sees updates instantly — you control who can edit, and guests can join without creating an account.' },
+  { q: 'Is my data private?', a: 'Yes. Your lists are visible only to you and the people you invite, and you can delete your account and all its data at any time.' },
+  { q: 'Can I import existing lists?', a: 'Not yet — though smart type-ahead and templates make rebuilding a list fast. Import is on the roadmap.' },
   { q: 'Are reminders supported?', a: 'Listo’s "Before You Go" check flags frequently used items that might be missing from your list. Time-based reminders are on the roadmap.' },
 ]

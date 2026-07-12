@@ -117,7 +117,7 @@
   padding-right: max(clamp(20px, 5vw, 64px), var(--safe-right));
 }
 
-.lp-section { padding: clamp(48px, 7vw, 88px) 0; }
+.lp-section { padding: clamp(56px, 8vw, 104px) 0; }
 .lp-center { text-align: center; }
 
 .lp-section-head {
@@ -128,8 +128,9 @@
 
 /* ── Type scale (fluid, per labs spec) ─────────────────────────── */
 .lp-h1 {
-  font-size: clamp(2.7rem, 9vw, 4.5rem);
-  line-height: 1.02;
+  /* Min sized so "Stay Organized." stays on one line at 320px */
+  font-size: clamp(2.25rem, 1.3rem + 4.5vw, 4.5rem);
+  line-height: 1.04;
   font-weight: 800;
 }
 .lp-h2 {
@@ -167,6 +168,13 @@
   will-change: opacity, transform;
 }
 .lp-reveal.in { opacity: 1; transform: none; }
+
+/* Visible keyboard focus everywhere on the page */
+.lp :focus-visible {
+  outline: 2px solid var(--lp-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
 
 /* ── Atoms ─────────────────────────────────────────────────────── */
 
@@ -335,6 +343,7 @@
 }
 @media (max-width: 599px) {
   .lp-grid-3, .lp-grid-4 { grid-template-columns: 1fr; }
+  .lp-hide-mobile { display: none; }
 }
 
 /* ── Navigation ────────────────────────────────────────────────── */
@@ -381,7 +390,7 @@
   gap: 4px;
 }
 .lp-nav-link {
-  padding: 9px 14px;
+  padding: 11px 16px;
   border-radius: 999px;
   border: none;
   background: none;
@@ -475,6 +484,8 @@
 /* ── Hero ──────────────────────────────────────────────────────── */
 .lp-hero {
   position: relative;
+  /* Contain the floating art (orbs are wider than small viewports) */
+  overflow: hidden;
   padding: clamp(56px, 9vw, 128px) 0 clamp(24px, 4vw, 48px);
   text-align: center;
 }
@@ -488,7 +499,7 @@
 .lp-hero-cta {
   display: flex;
   justify-content: center;
-  gap: 14px;
+  gap: 24px;
 }
 @media (max-width: 599px) {
   .lp-hero-cta { flex-direction: column; align-items: stretch; }
@@ -589,6 +600,34 @@
 .lp-shots::before, .lp-shots::after {
   content: '';
   flex: 0 0 max(calc(50% - 130px), 4px);
+}
+
+/* Carousel page indicators */
+.lp-dots {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+.lp-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.lp-dot span {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--lp-muted) 45%, transparent);
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.lp-dot[aria-current='true'] span {
+  width: 20px;
+  background: linear-gradient(90deg, var(--lp-green), var(--lp-teal));
 }
 
 .lp-shot-label {
@@ -742,19 +781,21 @@
   color: #fff;
 }
 
-/* ── Listo + YFT ecosystem ─────────────────────────────────────── */
-.lp-eco {
+/* ── Listo + YFT workflow ──────────────────────────────────────── */
+.lp-flow {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 20px;
+  gap: 14px;
   margin-bottom: 30px;
 }
-.lp-eco-card {
+.lp-flow-step {
   display: grid;
-  gap: 2px;
-  min-width: 190px;
-  padding: 24px 30px;
+  align-content: start;
+  justify-items: center;
+  gap: 4px;
+  flex: 0 1 200px;
+  padding: 22px 18px;
   border-radius: var(--lp-r-card);
   border: 1px solid var(--lp-line);
   background: var(--lp-glass);
@@ -763,23 +804,24 @@
   text-align: center;
   transition: transform 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
 }
-.lp-eco-card:hover {
+.lp-flow-step:hover {
   transform: translateY(-4px);
   border-color: var(--lp-line-strong);
   background: var(--lp-glass-hover);
   box-shadow: var(--lp-shadow-card);
 }
-.lp-eco-card .name {
+.lp-flow-step .lp-card-icon { margin-bottom: 8px; width: 46px; height: 46px; border-radius: 14px; }
+.lp-flow-step .t {
   font-family: var(--lp-font-head);
-  font-size: 1.3rem;
-  font-weight: 800;
+  font-size: 1.02rem;
+  font-weight: 700;
 }
-.lp-eco-card .desc { font-size: 0.9rem; font-weight: 600; color: var(--lp-muted); }
-.lp-eco-arrow { color: var(--lp-accent); flex-shrink: 0; }
-@media (max-width: 599px) {
-  .lp-eco { flex-direction: column; gap: 12px; }
-  .lp-eco-arrow { transform: rotate(90deg); }
-  .lp-eco-card { width: 100%; }
+.lp-flow-step .d { font-size: 0.86rem; font-weight: 500; color: var(--lp-muted); }
+.lp-flow-arrow { align-self: center; color: var(--lp-accent); flex-shrink: 0; }
+@media (max-width: 859px) {
+  .lp-flow { flex-direction: column; align-items: center; gap: 10px; }
+  .lp-flow-arrow { transform: rotate(90deg); }
+  .lp-flow-step { width: 100%; max-width: 380px; flex-basis: auto; }
 }
 
 /* ── Testimonials ──────────────────────────────────────────────── */
@@ -867,7 +909,7 @@
 }
 .lp-footer-grid {
   display: grid;
-  grid-template-columns: 1.6fr repeat(3, 1fr);
+  grid-template-columns: 1.6fr repeat(4, 1fr);
   gap: 40px;
   margin-bottom: 48px;
 }
@@ -887,7 +929,7 @@
 .lp-footer-col a, .lp-footer-col button {
   display: block;
   width: fit-content;
-  padding: 6px 0;
+  padding: 8px 0;
   border: none;
   background: none;
   font-size: 0.95rem;
