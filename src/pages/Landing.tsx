@@ -1,14 +1,39 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Check, ArrowRight, Sparkles, Users, Layers,
-  Brain, PlusCircle, ShoppingBag, Plane, Home as HomeIcon,
-  Briefcase, CalendarDays, User as UserIcon, Share2, EyeOff,
-  ShieldCheck, Zap, TrendingUp, RefreshCw,
+  ArrowRight, Check, ChevronDown, Sparkles, Menu, X, Star,
+  ListChecks, Tags, ShoppingBag, Plane, LayoutTemplate, Brain,
+  Feather, Zap, MonitorSmartphone, Layers,
+  ShoppingCart, GraduationCap, Briefcase, Home as HomeIcon, Gift,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { openYft } from '../lib/yft'
 import './landing.css'
+
+/* Landing-only webfonts (Plus Jakarta Sans + Inter — same as JishRaa Labs).
+   Injected on mount so the app shell never pays for them. */
+function useLandingFonts() {
+  useEffect(() => {
+    if (document.getElementById('lp-fonts')) return
+    const mk = (rel: string, href: string, crossOrigin?: string) => {
+      const l = document.createElement('link')
+      l.rel = rel
+      l.href = href
+      if (crossOrigin !== undefined) l.crossOrigin = crossOrigin
+      return l
+    }
+    const css = mk(
+      'stylesheet',
+      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap'
+    )
+    css.id = 'lp-fonts'
+    document.head.append(
+      mk('preconnect', 'https://fonts.googleapis.com'),
+      mk('preconnect', 'https://fonts.gstatic.com', ''),
+      css
+    )
+  }, [])
+}
 
 /* Reveal-on-scroll wrapper. Content is visible by default under
    prefers-reduced-motion (handled in CSS); otherwise it fades/rises in once. */
@@ -34,17 +59,42 @@ function Reveal({ children, className = '', as: Tag = 'div', style, id }: {
   )
 }
 
+/* Uppercase gradient badge (labs Eyebrow) */
+function Eyebrow({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+  return (
+    <span className="lp-eyebrow">
+      {icon}
+      <span className="lp-eyebrow-label">{children}</span>
+    </span>
+  )
+}
+
+function SectionHead({ eyebrow, icon, title, children }: {
+  eyebrow: string; icon?: ReactNode; title: ReactNode; children?: ReactNode
+}) {
+  return (
+    <Reveal className="lp-section-head">
+      <Eyebrow icon={icon}>{eyebrow}</Eyebrow>
+      <h2 className="lp-h2">{title}</h2>
+      {children && <p className="lp-lead">{children}</p>}
+    </Reveal>
+  )
+}
+
 export default function Landing() {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useAuthStore()
   const isAuthed = !!user
+
+  useLandingFonts()
 
   // Marketing page owns the document title / SEO signal while mounted.
   useEffect(() => {
     const prev = document.title
-    document.title = 'Listo – Smart Lists for Everyday Life'
+    document.title = 'Listo – Organize Everything That Matters'
     return () => { document.title = prev }
   }, [])
 
@@ -56,7 +106,16 @@ export default function Landing() {
     return () => node.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Lock the page scroll while the full-screen mobile menu is open.
+  useEffect(() => {
+    const node = scrollRef.current
+    if (!node) return
+    node.style.overflowY = menuOpen ? 'hidden' : ''
+    return () => { node.style.overflowY = '' }
+  }, [menuOpen])
+
   const scrollTo = (id: string) => {
+    setMenuOpen(false)
     scrollRef.current?.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -64,355 +123,167 @@ export default function Landing() {
   const getStarted = () => (isAuthed ? navigate('/') : navigate('/login?mode=register'))
   const signIn = () => navigate('/login')
 
+  const NAV_LINKS: [string, string][] = [
+    ['Features', '#features'],
+    ['App Preview', '#screens'],
+    ['Why Listo', '#why'],
+    ['FAQ', '#faq'],
+  ]
+
   return (
     <div className="lp" ref={scrollRef}>
-      {/* ── 1. Navigation ─────────────────────────────────────── */}
+      {/* ── Navigation ────────────────────────────────────────── */}
       <nav className={`lp-nav ${scrolled ? 'scrolled' : ''}`} aria-label="Primary">
         <div className="lp-container lp-nav-inner">
-          <a className="lp-brand" href="#top" onClick={(e) => { e.preventDefault(); scrollTo('#top') }}>
+          <button className="lp-brand" onClick={() => scrollTo('#top')} aria-label="Listo — back to top">
             <img src="/brand.png" alt="" aria-hidden />
             <img src="/wordmark.png" alt="Listo" className="lp-wordmark" />
-          </a>
-          <div className="lp-nav-links">
-            <a className="lp-nav-link" href="#features" onClick={(e) => { e.preventDefault(); scrollTo('#features') }}>Features</a>
-            <a className="lp-nav-link" href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('#how-it-works') }}>How It Works</a>
-            <a className="lp-nav-link" href="#use-cases" onClick={(e) => { e.preventDefault(); scrollTo('#use-cases') }}>Use Cases</a>
-            <a className="lp-nav-link" href="#about" onClick={(e) => { e.preventDefault(); scrollTo('#about') }}>About</a>
-            {!isAuthed && (
-              <button className="lp-nav-link lp-hide-mobile" onClick={signIn}>Sign In</button>
-            )}
-          </div>
-          <button className="lp-btn lp-btn-primary lp-btn-sm lp-nav-cta" onClick={isAuthed ? openApp : getStarted}>
-            {isAuthed ? 'Open Listo' : 'Get Started'}
           </button>
+          <div className="lp-nav-links">
+            {NAV_LINKS.map(([label, id]) => (
+              <button key={id} className="lp-nav-link" onClick={() => scrollTo(id)}>{label}</button>
+            ))}
+            {!isAuthed && <button className="lp-nav-link" onClick={signIn}>Sign In</button>}
+          </div>
+          <div className="lp-nav-actions">
+            <button className="lp-btn lp-btn-primary lp-btn-sm lp-nav-cta" onClick={isAuthed ? openApp : getStarted}>
+              {isAuthed ? 'Open Listo' : 'Get Started'}
+            </button>
+            <button
+              className="lp-nav-burger"
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
       </nav>
 
-      {/* ── 2. Hero ───────────────────────────────────────────── */}
-      <header className="lp-hero" id="top">
-        <div className="lp-container">
-          <div className="lp-hero-grid">
-            <Reveal>
-              <h1 className="lp-h1">
-                Lists that get <span className="lp-accent">smarter</span> every time you use them.
-              </h1>
-              <p className="lp-hero-desc">
-                Create, organize, collaborate, and track progress with a smarter list experience built for everyday life.
-              </p>
-              <div className="lp-hero-cta">
-                <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
-                  {isAuthed ? 'Open Listo' : 'Get Started Free'} <ArrowRight size={18} />
-                </button>
-                <button className="lp-btn lp-btn-secondary" onClick={() => scrollTo('#how-it-works')}>
-                  See How It Works
-                </button>
-              </div>
-              <span className="lp-hero-support">
-                <Sparkles size={16} /> Simple to start. Smarter over time.
-              </span>
-            </Reveal>
-
-            {/* ── 3. Product Preview ── */}
-            <Reveal className="lp-preview-wrap" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-toast lp-toast-1"><Check size={15} strokeWidth={3} /> Milk ×2 added</div>
-              <div className="lp-toast lp-toast-2"><Check size={15} strokeWidth={3} /> Anjana completed Book Hotel</div>
-              <div className="lp-toast lp-toast-3"><Check size={15} strokeWidth={3} /> List completed · 100%</div>
-              <div className="lp-phone lp-float">
-                <div className="lp-phone-head">
-                  <span className="lp-phone-title">Lists</span>
-                  <span className="lp-phone-sub">4 lists</span>
-                </div>
-                <div className="lp-chips">
-                  <span className="lp-chip active">Active</span>
-                  <span className="lp-chip">Shared</span>
-                  <span className="lp-chip">Completed</span>
-                </div>
-                <PreviewList emoji="🛒" name="July Groceries" meta="3 items left" pct={62} />
-                <PreviewList emoji="✈️" name="Travel Checklist" meta="4 items left" pct={60} />
-                <PreviewList emoji="🏠" name="Home Chores" meta="4 items" />
-                <PreviewList emoji="💼" name="Office Tasks" meta="2 items left" pct={78} />
-              </div>
-            </Reveal>
+      {/* Full-screen mobile menu */}
+      {menuOpen && (
+        <div className="lp-menu">
+          <div>
+            {NAV_LINKS.map(([label, id], i) => (
+              <button key={id} className="lp-menu-link" style={{ animationDelay: `${i * 40}ms` }} onClick={() => scrollTo(id)}>
+                {label}
+              </button>
+            ))}
+            {!isAuthed && (
+              <button className="lp-menu-link" style={{ animationDelay: `${NAV_LINKS.length * 40}ms` }} onClick={signIn}>
+                Sign In
+              </button>
+            )}
           </div>
+          <div className="lp-menu-foot">
+            <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
+              {isAuthed ? 'Open Listo' : 'Get Started Free'} <span className="lp-btn-arrow"><ArrowRight size={17} /></span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <header className="lp-hero" id="top">
+        <HeroArt />
+        <div className="lp-container">
+          <Reveal>
+            <Eyebrow icon={<Sparkles size={15} />}>Smart Productivity</Eyebrow>
+            <h1 className="lp-h1">
+              Stay Organized.<br />
+              <span className="lp-gradient">Stay Productive.</span><br />
+              Every Day.
+            </h1>
+            <p className="lp-hero-desc">
+              Create smart lists for shopping, tasks, travel, packing, routines, and everything
+              in between. Stay organized with a beautifully simple experience.
+            </p>
+            <div className="lp-hero-cta">
+              <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
+                {isAuthed ? 'Open Listo' : 'Get Started Free'} <span className="lp-btn-arrow"><ArrowRight size={18} /></span>
+              </button>
+              <button className="lp-btn lp-btn-secondary" onClick={() => scrollTo('#features')}>
+                View Features
+              </button>
+            </div>
+            <button className="lp-scroll-cue" onClick={() => scrollTo('#features')} aria-label="Scroll to features">
+              Scroll
+              <ChevronDown size={18} />
+            </button>
+          </Reveal>
         </div>
       </header>
 
-      {/* ── 4. Value Strip ────────────────────────────────────── */}
-      <div className="lp-strip">
-        <div className="lp-container">
-          <div className="lp-strip-inner">
-            {['Natural Input', 'Smart Organization', 'Real-Time Collaboration', 'Progress Tracking', 'Useful Insights'].map((v, i) => (
-              <span key={v} style={{ display: 'inline-flex', alignItems: 'center', gap: 20 }}>
-                {i > 0 && <span className="lp-strip-dot" aria-hidden />}
-                <span className="lp-strip-item">{v}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── 5. Core Capabilities ──────────────────────────────── */}
+      {/* ── Features ──────────────────────────────────────────── */}
       <section className="lp-section" id="features">
         <div className="lp-container">
-          <Reveal className="lp-center">
-            <h2 className="lp-h2">More than a checklist.</h2>
-            <p className="lp-lead">
-              Listo helps you organize what matters, work together, track progress, and prepare for what comes next.
-            </p>
-          </Reveal>
-          <Reveal className="lp-grid lp-grid-2" style={{ marginTop: 40 }}>
-            <Capability icon={<PlusCircle size={22} />} title="Create naturally"
-              desc="Add items the way you think." extra={
-                <div className="lp-transform" style={{ marginTop: 14 }}>
-                  <span className="lp-type-in">Milk 2L</span>
-                  <ArrowRight size={16} />
-                  <span className="lp-type-out">Milk · <span className="u">2 L</span></span>
-                </div>
-              } />
-            <Capability icon={<Layers size={22} />} title="Stay organized"
-              desc="Categories, progress tracking, smart filters, and duplicate detection keep every list clear." />
-            <Capability icon={<Users size={22} />} title="Work together"
-              desc="Share lists, collaborate in real time, and always know what has already been completed." />
-            <Capability icon={<Brain size={22} />} title="Learn and improve"
-              desc="Listo uses your list history to surface useful insights, suggestions, and smarter ways to prepare your next list." />
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── 6. How Listo Works ────────────────────────────────── */}
-      <section className="lp-section" id="how-it-works">
-        <div className="lp-container">
-          <Reveal className="lp-center">
-            <h2 className="lp-h2">From idea to done.</h2>
-            <p className="lp-lead">Listo keeps every step simple.</p>
-          </Reveal>
-          <Reveal className="lp-steps" style={{ marginTop: 40 }}>
-            {LIFECYCLE.map((s, i) => (
-              <div className={`lp-card lp-cap lp-step ${i === LIFECYCLE.length - 1 ? 'loop' : ''}`} key={s.title}>
-                <div className="lp-cap-head">
-                  <div className="lp-card-icon"><s.Icon size={20} /></div>
-                  <h3><span className="lp-step-seq">{i + 1}</span>{s.title}</h3>
-                </div>
-                <p>{s.desc}</p>
+          <SectionHead eyebrow="Features" title={<>Everything You Need to <span className="lp-gradient">Stay Organized</span></>}>
+            More than a checklist — Listo understands what you type, keeps things tidy, and
+            gets smarter every time you use it.
+          </SectionHead>
+          <Reveal className="lp-grid lp-grid-3">
+            {FEATURES.map(f => (
+              <div className="lp-card lp-card-lift" key={f.title}>
+                <div className="lp-card-icon"><f.Icon size={24} /></div>
+                <h3 className="lp-h3">{f.title}</h3>
+                <p>{f.desc}</p>
               </div>
             ))}
           </Reveal>
         </div>
       </section>
 
-      {/* ── 7. Natural Add ────────────────────────────────────── */}
-      <section className="lp-section">
+      {/* ── App screenshots ───────────────────────────────────── */}
+      <section className="lp-section" id="screens">
         <div className="lp-container">
-          <div className="lp-feature">
-            <Reveal>
-              <span className="lp-eyebrow">Natural Input</span>
-              <h2 className="lp-h2">Just type. Listo understands.</h2>
-              <p className="lp-lead">Skip complicated forms and add items naturally.</p>
-              <p className="lp-hero-support" style={{ marginTop: 22 }}>
-                <Zap size={16} /> Less typing. Less editing. Faster lists.
-              </p>
-            </Reveal>
-            <Reveal className="lp-feature-media" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-panel">
-                <div className="lp-panel-label">Add item</div>
-                <Transform inp="Milk 2" out={<>Milk <span className="u">×2</span></>} />
-                <Transform inp="Rice 5kg" out={<>Rice · <span className="u">5 kg</span></>} />
-                <Transform inp="Chicken 500g" out={<>Chicken · <span className="u">500 g</span></>} />
-              </div>
-            </Reveal>
-          </div>
+          <SectionHead eyebrow="App Preview" title="A Look Inside Listo">
+            Swipe through the experience — from your lists to shopping, travel, templates, and insights.
+          </SectionHead>
         </div>
+        <Reveal>
+          <div className="lp-shots" role="group" aria-label="App screens">
+            <Shot label="My Lists" cap="Everything in one place"><ScreenLists /></Shot>
+            <Shot label="Shopping" cap="Auto-categorized aisles"><ScreenShopping /></Shot>
+            <Shot label="Travel" cap="Shared packing lists"><ScreenTravel /></Shot>
+            <Shot label="Templates" cap="Reusable in one tap"><ScreenTemplates /></Shot>
+            <Shot label="Insights" cap="Understand your habits"><ScreenInsights /></Shot>
+            <Shot label="Focus Mode" cap="Just what's left"><ScreenFocus /></Shot>
+          </div>
+        </Reveal>
       </section>
 
-      {/* ── 8. Smart Organization ─────────────────────────────── */}
-      <section className="lp-section">
+      {/* ── Why Listo ─────────────────────────────────────────── */}
+      <section className="lp-section" id="why">
         <div className="lp-container">
-          <div className="lp-feature reverse">
-            <Reveal className="lp-feature-media">
-              <div className="lp-panel">
-                <div className="lp-lrow"><span className="lp-lrow-emoji" aria-hidden>🥛</span>
-                  <div className="lp-lrow-body"><div className="lp-lrow-name">Milk <span style={{ color: 'var(--text-3)' }}>×2</span></div></div>
-                </div>
-                <div className="lp-lrow"><span className="lp-lrow-emoji" aria-hidden>🥛</span>
-                  <div className="lp-lrow-body"><div className="lp-lrow-name">Milk <span style={{ color: 'var(--text-3)' }}>×3</span></div></div>
-                </div>
-                <div className="lp-dupe-note"><Sparkles size={15} /> Similar item found</div>
-                <div className="lp-dupe-actions">
-                  <button className="lp-btn lp-btn-secondary lp-btn-sm" type="button" tabIndex={-1}>Keep Both</button>
-                  <button className="lp-btn lp-btn-primary lp-btn-sm" type="button" tabIndex={-1}>Merge to Milk ×5</button>
-                </div>
-                <div className="divider" style={{ margin: '18px 0 14px' }} />
-                <div className="flex items-center justify-between">
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>Travel Checklist</span>
-                  <span className="badge badge-green">80%</span>
-                </div>
-                <div className="lp-progress-track" style={{ marginTop: 12 }}><div style={{ width: '80%' }} /></div>
-                <div className="flex items-center justify-between" style={{ fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600 }}>
-                  <span>8 of 10 completed</span><span>2 items left</span>
-                </div>
+          <SectionHead eyebrow="Why Listo" title="Built For Everyday Life">
+            Designed for students, professionals, families, and travelers — anyone with things to do.
+          </SectionHead>
+          <Reveal className="lp-grid lp-grid-4">
+            {WHY.map(w => (
+              <div className="lp-card" key={w.title}>
+                <div className="lp-card-icon"><w.Icon size={24} /></div>
+                <h3 className="lp-h3">{w.title}</h3>
+                <p>{w.desc}</p>
               </div>
-            </Reveal>
-            <Reveal style={{ transitionDelay: '80ms' }}>
-              <span className="lp-eyebrow">Smart Organization</span>
-              <h2 className="lp-h2">Stay organized, and always know what's left.</h2>
-              <p className="lp-lead">
-                Listo helps keep your lists clean by understanding similar items and preventing accidental duplicates.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 16, fontWeight: 600, color: 'var(--text-2)' }}>
-                Already completed an item? Add it again whenever you need it. Listo understands the difference
-                between a duplicate and a repeat.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 16, fontWeight: 700, color: 'var(--text)' }}>
-                Simple progress tracking keeps you focused on what still needs attention.
-              </p>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 9. Collaboration ──────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature">
-            <Reveal>
-              <span className="lp-eyebrow">Collaboration</span>
-              <h2 className="lp-h2">Better lists, together.</h2>
-              <p className="lp-lead">Share a list and keep everyone in sync.</p>
-              <ul style={{ listStyle: 'none', margin: '22px 0 0', display: 'grid', gap: 10 }}>
-                {['Real-time updates', 'Shared progress', 'Member activity', 'Clear ownership'].map(t => (
-                  <li key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 15, fontWeight: 600, color: 'var(--text-2)' }}>
-                    <Check size={17} color="var(--accent)" strokeWidth={3} /> {t}
-                  </li>
-                ))}
-              </ul>
-              <p className="lp-lead" style={{ marginTop: 20, fontWeight: 700, color: 'var(--text)' }}>
-                No more asking, “Did someone already do this?”
-              </p>
-            </Reveal>
-            <Reveal className="lp-feature-media" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-panel">
-                <div className="lp-panel-label">Weekend Trip</div>
-                <div className="lp-avatars" aria-hidden>
-                  <span className="lp-avatar" style={{ background: '#16A34A' }}>Y</span>
-                  <span className="lp-avatar" style={{ background: '#38bdf8' }}>A</span>
-                  <span className="lp-avatar" style={{ background: '#a78bfa' }}>R</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600, margin: '4px 0 12px' }}>You · Anjana · Rishvika</div>
-                <div className="lp-check done"><span className="lp-check-box"><Check size={13} strokeWidth={3.5} /></span><span className="lp-check-label">Book Hotel</span><span className="lp-check-who">Anjana</span></div>
-                <div className="lp-check done"><span className="lp-check-box"><Check size={13} strokeWidth={3.5} /></span><span className="lp-check-label">Pack Clothes</span><span className="lp-check-who">You</span></div>
-                <div className="lp-check"><span className="lp-check-box" /><span className="lp-check-label">Buy Snacks</span></div>
-                <div className="lp-check"><span className="lp-check-box" /><span className="lp-check-label">Charge Camera</span></div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Listo Intelligence (memory · before-you-go · next list) ── */}
-      <section className="lp-section">
-        <div className="lp-container lp-center">
-          <Reveal>
-            <span className="lp-eyebrow">Listo Intelligence</span>
-            <h2 className="lp-h2">The more you use Listo, the more useful it becomes.</h2>
-            <p className="lp-lead">
-              Listo learns from your list history to help you prepare faster, remember important items, and make
-              better use of every list.
-            </p>
-          </Reveal>
-          <Reveal className="lp-flow-row" style={{ marginTop: 32 }}>
-            {['You create lists', 'Listo remembers', 'Finds patterns', 'Suggests', 'You save time'].map((n, i, a) => (
-              <span className="lp-flow-chip-wrap" key={n}>
-                <span className="lp-flow-chip">{n}</span>
-                {i < a.length - 1 && <ArrowRight className="lp-flow-sep" size={16} aria-hidden />}
-              </span>
             ))}
           </Reveal>
-          <Reveal className="lp-grid lp-grid-3" style={{ marginTop: 36, textAlign: 'left' }}>
-            <div className="lp-card lp-cap">
-              <div className="lp-cap-head">
-                <div className="lp-card-icon"><Brain size={22} /></div>
-                <h3>Lists that remember</h3>
-              </div>
-              <p>Frequently added items, typical quantities, and recurring patterns power better suggestions over time — every list makes the next one easier.</p>
-              <div className="lp-pills" style={{ marginTop: 14 }}>
-                <span className="lp-pill"><PlusCircle size={15} /> Milk ×2</span>
-                <span className="lp-pill"><PlusCircle size={15} /> Eggs ×12</span>
-                <span className="lp-pill"><PlusCircle size={15} /> Rice 5kg</span>
-              </div>
-            </div>
-            <div className="lp-card lp-cap">
-              <div className="lp-cap-head">
-                <div className="lp-card-icon"><Sparkles size={22} /></div>
-                <h3>Forget less</h3>
-              </div>
-              <p>Before you start, Listo flags frequently used items that may be missing — a small reminder before forgotten items become a problem.</p>
-              <div className="lp-pills" style={{ marginTop: 14 }}>
-                <span className="lp-pill">Milk</span>
-                <span className="lp-pill">Eggs</span>
-                <span className="lp-pill">Bread</span>
-              </div>
-            </div>
-            <div className="lp-card lp-cap">
-              <div className="lp-cap-head">
-                <div className="lp-card-icon"><PlusCircle size={22} /></div>
-                <h3>Done doesn't mean starting over</h3>
-              </div>
-              <p>Completed lists help Listo prepare what comes next, so every finished list gives you a faster head start on the next one.</p>
-              <div className="lp-pills" style={{ marginTop: 14 }}>
-                <span className="lp-pill">Rice 5kg</span>
-                <span className="lp-pill">Bananas</span>
-                <span className="lp-pill">Bread</span>
-              </div>
-            </div>
-          </Reveal>
         </div>
       </section>
 
-      {/* ── 14. Insights ──────────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature">
-            <Reveal>
-              <span className="lp-eyebrow">Insights</span>
-              <h2 className="lp-h2">Insights that lead somewhere.</h2>
-              <p className="lp-lead">
-                Listo doesn't show data just for the sake of showing data. Insights help you understand progress,
-                patterns, and what to do next.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 18, fontWeight: 700, color: 'var(--text)' }}>
-                Understand what happened. Improve what comes next.
-              </p>
-            </Reveal>
-            <Reveal className="lp-feature-media" style={{ transitionDelay: '80ms' }}>
-              <div className="lp-panel">
-                <div className="lp-stats">
-                  <div className="lp-stat"><div className="lp-stat-val accent">88 / 100</div><div className="lp-stat-label">Good Planner</div></div>
-                  <div className="lp-stat"><div className="lp-stat-val">84%</div><div className="lp-stat-label">Completion</div></div>
-                  <div className="lp-stat"><div className="lp-stat-val">0</div><div className="lp-stat-label">Duplicates</div></div>
-                  <div className="lp-stat"><div className="lp-stat-val">Saturday</div><div className="lp-stat-label">Most Active Day</div></div>
-                </div>
-                <div className="lp-panel-label" style={{ marginBottom: 6 }}>Top recommendations</div>
-                <div className="lp-rec"><span className="num">1</span> Categorize remaining items</div>
-                <div className="lp-rec"><span className="num">2</span> Prepare your next list</div>
-                <div className="lp-rec"><span className="num">3</span> Create a reusable template</div>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 15. Use Cases ─────────────────────────────────────── */}
+      {/* ── Use cases ─────────────────────────────────────────── */}
       <section className="lp-section" id="use-cases">
         <div className="lp-container">
-          <Reveal className="lp-center">
-            <h2 className="lp-h2">One Listo. Every kind of list.</h2>
-            <p className="lp-lead">Simple enough for everyday tasks. Flexible enough for almost anything.</p>
-          </Reveal>
-          <Reveal className="lp-grid lp-grid-3 lp-usecases" style={{ marginTop: 40 }}>
+          <SectionHead eyebrow="Use Cases" title="One Listo. Every Kind of List.">
+            Simple enough for everyday tasks. Flexible enough for almost anything.
+          </SectionHead>
+          <Reveal className="lp-grid lp-grid-3">
             {USE_CASES.map(u => (
-              <div className="lp-card" key={u.title}>
-                <div className="lp-card-icon">{u.icon}</div>
-                <h3>{u.title}</h3>
+              <div className="lp-card lp-card-lift" key={u.title}>
+                <div className="lp-card-row">
+                  <div className="lp-card-icon"><u.Icon size={22} /></div>
+                  <h3 className="lp-h3">{u.title}</h3>
+                </div>
                 <p>{u.desc}</p>
               </div>
             ))}
@@ -420,125 +291,130 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── 16. Focus Mode ────────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <div className="lp-feature reverse">
-            <Reveal className="lp-feature-media">
-              <div className="lp-panel">
-                <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
-                  <span className="lp-panel-label" style={{ margin: 0 }}>Focus Mode</span>
-                  <span className="badge badge-green">3 of 12 remaining</span>
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-3)', margin: '4px 0 6px' }}>IMPORTANT</div>
-                <div className="lp-check"><span className="lp-check-box" /><span className="lp-check-label">Book Hotel</span></div>
-                <div className="lp-check"><span className="lp-check-box" /><span className="lp-check-label">Charge Camera</span></div>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--text-3)', margin: '12px 0 6px' }}>PACKING</div>
-                <div className="lp-check"><span className="lp-check-box" /><span className="lp-check-label">Passport</span></div>
-              </div>
-            </Reveal>
-            <Reveal style={{ transitionDelay: '80ms' }}>
-              <span className="lp-eyebrow">Focus Mode</span>
-              <h2 className="lp-h2">Focus on what matters now.</h2>
-              <p className="lp-lead">
-                When it's time to get things done, Listo simplifies the experience so you can focus on what's left.
-              </p>
-              <p className="lp-lead" style={{ marginTop: 16, color: 'var(--text-2)' }}>
-                For shopping lists, Focus Mode can group what's left by aisle so a single trip stays effortless.
-              </p>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
       {/* ── Listo + YFT ───────────────────────────────────────── */}
-      <section className="lp-section-sm">
-        <div className="lp-container lp-center">
+      <section className="lp-section lp-center" id="yft">
+        <div className="lp-container">
+          <SectionHead eyebrow="Listo + YFT" title="Plan with Listo. Track spending with YFT.">
+            Use Listo to organize what you need and YFT to understand how much you spend.
+          </SectionHead>
           <Reveal>
-            <span className="lp-eyebrow">Listo + YFT</span>
-            <h2 className="lp-h2">Plan with Listo. Track spending with YFT.</h2>
-            <p className="lp-lead">Use Listo to organize what you need and YFT to understand how much you spend.</p>
-          </Reveal>
-          <Reveal style={{ marginTop: 32 }}>
             <div className="lp-eco">
-              <div className="lp-eco-card"><div className="name">Listo</div><div className="desc">What you need</div></div>
-              <div className="lp-eco-arrow"><ArrowRight size={22} /></div>
-              <div className="lp-eco-card"><div className="name">YFT</div><div className="desc">What you spend</div></div>
+              <div className="lp-eco-card">
+                <span className="name">Listo</span>
+                <span className="desc">What you need</span>
+              </div>
+              <ArrowRight className="lp-eco-arrow" size={22} aria-hidden />
+              <div className="lp-eco-card">
+                <span className="name">YFT</span>
+                <span className="desc">What you spend</span>
+              </div>
             </div>
             <button className="lp-btn lp-btn-secondary" onClick={() => openYft('/about')}>
-              Learn about YFT <ArrowRight size={16} />
+              Learn about YFT <span className="lp-btn-arrow"><ArrowRight size={16} /></span>
             </button>
           </Reveal>
         </div>
       </section>
 
-      {/* ── 19. Privacy and Trust ─────────────────────────────── */}
-      <section className="lp-section" id="about">
-        <div className="lp-container">
-          <Reveal className="lp-center">
-            <h2 className="lp-h2">Your lists are yours.</h2>
-            <p className="lp-lead">
-              Listo is designed to keep your personal and shared lists secure while giving you control over what you
-              share and with whom.
-            </p>
-          </Reveal>
-          <Reveal className="lp-trust" style={{ marginTop: 36 }}>
-            <div className="lp-trust-item"><ShieldCheck size={20} /><span>Secure Accounts</span></div>
-            <div className="lp-trust-item"><Share2 size={20} /><span>Controlled Sharing</span></div>
-            <div className="lp-trust-item"><EyeOff size={20} /><span>Private Personal Lists</span></div>
-            <div className="lp-trust-item"><Users size={20} /><span>Clear Collaboration</span></div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── 20. Final CTA ─────────────────────────────────────── */}
+      {/* ── Testimonials ──────────────────────────────────────── */}
       <section className="lp-section">
         <div className="lp-container">
-          <Reveal className="lp-final">
-            <h2 className="lp-h2">Ready to make your lists smarter?</h2>
-            <p className="lp-lead">Create, collaborate, track progress, and get more from every list.</p>
-            <div className="lp-final-cta">
-              <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted} style={{ minWidth: 220 }}>
-                {isAuthed ? 'Open Listo' : 'Create your first list'} <ArrowRight size={18} />
-              </button>
-              {!isAuthed && (
-                <span className="lp-final-sign">
-                  Already have an account? <a href="/login" onClick={(e) => { e.preventDefault(); signIn() }}>Sign In</a>
-                </span>
-              )}
-            </div>
+          <SectionHead eyebrow="Loved by Early Users" title="What People Are Saying" />
+          <Reveal className="lp-quotes">
+            {QUOTES.map(q => (
+              <figure className="lp-card" key={q.who}>
+                <div className="lp-quote-stars" aria-label="5 out of 5 stars">
+                  {[0, 1, 2, 3, 4].map(i => <Star key={i} size={17} fill="currentColor" />)}
+                </div>
+                <blockquote className="lp-quote-text">“{q.text}”</blockquote>
+                <figcaption className="lp-quote-who">— {q.who}</figcaption>
+              </figure>
+            ))}
           </Reveal>
         </div>
       </section>
 
-      {/* ── 21. Footer ────────────────────────────────────────── */}
+      {/* ── FAQ ───────────────────────────────────────────────── */}
+      <section className="lp-section" id="faq">
+        <div className="lp-container">
+          <SectionHead eyebrow="FAQ" title="Frequently Asked Questions" />
+          <Reveal className="lp-faq">
+            {FAQ.map(f => (
+              <details className="lp-faq-item" key={f.q}>
+                <summary className="lp-faq-q">{f.q}<ChevronDown size={18} /></summary>
+                <p className="lp-faq-a">{f.a}</p>
+              </details>
+            ))}
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Final CTA ─────────────────────────────────────────── */}
+      <section className="lp-section">
+        <div className="lp-container">
+          <Reveal className="lp-cta-band">
+            {/* Oversized brand check, ~4% opacity */}
+            <svg className="lp-cta-mark" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="6" y="6" width="52" height="52" rx="14" fill="none" stroke="currentColor" strokeWidth="3" />
+              <path d="M20 33l8 8 16-18" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <Eyebrow icon={<Sparkles size={15} />}>Get Started</Eyebrow>
+            <h2 className="lp-h2">Ready to Organize <span className="lp-gradient">Your Life?</span></h2>
+            <p className="lp-lead">
+              Join everyone building simpler, smarter routines with Listo — free, on every device.
+            </p>
+            <div className="lp-cta-actions">
+              <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
+                {isAuthed ? 'Open Listo' : 'Get Listo Free'} <span className="lp-btn-arrow"><ArrowRight size={18} /></span>
+              </button>
+              <button className="lp-btn lp-btn-secondary" onClick={() => scrollTo('#features')}>
+                Learn More
+              </button>
+            </div>
+            {!isAuthed && (
+              <span className="lp-cta-signin">
+                Already have an account? <a href="/login" onClick={(e) => { e.preventDefault(); signIn() }}>Sign In</a>
+              </span>
+            )}
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Footer ────────────────────────────────────────────── */}
       <footer className="lp-footer">
         <div className="lp-container">
           <div className="lp-footer-grid">
-            <div className="lp-footer-brand lp-footer-col">
-              <div className="lp-brand"><img src="/brand.png" alt="" aria-hidden /><img src="/wordmark.png" alt="Listo" className="lp-wordmark" /></div>
-              <p className="lp-footer-tag">Type less. Forget less. Get more done.</p>
+            <div>
+              <span className="lp-brand">
+                <img src="/brand.png" alt="" aria-hidden />
+                <img src="/wordmark.png" alt="Listo" className="lp-wordmark" />
+              </span>
+              <p className="lp-footer-tag">
+                Organize everything that matters — beautifully simple lists for everyday life.
+              </p>
             </div>
             <div className="lp-footer-col">
               <h5>Product</h5>
               <button onClick={() => scrollTo('#features')}>Features</button>
-              <button onClick={() => scrollTo('#how-it-works')}>How It Works</button>
-              <button onClick={() => scrollTo('#use-cases')}>Use Cases</button>
+              <button onClick={() => scrollTo('#screens')}>App Preview</button>
+              <button onClick={() => scrollTo('#why')}>Why Listo</button>
+              <button onClick={() => scrollTo('#faq')}>FAQ</button>
             </div>
             <div className="lp-footer-col">
-              <h5>Company</h5>
-              <button onClick={() => scrollTo('#about')}>About</button>
-              <a href="/profile/support" onClick={(e) => { e.preventDefault(); navigate('/profile/support') }}>Contact</a>
+              <h5>Products</h5>
+              <button onClick={() => scrollTo('#top')}>Listo</button>
+              <button onClick={() => openYft('')}>YFT</button>
             </div>
             <div className="lp-footer-col">
-              <h5>Legal</h5>
+              <h5>Resources</h5>
               <a href="/privacy" onClick={(e) => { e.preventDefault(); navigate('/privacy') }}>Privacy Policy</a>
               <a href="/terms" onClick={(e) => { e.preventDefault(); navigate('/terms') }}>Terms of Service</a>
+              <a href="/profile/support" onClick={(e) => { e.preventDefault(); navigate('/profile/support') }}>Contact</a>
             </div>
           </div>
           <div className="lp-footer-bottom">
-            <span>© 2026 Listo</span>
-            <span>Made with care.</span>
+            <span>© {new Date().getFullYear()} Listo · A JishRaa Labs product</span>
+            <span>Organize Everything That Matters.</span>
           </div>
         </div>
       </footer>
@@ -546,58 +422,271 @@ export default function Landing() {
   )
 }
 
-/* ── Small presentational helpers ────────────────────────────── */
-
-function PreviewList({ emoji, name, meta, pct }: { emoji: string; name: string; meta: string; pct?: number }) {
+/* ── Hero decorations — floating productivity motifs ─────────────
+   Density: mobile keeps orb + checklist · tablet adds nodes, ring,
+   note · desktop adds calendar and target. */
+function HeroArt() {
   return (
-    <div className="lp-lrow">
-      <span className="lp-lrow-emoji" aria-hidden>{emoji}</span>
-      <div className="lp-lrow-body">
-        <div className="lp-lrow-name">{name}</div>
-        <div className="lp-lrow-meta">{meta}</div>
-        {pct != null && <div className="lp-lrow-prog"><div style={{ width: `${pct}%` }} /></div>}
+    <div className="lp-hero-art" aria-hidden="true">
+      <div className="lp-orb lp-orb-1 lp-float" style={{ '--dur': '14s' } as React.CSSProperties} />
+      <div className="lp-orb lp-orb-2 lp-float-rev" style={{ '--dur': '18s' } as React.CSSProperties} />
+
+      {/* node constellation — left */}
+      <svg className="lp-art lp-art-nodes-l lp-float" style={{ '--dur': '11s' } as React.CSSProperties} viewBox="0 0 220 220" fill="none">
+        <g stroke="currentColor" strokeWidth="1.2" opacity="0.4">
+          <line x1="30" y1="40" x2="120" y2="80" />
+          <line x1="120" y1="80" x2="82" y2="170" />
+          <line x1="120" y1="80" x2="195" y2="52" />
+          <line x1="82" y1="170" x2="30" y2="40" />
+        </g>
+        <circle className="lp-node" cx="30" cy="40" r="5" fill="#4ADE80" />
+        <circle className="lp-node lp-node-2" cx="120" cy="80" r="6" fill="#2DD4BF" />
+        <circle className="lp-node lp-node-3" cx="195" cy="52" r="4.5" fill="#22D3EE" />
+        <circle className="lp-node lp-node-4" cx="82" cy="170" r="5" fill="#2DD4BF" />
+      </svg>
+
+      {/* node constellation — right */}
+      <svg className="lp-art lp-art-nodes-r lp-float-rev" style={{ '--dur': '13s' } as React.CSSProperties} viewBox="0 0 220 220" fill="none">
+        <g stroke="currentColor" strokeWidth="1.2" opacity="0.4">
+          <line x1="190" y1="30" x2="110" y2="90" />
+          <line x1="110" y1="90" x2="160" y2="180" />
+          <line x1="110" y1="90" x2="25" y2="60" />
+        </g>
+        <circle className="lp-node" cx="190" cy="30" r="5" fill="#4ADE80" />
+        <circle className="lp-node lp-node-2" cx="110" cy="90" r="6" fill="#22D3EE" />
+        <circle className="lp-node lp-node-3" cx="25" cy="60" r="4.5" fill="#2DD4BF" />
+        <circle className="lp-node lp-node-4" cx="160" cy="180" r="5" fill="#2DD4BF" />
+      </svg>
+
+      {/* checklist card */}
+      <svg className="lp-art lp-art-check lp-float" style={{ '--dur': '9s' } as React.CSSProperties} viewBox="0 0 56 52" fill="none">
+        <defs>
+          <linearGradient id="lpArtG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#4ADE80" />
+            <stop offset="0.5" stopColor="#2DD4BF" />
+            <stop offset="1" stopColor="#22D3EE" />
+          </linearGradient>
+        </defs>
+        <rect x="1.5" y="1.5" width="53" height="49" rx="11" stroke="url(#lpArtG)" strokeWidth="1.4" fill="rgba(74,222,128,0.08)" />
+        <circle cx="14" cy="17" r="4" stroke="url(#lpArtG)" strokeWidth="1.4" />
+        <path d="M12.3 17l1.3 1.3 2.2-2.6" stroke="url(#lpArtG)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M24 17h20" stroke="url(#lpArtG)" strokeWidth="1.4" strokeLinecap="round" opacity="0.7" />
+        <circle cx="14" cy="34" r="4" stroke="url(#lpArtG)" strokeWidth="1.4" />
+        <path d="M24 34h14" stroke="url(#lpArtG)" strokeWidth="1.4" strokeLinecap="round" opacity="0.5" />
+      </svg>
+
+      {/* sticky note */}
+      <svg className="lp-art lp-art-note lp-float-rev" style={{ '--dur': '12s' } as React.CSSProperties} viewBox="0 0 44 44" fill="none">
+        <path d="M6 10a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v18l-10 10H10a4 4 0 0 1-4-4V10Z" stroke="url(#lpArtG)" strokeWidth="1.4" fill="rgba(34,211,238,0.06)" />
+        <path d="M28 38V28h10" stroke="url(#lpArtG)" strokeWidth="1.4" />
+        <path d="M13 16h18M13 23h12" stroke="url(#lpArtG)" strokeWidth="1.4" strokeLinecap="round" opacity="0.6" />
+      </svg>
+
+      {/* calendar */}
+      <svg className="lp-art lp-art-cal lp-float" style={{ '--dur': '13s' } as React.CSSProperties} viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="8" width="40" height="36" rx="9" stroke="url(#lpArtG)" strokeWidth="1.4" fill="rgba(45,212,191,0.07)" />
+        <path d="M4 19h40" stroke="url(#lpArtG)" strokeWidth="1.4" />
+        <path d="M15 4v8M33 4v8" stroke="url(#lpArtG)" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="16" cy="28" r="2.4" fill="#4ADE80" opacity="0.8" />
+        <circle cx="24" cy="28" r="2.4" fill="#2DD4BF" opacity="0.8" />
+        <circle cx="32" cy="36" r="2.4" fill="#22D3EE" opacity="0.8" />
+      </svg>
+
+      {/* target */}
+      <svg className="lp-art lp-art-target lp-float-rev" style={{ '--dur': '10s' } as React.CSSProperties} viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" stroke="url(#lpArtG)" strokeWidth="1.4" opacity="0.8" />
+        <circle cx="24" cy="24" r="12" stroke="url(#lpArtG)" strokeWidth="1.4" opacity="0.6" />
+        <circle cx="24" cy="24" r="4.5" fill="url(#lpArtG)" opacity="0.85" />
+      </svg>
+
+      {/* glowing ring */}
+      <span className="lp-art lp-art-ring lp-float-rev" style={{ '--dur': '12s' } as React.CSSProperties} />
+    </div>
+  )
+}
+
+/* ── Phone mockups (stylized screens; swap for real captures later) ── */
+
+function Shot({ label, cap, children }: { label: string; cap: string; children: ReactNode }) {
+  return (
+    <div className="lp-shot">
+      <div className="lp-phone">
+        <span className="lp-phone-notch" />
+        <div className="lp-screen">{children}</div>
+      </div>
+      <span className="lp-shot-label">{label}</span>
+      <span className="lp-shot-cap">{cap}</span>
+    </div>
+  )
+}
+
+function MkRow({ emoji, name, meta, pct }: { emoji: string; name: string; meta: string; pct?: number }) {
+  return (
+    <div className="mk-row">
+      <span className="mk-row-emoji" aria-hidden>{emoji}</span>
+      <div className="mk-row-body">
+        <div className="mk-row-name">{name}</div>
+        <div className="mk-row-meta">{meta}</div>
+        {pct != null && <div className="mk-prog"><div style={{ width: `${pct}%` }} /></div>}
       </div>
     </div>
   )
 }
 
-function Capability({ icon, title, desc, extra }: { icon: ReactNode; title: string; desc: string; extra?: ReactNode }) {
+function MkCheck({ label, done, who }: { label: string; done?: boolean; who?: string }) {
   return (
-    <div className="lp-card lp-cap">
-      <div className="lp-cap-head">
-        <div className="lp-card-icon">{icon}</div>
-        <h3>{title}</h3>
+    <div className={`mk-check ${done ? 'done' : ''}`}>
+      <span className="mk-check-box">{done && <Check size={11} strokeWidth={3.5} />}</span>
+      <span className="mk-check-label">{label}</span>
+      {who && <span className="mk-check-who">{who}</span>}
+    </div>
+  )
+}
+
+function ScreenLists() {
+  return (
+    <>
+      <div className="mk-title">Lists</div>
+      <div className="mk-sub">4 lists</div>
+      <div className="mk-chips">
+        <span className="mk-chip on">Active</span>
+        <span className="mk-chip">Shared</span>
+        <span className="mk-chip">Done</span>
       </div>
-      <p>{desc}</p>
-      {extra}
-    </div>
+      <MkRow emoji="🛒" name="July Groceries" meta="3 items left" pct={62} />
+      <MkRow emoji="✈️" name="Travel Checklist" meta="4 items left" pct={60} />
+      <MkRow emoji="🏠" name="Home Chores" meta="4 items" />
+      <MkRow emoji="💼" name="Office Tasks" meta="2 items left" pct={78} />
+    </>
   )
 }
 
-function Transform({ inp, out }: { inp: string; out: ReactNode }) {
+function ScreenShopping() {
   return (
-    <div className="lp-transform">
-      <span className="lp-type-in">{inp}</span>
-      <ArrowRight size={16} />
-      <span className="lp-type-out">{out}</span>
-    </div>
+    <>
+      <div className="mk-title">July Groceries</div>
+      <div className="mk-sub">8 of 11 done</div>
+      <div className="mk-cat">PRODUCE</div>
+      <MkCheck label="Bananas ×6" done />
+      <MkCheck label="Spinach" done />
+      <MkCheck label="Tomatoes 1kg" />
+      <div className="mk-cat">DAIRY</div>
+      <MkCheck label="Milk 2L" done />
+      <MkCheck label="Yogurt ×4" />
+      <div className="mk-cat">PANTRY</div>
+      <MkCheck label="Rice 5kg" />
+    </>
   )
 }
 
-const LIFECYCLE = [
-  { title: 'Create', desc: 'Start any list.', Icon: PlusCircle },
-  { title: 'Organize', desc: 'Add items naturally and let Listo keep things structured.', Icon: Layers },
-  { title: 'Collaborate', desc: 'Invite others and stay updated in real time.', Icon: Users },
-  { title: 'Track', desc: 'See progress and know exactly what remains.', Icon: TrendingUp },
-  { title: 'Complete', desc: 'Finish your list and understand how you did.', Icon: Check },
-  { title: 'Repeat Smarter', desc: 'Use your history to prepare future lists faster.', Icon: RefreshCw },
+function ScreenTravel() {
+  return (
+    <>
+      <div className="mk-title">Weekend Trip</div>
+      <div className="mk-avatars" aria-hidden>
+        <span className="mk-avatar" style={{ background: '#16A34A' }}>Y</span>
+        <span className="mk-avatar" style={{ background: '#0D9488' }}>A</span>
+        <span className="mk-avatar" style={{ background: '#0891B2' }}>R</span>
+      </div>
+      <MkCheck label="Book Hotel" done who="Anjana" />
+      <MkCheck label="Pack Clothes" done who="You" />
+      <MkCheck label="Charge Camera" />
+      <MkCheck label="Passport" />
+      <MkCheck label="Buy Snacks" />
+      <MkCheck label="Travel Adapter" />
+    </>
+  )
+}
+
+function ScreenTemplates() {
+  return (
+    <>
+      <div className="mk-title">Templates</div>
+      <div className="mk-sub">Start faster</div>
+      <div style={{ height: 10 }} />
+      <MkRow emoji="🛒" name="Weekly Groceries" meta="18 items" />
+      <span className="mk-badge">Template</span>
+      <div style={{ height: 8 }} />
+      <MkRow emoji="🧳" name="Packing Essentials" meta="12 items" />
+      <span className="mk-badge">Template</span>
+      <div style={{ height: 8 }} />
+      <MkRow emoji="🎉" name="Party Prep" meta="9 items" />
+      <span className="mk-badge">Template</span>
+    </>
+  )
+}
+
+function ScreenInsights() {
+  return (
+    <>
+      <div className="mk-title">Insights</div>
+      <div className="mk-sub">July Groceries</div>
+      <div className="mk-stats">
+        <div className="mk-stat"><div className="mk-stat-val grad">88</div><div className="mk-stat-label">Planner Score</div></div>
+        <div className="mk-stat"><div className="mk-stat-val">84%</div><div className="mk-stat-label">Completion</div></div>
+        <div className="mk-stat"><div className="mk-stat-val">0</div><div className="mk-stat-label">Duplicates</div></div>
+        <div className="mk-stat"><div className="mk-stat-val">Sat</div><div className="mk-stat-label">Most Active</div></div>
+      </div>
+      <div className="mk-cat">TOP SUGGESTIONS</div>
+      <MkCheck label="Prepare your next list" />
+      <MkCheck label="Save as a template" />
+    </>
+  )
+}
+
+function ScreenFocus() {
+  return (
+    <>
+      <div className="mk-title">Focus Mode</div>
+      <div className="mk-sub">3 of 12 remaining</div>
+      <div className="mk-cat">IMPORTANT</div>
+      <MkCheck label="Book Hotel" />
+      <MkCheck label="Charge Camera" />
+      <div className="mk-cat">PACKING</div>
+      <MkCheck label="Passport" />
+      <div className="mk-cat">DONE</div>
+      <MkCheck label="Pack Clothes" done />
+      <MkCheck label="Print Tickets" done />
+    </>
+  )
+}
+
+/* ── Content data ────────────────────────────────────────────── */
+
+const FEATURES = [
+  { Icon: ListChecks, title: 'Smart Lists', desc: 'Create unlimited lists for anything. Type naturally — "Milk 2L" becomes an item with the right quantity.' },
+  { Icon: Tags, title: 'Task Categories', desc: 'Automatic categorization keeps work, personal, and household tasks neatly organized.' },
+  { Icon: ShoppingBag, title: 'Shopping Lists', desc: 'Duplicate detection, aisle grouping, and progress tracking — never forget an item again.' },
+  { Icon: Plane, title: 'Travel Planning', desc: 'Packing checklists made easy. Share them and watch progress update in real time.' },
+  { Icon: LayoutTemplate, title: 'Templates', desc: 'Turn any list into a reusable template and start your next one in a single tap.' },
+  { Icon: Brain, title: 'Smart Suggestions', desc: 'Listo learns your regulars and flags what you might be forgetting before you head out.' },
+]
+
+const WHY = [
+  { Icon: Feather, title: 'Beautiful Simplicity', desc: 'No clutter. Only what matters — a calm, focused space for your lists.' },
+  { Icon: Zap, title: 'Fast', desc: 'Capture ideas instantly. Add a full list in seconds, not minutes.' },
+  { Icon: MonitorSmartphone, title: 'Sync Everywhere', desc: 'Access your lists on every device — changes sync in real time, even after going offline.' },
+  { Icon: Layers, title: 'Smart Organization', desc: 'Categories, progress, and duplicate detection keep everything neatly organized.' },
 ]
 
 const USE_CASES = [
-  { icon: <ShoppingBag size={22} />, title: 'Shopping', desc: 'Plan purchases, avoid duplicates, and prepare future lists faster.' },
-  { icon: <Plane size={22} />, title: 'Travel', desc: 'Keep packing, bookings, and plans organized.' },
-  { icon: <HomeIcon size={22} />, title: 'Home', desc: 'Share chores and household responsibilities.' },
-  { icon: <Briefcase size={22} />, title: 'Work', desc: 'Track tasks and collaborate on shared responsibilities.' },
-  { icon: <CalendarDays size={22} />, title: 'Events', desc: 'Coordinate everything that needs to happen.' },
-  { icon: <UserIcon size={22} />, title: 'Personal', desc: 'Keep everyday tasks simple and organized.' },
+  { Icon: ShoppingCart, title: 'Shopping', desc: 'Plan purchases, avoid duplicates, and breeze through the store.' },
+  { Icon: Plane, title: 'Travel', desc: 'Keep packing, bookings, and plans organized in one place.' },
+  { Icon: GraduationCap, title: 'Study', desc: 'Track assignments, readings, and revision — one topic at a time.' },
+  { Icon: Briefcase, title: 'Work', desc: 'Track tasks and collaborate on shared responsibilities.' },
+  { Icon: HomeIcon, title: 'Home', desc: 'Share chores and household responsibilities with the family.' },
+  { Icon: Gift, title: 'Gift Planning', desc: 'Plan presents for every occasion — without spoiling the surprise.' },
+]
+
+const QUOTES = [
+  { text: 'Listo has replaced three different apps.', who: 'Early User' },
+  { text: 'Simple, fast and beautifully designed.', who: 'Beta Tester' },
+]
+
+const FAQ = [
+  { q: 'Is Listo free?', a: 'Yes — Listo is free to use. Create an account and start organizing in seconds.' },
+  { q: 'Can I sync across devices?', a: 'Yes. Sign in on any device and your lists stay in sync in real time. You can also install Listo on your phone or desktop for a native app feel.' },
+  { q: 'Does it work offline?', a: 'Yes. Changes you make offline are saved on your device and sync automatically the moment you’re back online.' },
+  { q: 'Can I share lists?', a: 'Yes. Share a private invite link and collaborate in real time — everyone sees updates instantly, and you control who can edit.' },
+  { q: 'Are reminders supported?', a: 'Listo’s "Before You Go" check flags frequently used items that might be missing from your list. Time-based reminders are on the roadmap.' },
 ]
