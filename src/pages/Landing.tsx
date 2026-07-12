@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, Check, ChevronDown, Sparkles, Menu, X, Star,
+  ArrowRight, Check, ChevronDown, Sparkles, Menu, X,
   ListChecks, Tags, ShoppingBag, Plane, LayoutTemplate, Brain,
   Feather, Zap, MonitorSmartphone, Layers,
   ShoppingCart, GraduationCap, Briefcase, Home as HomeIcon, Gift,
@@ -241,8 +241,10 @@ export default function Landing() {
           <Reveal className="lp-grid lp-grid-3">
             {FEATURES.map(f => (
               <div className="lp-card lp-card-lift" key={f.title}>
-                <div className="lp-card-icon"><f.Icon size={24} /></div>
-                <h3 className="lp-h3">{f.title}</h3>
+                <div className="lp-card-row">
+                  <div className="lp-card-icon"><f.Icon size={22} /></div>
+                  <h3 className="lp-h3">{f.title}</h3>
+                </div>
                 <p>{f.desc}</p>
               </div>
             ))}
@@ -278,8 +280,10 @@ export default function Landing() {
           <Reveal className="lp-grid lp-grid-4">
             {WHY.map(w => (
               <div className="lp-card" key={w.title}>
-                <div className="lp-card-icon"><w.Icon size={24} /></div>
-                <h3 className="lp-h3">{w.title}</h3>
+                <div className="lp-card-row">
+                  <div className="lp-card-icon"><w.Icon size={22} /></div>
+                  <h3 className="lp-h3">{w.title}</h3>
+                </div>
                 <p>{w.desc}</p>
               </div>
             ))}
@@ -332,23 +336,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Testimonials ──────────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="lp-container">
-          <SectionHead eyebrow="Loved by Early Users" title="What People Are Saying" />
-          <Reveal className="lp-quotes">
-            {QUOTES.map(q => (
-              <figure className="lp-card" key={q.who}>
-                <div className="lp-quote-stars" aria-label="5 out of 5 stars">
-                  {[0, 1, 2, 3, 4].map(i => <Star key={i} size={17} fill="currentColor" />)}
-                </div>
-                <blockquote className="lp-quote-text">“{q.text}”</blockquote>
-                <figcaption className="lp-quote-who">— {q.who}</figcaption>
-              </figure>
-            ))}
-          </Reveal>
-        </div>
-      </section>
+      {/* Testimonials intentionally omitted until there are real reviews —
+          restore the "Loved by Early Users" section from git history
+          (commit c6238ab) when genuine quotes exist. */}
 
       {/* ── FAQ ───────────────────────────────────────────────── */}
       <section className="lp-section" id="faq">
@@ -692,11 +682,6 @@ const USE_CASES = [
   { Icon: Briefcase, title: 'Work', desc: 'Track tasks and collaborate on shared responsibilities.' },
   { Icon: HomeIcon, title: 'Home', desc: 'Share chores and household responsibilities with the family.' },
   { Icon: Gift, title: 'Gift Planning', desc: 'Plan presents for every occasion — without spoiling the surprise.' },
-]
-
-const QUOTES = [
-  { text: 'Listo has replaced three different apps.', who: 'Early User' },
-  { text: 'Simple, fast and beautifully designed.', who: 'Beta Tester' },
 ]
 
 const FAQ = [
