@@ -396,6 +396,22 @@
 
 .lp-nav-actions { display: flex; align-items: center; gap: 10px; }
 
+/* 44px round glass icon button (theme toggle — desktop only) */
+.lp-nav-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-glass);
+  color: var(--lp-text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.lp-nav-iconbtn:hover { border-color: var(--lp-accent); background: var(--lp-glass-hover); }
+@media (max-width: 860px) { .lp-nav-iconbtn { display: none; } }
+
 /* 44px hamburger (mobile only) */
 .lp-nav-burger {
   display: none;

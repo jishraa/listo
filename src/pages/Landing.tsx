@@ -5,8 +5,10 @@ import {
   ListChecks, Tags, ShoppingBag, Plane, LayoutTemplate, Brain,
   Feather, Zap, MonitorSmartphone, Layers,
   ShoppingCart, GraduationCap, Briefcase, Home as HomeIcon, Gift,
+  Sun, Moon,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
+import { useThemeStore, effectiveTheme } from '../store/useThemeStore'
 import { openYft } from '../lib/yft'
 import './landing.css'
 
@@ -88,6 +90,9 @@ export default function Landing() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { user } = useAuthStore()
   const isAuthed = !!user
+  const { pref, setPref } = useThemeStore()
+  const theme = effectiveTheme(pref)
+  const toggleTheme = () => setPref(theme === 'dark' ? 'light' : 'dark')
 
   useLandingFonts()
 
@@ -146,6 +151,13 @@ export default function Landing() {
             {!isAuthed && <button className="lp-nav-link" onClick={signIn}>Sign In</button>}
           </div>
           <div className="lp-nav-actions">
+            <button
+              className="lp-nav-iconbtn"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button className="lp-btn lp-btn-primary lp-btn-sm lp-nav-cta" onClick={isAuthed ? openApp : getStarted}>
               {isAuthed ? 'Open Listo' : 'Get Started'}
             </button>
@@ -177,6 +189,10 @@ export default function Landing() {
             )}
           </div>
           <div className="lp-menu-foot">
+            <button className="lp-btn lp-btn-secondary" onClick={toggleTheme}>
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
             <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
               {isAuthed ? 'Open Listo' : 'Get Started Free'} <span className="lp-btn-arrow"><ArrowRight size={17} /></span>
             </button>
