@@ -552,7 +552,7 @@
 .lp-art { position: absolute; opacity: 0.55; }
 .lp-art-nodes-l { left: 2%; top: 46%; width: 200px; height: 200px; }
 .lp-art-nodes-r { right: 2%; top: 46%; width: 200px; height: 200px; display: none; }
-.lp-art-check { right: 4%; top: 10%; width: 64px; height: 60px; rotate: 8deg; opacity: 0.6; }
+.lp-art-check { right: 4%; top: 10%; width: 64px; height: 60px; rotate: 8deg; opacity: 0.3; }
 .lp-art-cal { left: 10%; top: 72%; width: 58px; height: 58px; rotate: -7deg; display: none; }
 .lp-art-target { right: 11%; top: 70%; width: 56px; height: 56px; display: none; }
 .lp-art-note { left: 5%; top: 14%; width: 46px; height: 46px; rotate: -10deg; display: none; }
