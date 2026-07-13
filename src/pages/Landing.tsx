@@ -452,9 +452,6 @@ export default function Landing() {
               <button className="lp-btn lp-btn-primary" onClick={isAuthed ? openApp : getStarted}>
                 {isAuthed ? 'Open Listo' : 'Get Listo Free'} <span className="lp-btn-arrow"><ArrowRight size={18} /></span>
               </button>
-              <button className="lp-btn lp-btn-secondary" onClick={() => scrollTo('#features')}>
-                Learn More
-              </button>
             </div>
             {!isAuthed && (
               <span className="lp-cta-signin">
