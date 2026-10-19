@@ -328,7 +328,9 @@ export default function Landing() {
           </SectionHead>
         </div>
         <Reveal>
-          <div className="lp-shots" role="group" aria-label="App screens" ref={shotsRef}>
+          {/* tabIndex: the carousel scrolls horizontally, so keyboard users need a
+              focus stop to scroll it with the arrow keys (axe scrollable-region-focusable) */}
+          <div className="lp-shots" role="group" aria-label="App screens" tabIndex={0} ref={shotsRef}>
             {SHOTS.map(s => (
               <Shot key={s.label} label={s.label} cap={s.cap}><s.Screen /></Shot>
             ))}
