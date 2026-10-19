@@ -50,7 +50,7 @@ test.describe('authenticated journey', () => {
     // ── Complete one ──
     await page.getByRole('button', { name: 'Mark complete' }).first().click()
     await expect(page.getByText('1 item left')).toBeVisible()
-    await expect(page.getByRole('button', { name: /Completed \(1\)/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Completed Items \(1\)/ })).toBeVisible()
 
     // ── Rename via List Options ──
     await page.getByRole('button', { name: 'List options' }).click()

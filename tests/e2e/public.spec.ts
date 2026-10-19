@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test'
 test.describe('landing & routing', () => {
   test('signed-out "/" shows the marketing landing with a signup CTA', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: /Lists that get/ })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: /Stay Organized/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /Get Started/i }).first()).toBeVisible()
   })
 
@@ -32,7 +32,8 @@ test.describe('login screen', () => {
     await page.goto('/login')
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Continue with Apple' })).toBeVisible()
+    // Apple sign-in was removed (23bcaa8) — guard against it creeping back half-wired
+    await expect(page.getByRole('button', { name: 'Continue with Apple' })).toHaveCount(0)
 
     // Inline validation, never browser-native popups
     await page.getByRole('button', { name: 'Sign In', exact: true }).click()
