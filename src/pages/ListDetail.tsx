@@ -42,6 +42,10 @@ import SortSheet from '../features/list-detail/SortSheet'
 import CustomizeViewSheet from '../features/list-detail/CustomizeViewSheet'
 import RenameSheet from '../features/list-detail/RenameSheet'
 
+// Stable fallback so `items` keeps its identity while a list has no loaded
+// rows — a fresh `[]` each render would invalidate every memo below.
+const NO_ITEMS: ListItem[] = []
+
 export default function ListDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -53,7 +57,7 @@ export default function ListDetail() {
 
   const list    = store.lists.find(l => l.id === id)
   const rawItems = list ? store.items[list.id] : undefined
-  const items   = rawItems ?? []
+  const items   = rawItems ?? NO_ITEMS
   const members = list ? (store.members[list.id] ?? []) : []
   const isOwner = !!list && list.owner_id === user?.id
   // A viewer can see the list but never write to it (RLS-enforced; the UI hides
@@ -125,10 +129,10 @@ export default function ListDetail() {
 
   useEffect(() => {
     if (!id) return
-    store.loadItems(id)
-    store.loadMembers(id)
-    const unsub = store.subscribeToList(id)
-    return unsub
+    const { loadItems, loadMembers, subscribeToList } = useListsStore.getState()
+    loadItems(id)
+    loadMembers(id)
+    return subscribeToList(id)
   }, [id])
 
   useEffect(() => { if (id) localStorage.setItem(storageKeys.listSort(id), sortMode) }, [id, sortMode])
@@ -160,7 +164,8 @@ export default function ListDetail() {
   }, [nearlyDone])
 
   const allCategories = useCategoriesStore(s2 => s2.categories)
-  const cats = list ? allCategories[list.type] : []
+  const listType = list?.type
+  const cats = useMemo(() => (listType ? allCategories[listType] : []), [allCategories, listType])
 
   // List Memory — "your regulars" to seed a fresh list in one tap.
   const memHistory = useMemoryStore(s => s.history)
@@ -309,7 +314,7 @@ export default function ListDetail() {
 
   const handleDelete = useCallback((item: ListItem) => {
     if (!list) return
-    store.deleteItem(list.id, item.id)
+    useListsStore.getState().deleteItem(list.id, item.id)
     if (undoTimer.current) clearTimeout(undoTimer.current)
     setUndoItem(item)
     undoTimer.current = setTimeout(() => setUndoItem(null), 3500)
@@ -537,7 +542,9 @@ export default function ListDetail() {
               const active = filterCategories.has(c.id)
               return (
                 <button key={c.id} aria-pressed={active} onClick={() => setFilterCategories(prev => {
-                  const next = new Set(prev); active ? next.delete(c.id) : next.add(c.id); return next
+                  const next = new Set(prev)
+                  if (active) next.delete(c.id); else next.add(c.id)
+                  return next
                 })} style={pillStyle(active)}>{c.name}</button>
               )
             })}

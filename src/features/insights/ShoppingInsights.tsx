@@ -45,7 +45,7 @@ export default function ShoppingInsights({ list, items, members, displayName, on
   const store = useListsStore()
   const navigate = useNavigate()
   const allCategories = useCategoriesStore(s => s.categories)
-  const cats = allCategories[list.type] ?? []
+  const cats = useMemo(() => allCategories[list.type] ?? [], [allCategories, list.type])
   const recsRef = useRef<HTMLDivElement>(null)
 
   const [showAllCats, setShowAllCats] = useState(false)

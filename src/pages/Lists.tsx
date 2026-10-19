@@ -87,7 +87,7 @@ export default function Lists() {
 
   const togglePin = (listId: string) => {
     const next = new Set(pinnedIds)
-    next.has(listId) ? next.delete(listId) : next.add(listId)
+    if (next.has(listId)) next.delete(listId); else next.add(listId)
     setPinnedIds(next)
     if (user?.id) writeJSON(storageKeys.pins(user.id), [...next])
   }

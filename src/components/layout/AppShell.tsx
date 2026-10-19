@@ -18,7 +18,7 @@ const TABS = [
 // has data on direct navigation. Drill-in pages (ListDetail, Join) render
 // outside the shell with their own full-screen layout.
 export default function AppShell() {
-  const { user, displayName, isGuest } = useAuthStore()
+  const { user, isGuest } = useAuthStore()
   const store = useListsStore()
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -28,9 +28,11 @@ export default function AppShell() {
     if (!user) return
     // Prefer the resolved display name (guests: their chosen name from the
     // join screen; members: their profile name) so a re-init never overwrites
-    // a guest's identity with the "User" fallback.
+    // a guest's identity with the "User" fallback. Read at init time only — a
+    // later rename must not re-run init (and refetch everything).
+    const { displayName } = useAuthStore.getState()
     const name = displayName || (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'User'
-    store.init(user.id, name)
+    useListsStore.getState().init(user.id, name)
     useCategoriesStore.getState().init(user.id)
     useMemoryStore.getState().load(user.id)
   }, [user])
